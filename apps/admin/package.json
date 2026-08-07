@@ -1,0 +1,30 @@
+{
+  "name": "admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "next typecheck"
+  },
+  "dependencies": {
+    "@samren/api-client": "workspace:*",
+    "@samren/hooks": "workspace:*",
+    "@samren/types": "workspace:*",
+    "@samren/ui": "workspace:*",
+    "@samren/utils": "workspace:*",
+    "@tanstack/react-query": "^5.60.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "lucide-react": "^0.470.0",
+    "tailwindcss": "^3.4.0"
+  }
+}

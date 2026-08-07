@@ -1,0 +1,40 @@
+{
+  "name": "samren",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Samren - Anime streaming marketplace",
+  "scripts": {
+    "dev": "docker-compose -f docker/docker-compose.yml up --build",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "uvicorn src.main:app --host 0.0.0.0 --port 4000 --reload",
+    "dev:shivra": "uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:admin": "pnpm --filter admin dev",
+    "build": "pnpm --filter web build && pnpm --filter admin build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "turbo run clean",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "devDependencies": {
+    "@samren/typescript-config": "workspace:*",
+    "@samren/prettier-config": "workspace:*",
+    "husky": "^9.1.0",
+    "prettier": "^3.4.0",
+    "prisma": "^6.2.0",
+    "turbo": "^2.1.0",
+    "typescript": "^5.7.0"
+  }
+}

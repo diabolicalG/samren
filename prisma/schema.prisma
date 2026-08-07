@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Anime {
+  id          String   @id @default(cuid())
+  title       String
+  nativeTitle String?
+  description String
+  coverImage  String
+  bannerImage String?
+  rating      Float
+  status      Status
+  type        AnimeType
+  episodes    Int
+  duration    Int
+  year        Int
+  season      Season
+  source      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  genres      AnimeGenre[]
+  studios     AnimeStudio[]
+  tags        AnimeTag[]
+  episodes    Episode[]
+  history     HistoryEntry[]
+  favorites   AnimeListEntry[]
+  downloads   Download[]
+
+  @@index([title])
+  @@index([rating])
+  @@index([year])
+  @@index([status])
+}
+
+model Episode {
+  id          String   @id @default(cuid())
+  animeId     String
+  number      Int
+  title       String?
+  description String?
+  thumbnail   String?
+  duration    Int
+  isFiller    Boolean  @default(false)
+  isPreview   Boolean  @default(false)
+  airDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  anime       Anime    @relation(fields: [animeId], references: [id])
+  downloads   Download[]
+  history     HistoryEntry[]
+
+  @@index([animeId, number])
+  @@unique([animeId, number])
+}
+
+model Genre {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now())
+  animeGenres AnimeGenre[]
+}
+
+model AnimeGenre {
+  id      String @id @default(cuid())
+  animeId String
+  genreId String
+  anime   Anime  @relation(fields: [animeId], references: [id])
+  genre   Genre  @relation(fields: [genreId], references: [id])
+
+  @@unique([animeId, genreId])
+}
+
+model Studio {
+  id           String         @id @default(cuid())
+  name         String
+  logo         String?
+  url          String?
+  animeStudios AnimeStudio[]
+}
+
+model AnimeStudio {
+  id      String @id @default(cuid())
+  animeId String
+  studioId String
+  anime   Anime   @relation(fields: [animeId], references: [id])
+  studio  Studio  @relation(fields: [studioId], references: [id])
+
+  @@unique([animeId, studioId])
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  isRestricted Boolean  @default(false)
+  rank        Int?
+  animeTags   AnimeTag[]
+}
+
+model AnimeTag {
+  id      String @id @default(cuid())
+  animeId String
+  tagId   String
+  anime   Anime   @relation(fields: [animeId], references: [id])
+  tag     Tag     @relation(fields: [tagId], references: [id])
+
+  @@unique([animeId, tagId])
+}
+
+model User {
+  id          String           @id @default(cuid())
+  username    String           @unique
+  email       String           @unique
+  password    String
+  role        UserRole         @default(USER)
+  avatar      String?
+  preferences Json              @default("{}")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  lastSeenAt  DateTime?
+  history     HistoryEntry[]
+  favorites   AnimeListEntry[]
+  downloads   Download[]
+}
+
+model HistoryEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  animeId      String
+  episodeId    String
+  episodeNumber Int
+  currentTime  Float
+  duration     Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  anime        Anime    @relation(fields: [animeId], references: [id])
+
+  @@index([userId, animeId])
+  @@index([userId, createdAt])
+}
+
+model AnimeListEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  animeId      String
+  status       ListStatus @default(PLAN_TO_WATCH)
+  score        Float?
+  progress     Int      @default(0)
+  totalEpisodes Int     @default(0)
+  repeat       Int      @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  anime        Anime    @relation(fields: [animeId], references: [id])
+
+  @@unique([userId, animeId])
+  @@index([userId, status])
+}
+
+model Download {
+  id          String       @id @default(cuid())
+  userId      String
+  animeId     String
+  episodeId   String
+  quality     VideoQuality
+  filename    String
+  fileSize    Int
+  status      DownloadStatus @default(QUEUED)
+  progress    Int            @default(0)
+  path        String
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id])
+  anime       Anime          @relation(fields: [animeId], references: [id])
+
+  @@index([userId, status])
+  @@index([animeId])
+}
+
+model Cache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+enum Status {
+  ONGOING
+  COMPLETED
+  RELEASED
+  TBA
+}
+
+enum AnimeType {
+  TV
+  MOVIE
+  OVA
+  SPECIAL
+  ONA
+  MUSIC
+}
+
+enum Season {
+  WINTER
+  SPRING
+  SUMMER
+  FALL
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum ListStatus {
+  WATCHING
+  COMPLETED
+  ON_HOLD
+  DROPPED
+  PLAN_TO_WATCH
+}
+
+enum VideoQuality {
+  Q360P
+  Q480P
+  Q720P
+  Q1080P
+}
+
+enum DownloadStatus {
+  DOWNLOADING
+  COMPLETED
+  FAILED
+  QUEUED
+}

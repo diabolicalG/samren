@@ -1,0 +1,10 @@
+{
+  "name": "samren",
+  "version": "0.1.0",
+  "description": "Samren - Anime streaming marketplace with Next.js frontend and Python backend",
+  "agent": {
+    "commands": [".kilo/command/**/*.md"],
+    "agents": [".kilo/agent/**/*.md"],
+    "skills": []
+  }
+}

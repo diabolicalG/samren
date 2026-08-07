@@ -1,0 +1,42 @@
+# samren-admin
+FROM node:20-alpine AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV NODE_ENV=production
+
+RUN corepack enable
+
+WORKDIR /app
+
+# Dependencies layer
+FROM base AS deps
+COPY package.json pnpm-lock.yaml* ./
+COPY apps/admin/package.json apps/admin/
+COPY packages/*/package.json packages/*/
+RUN pnpm install --frozen-lockfile --filter "admin" --filter "@samren/types" --filter "@samren/ui" --filter "@samren/hooks" --filter "@samren/utils"
+
+# Build layer
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY apps/admin ./apps/admin
+COPY packages ./packages
+COPY tsconfig.json ./
+
+WORKDIR /app/apps/admin
+RUN pnpm build
+
+# Runtime layer
+FROM node:20-alpine AS runner
+WORKDIR /app/apps/admin
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+COPY --from=builder /app/apps/admin/.next ./.next
+COPY --from=builder /app/apps/admin/public ./public
+COPY --from=builder /app/apps/admin/package.json ./package.json
+COPY --from=builder /app/apps/admin/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3001
+CMD ["node", "server.js"]
