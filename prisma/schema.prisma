@@ -18,7 +18,7 @@ model Anime {
   rating      Float
   status      Status
   type        AnimeType
-  episodes    Int
+  episodeCount Int
   duration    Int
   year        Int
   season      Season
@@ -145,6 +145,7 @@ model HistoryEntry {
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id])
   anime        Anime    @relation(fields: [animeId], references: [id])
+  episode      Episode  @relation(fields: [episodeId], references: [id])
 
   @@index([userId, animeId])
   @@index([userId, createdAt])
@@ -187,6 +188,7 @@ model Download {
   updatedAt   DateTime       @updatedAt
   user        User           @relation(fields: [userId], references: [id])
   anime       Anime          @relation(fields: [animeId], references: [id])
+  episode     Episode        @relation(fields: [episodeId], references: [id])
 
   @@index([userId, status])
   @@index([animeId])
