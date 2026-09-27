@@ -9,8 +9,10 @@ export default {
     extend: {
       colors: {
         background: '#020617',
+        foreground: '#e2e8f0',
         surface: '#111827',
         panel: '#0f172a',
+        card: '#111827',
         accent: '#3b82f6',
         border: '#334155',
         subtle: '#94a3b8',

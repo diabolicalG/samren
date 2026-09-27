@@ -1,9 +1,23 @@
 import httpx
+from dataclasses import dataclass
 from typing import Optional, Dict, Any
 import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class StreamResult:
+    """Result of a stream-URL lookup.
+
+    ``verified`` is True only when the URL was actually scraped from a live
+    page; False means it's a guessed fallback pattern with no confirmation
+    it points at real, working content.
+    """
+
+    url: str
+    verified: bool
 
 
 class WCOStreamScraper:
@@ -126,13 +140,18 @@ class WCOStreamScraper:
         quality: str = "1080p",
         slug: Optional[str] = None,
         jikan_client: Optional[Any] = None,
-    ) -> Optional[str]:
+    ) -> "StreamResult":
         """Construct the episode page URL and extract the stream URL.
 
         ``anime_id`` is normally the Jikan/MAL numeric ID.  If ``slug`` is not
         supplied and ``anime_id`` is numeric, the title is looked up via the
         injected ``jikan_client`` (if provided) and slugified.  When ``anime_id``
         is already a slug it is used directly.
+
+        Returns a ``StreamResult`` distinguishing a real scraped embed link
+        from a guessed fallback URL (which has no guarantee of pointing to
+        working content) so callers can surface that distinction rather than
+        reporting a guess as a verified success.
         """
         resolved_slug = slug
 
@@ -156,12 +175,14 @@ class WCOStreamScraper:
         embed_url = await self.extract_wco_embed_link(episode_url)
 
         if embed_url:
-            return embed_url
+            return StreamResult(url=embed_url, verified=True)
 
-        # Fallback to a standard embed URL pattern
+        # Fallback to a guessed embed URL pattern — this host/path combination
+        # has not been confirmed to serve real content for this anime/episode,
+        # so callers must not treat it the same as a verified scrape.
         fallback = (
             f"{self.FALLBACK_HOSTS.get(quality, self.FALLBACK_HOSTS['1080p'])}"
             f"/{anime_id}/{episode}/{quality}"
         )
-        logger.warning("Using fallback stream URL: %s", fallback)
-        return fallback
+        logger.warning("Falling back to unverified guessed stream URL: %s", fallback)
+        return StreamResult(url=fallback, verified=False)

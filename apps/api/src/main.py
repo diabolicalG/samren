@@ -10,7 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from enum import Enum
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select, func
 import redis.asyncio as aioredis
 
@@ -23,7 +27,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
-CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGIN", "http://localhost:3000").split(",") if origin.strip()]
+CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGIN", "http://localhost:3000,http://localhost:3001").split(",") if origin.strip()]
 SHIVRA_API_URL = os.getenv("SHIVRA_API_URL", "http://localhost:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
@@ -36,7 +40,7 @@ def generate_uuid() -> str:
     return uuid4().hex
 
 
-class UserRole(str, SQLModel):
+class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
     MODERATOR = "moderator"
@@ -130,6 +134,17 @@ class UserRead(BaseModel):
     updated_at: datetime
     last_seen_at: Optional[datetime]
 
+    @validator("preferences", pre=True)
+    def parse_preferences(cls, value: Any) -> Dict[str, Any]:
+        # `User.preferences` is stored as a raw JSON string column; decode it
+        # here so the response model always sees a real dict.
+        if isinstance(value, str):
+            try:
+                return json.loads(value or "{}")
+            except json.JSONDecodeError:
+                return {}
+        return value or {}
+
     class Config:
         orm_mode = True
 
@@ -178,6 +193,10 @@ app = FastAPI(
     description="Samren - Anime streaming marketplace backend gateway",
     version="1.0.0",
 )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -266,11 +285,13 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 @app.on_event("startup")
 def on_startup() -> None:
     create_db_and_tables()
+    if os.getenv("SKIP_SEED_ADMIN", "false").lower() in ("1", "true", "yes"):
+        return
     with Session(engine) as session:
         admin = session.exec(select(User).where(User.role == "admin")).first()
         if not admin:
             hashed = get_password_hash("Admin123!")
-            session.add(User(username="admin", email="admin@samren.local", hashed_password=hashed, role="admin"))
+            session.add(User(username="admin", email="admin@samren.app", hashed_password=hashed, role="admin"))
             session.commit()
 
 
@@ -283,17 +304,45 @@ def health_check() -> Dict[str, str]:
 
 async def _proxy_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     cache_key = f"shivra:{path}:{json.dumps(params or {}, sort_keys=True)}"
-    redis = await get_redis()
-    cached = await redis.get(cache_key)
-    if cached:
-        return json.loads(cached)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(f"{SHIVRA_API_URL}{path}", params=params)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        redis = await get_redis()
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except aioredis.RedisError:
+        # Cache is an optimization, not a hard dependency — fall through to
+        # the live request rather than failing the whole request on a
+        # transient Redis outage.
+        redis = None
 
-    await redis.set(cache_key, json.dumps(data), ex=300)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{SHIVRA_API_URL}{path}", params=params)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Content service timed out",
+        )
+    except httpx.ConnectError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Content service is unreachable",
+        )
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Content service returned an error: {exc.response.status_code}",
+        )
+
+    if redis is not None:
+        try:
+            await redis.set(cache_key, json.dumps(data), ex=300)
+        except aioredis.RedisError:
+            pass  # caching the response is best-effort
+
     return data
 
 
@@ -355,7 +404,8 @@ async def get_schedule(request: Request):
 # --- Auth endpoints ---
 
 @app.post("/api/auth/register", response_model=UserRead)
-def register(user_create: UserCreate, session: Session = Depends(get_session)) -> UserRead:
+@limiter.limit("5/minute")
+def register(request: Request, user_create: UserCreate, session: Session = Depends(get_session)) -> UserRead:
     if get_user_by_email(session, user_create.email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     user = User(
@@ -370,7 +420,8 @@ def register(user_create: UserCreate, session: Session = Depends(get_session)) -
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-def login(payload: LoginRequest, session: Session = Depends(get_session)) -> TokenResponse:
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginRequest, session: Session = Depends(get_session)) -> TokenResponse:
     user = authenticate_user(session, payload.email, payload.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")

@@ -9,7 +9,7 @@ const DEMO_USER_ID = 'demo-user';
 
 export default function HistoryPage() {
   const { data, isLoading, error } = useHistory(DEMO_USER_ID);
-  const history: HistoryEntry[] = data?.data ?? [];
+  const history: HistoryEntry[] = data ?? [];
 
   if (error) {
     return <div className="p-6 text-red-500">Error loading history.</div>;

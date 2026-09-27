@@ -1,11 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "files": ["packages/types/tsconfig.json"],
   "compilerOptions": {
     "target": "es2022",
     "lib": ["es2022", "dom", "dom.iterable"],
     "module": "commonjs",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "jsx": "preserve",
@@ -18,8 +17,5 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "patterns": {
-    "src": "src/**/*",
-    "tests": "tests/**/*"
-  }
+  "exclude": ["node_modules", "dist", ".next"]
 }

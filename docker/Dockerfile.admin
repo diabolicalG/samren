@@ -29,8 +29,10 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app/apps/admin
 
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV PNPM_HOME="/pnpm"
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable
 
 COPY --from=builder /app/apps/admin/.next ./.next
 COPY --from=builder /app/apps/admin/public ./public
@@ -39,4 +41,6 @@ COPY --from=builder /app/apps/admin/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3001
-CMD ["node", "server.js"]
+# See Dockerfile.web for why this uses `next start` rather than
+# `node server.js` / Next's `standalone` output.
+CMD ["pnpm", "start", "--", "-p", "3001"]

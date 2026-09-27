@@ -94,11 +94,12 @@ async def get_stream(anime_id: str, episode: int, quality: str = "1080p"):
     Falls back to constructing a standard embed URL if scraping fails.
     """
     try:
-        stream_url = await wco.extract_stream_url(anime_id, episode, quality, jikan_client=jikan)
+        stream_result = await wco.extract_stream_url(anime_id, episode, quality, jikan_client=jikan)
         return {
             "success": True,
             "data": {
-                "streamUrl": stream_url,
+                "streamUrl": stream_result.url,
+                "verified": stream_result.verified,
                 "quality": quality,
                 "animeId": anime_id,
                 "episode": episode,

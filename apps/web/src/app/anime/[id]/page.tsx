@@ -154,6 +154,12 @@ export default function AnimeDetailPage() {
             <PlayCircle size={20} />
             EP {selectedEpisode}
           </h2>
+          {streamData?.data && !streamData.data.verified && (
+            <p className="text-xs text-yellow-500 mb-2">
+              This stream link couldn&apos;t be verified and may not work — the source page
+              didn&apos;t return a playable embed.
+            </p>
+          )}
           {player === 'browser' && (
             <div className="bg-black rounded-lg aspect-video flex items-center justify-center">
               {streamLoading ? (

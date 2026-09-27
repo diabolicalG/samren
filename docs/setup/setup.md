@@ -62,16 +62,10 @@ pnpm dev:shivra
 
 ## Database Setup
 
-```bash
-# Generate Prisma client
-pnpm prisma:generate
-
-# Run migrations
-pnpm prisma:migrate
-
-# Open Prisma Studio
-pnpm prisma:studio
-```
+The gateway (`apps/api`) creates its tables automatically on startup via
+SQLModel — there is no separate migration step today. Point `DATABASE_URL`
+at a running Postgres instance and start the gateway; tables are created if
+they don't already exist.
 
 ## Troubleshooting
 

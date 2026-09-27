@@ -1,54 +1,41 @@
 export type ISODateString = string;
 
-export enum Status {
-  ONGOING = 'ONGOING',
-  COMPLETED = 'COMPLETED',
-  RELEASED = 'RELEASED',
-  TBA = 'TBA',
+// NOTE: these mirror the *actual* shapes returned by services/shivra-api's
+// Jikan transforms (see services/shivra-api/scrapers/transform.py), not the
+// (unused) prisma/schema.prisma model. The two disagree on casing and on a
+// few field names (e.g. `episodes` vs `episodeCount`) — this file follows
+// the real wire format so the frontend doesn't silently break on it.
+
+export type AnimeStatus = 'ongoing' | 'completed' | 'released' | 'tba';
+export type AnimeKind = 'tv' | 'movie' | 'ova' | 'special' | 'ona' | 'music';
+export type Season = 'winter' | 'spring' | 'summer' | 'fall' | null;
+
+export type PlayerType = 'auto' | 'browser' | 'mpv';
+export type Theme = 'dark' | 'light';
+export type VideoQuality = '360p' | '480p' | '720p' | '1080p';
+
+export interface Genre {
+  id: string;
+  name: string;
+  description: string | null;
 }
 
-export enum AnimeType {
-  TV = 'TV',
-  MOVIE = 'MOVIE',
-  OVA = 'OVA',
-  SPECIAL = 'SPECIAL',
-  ONA = 'ONA',
-  MUSIC = 'MUSIC',
+export interface Studio {
+  id: string;
+  name: string;
+  logo: string | null;
+  url: string | null;
 }
 
-export enum Season {
-  WINTER = 'WINTER',
-  SPRING = 'SPRING',
-  SUMMER = 'SUMMER',
-  FALL = 'FALL',
+export interface Tag {
+  id: string;
+  name: string;
+  description?: string | null;
 }
 
-export enum UserRole {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  MODERATOR = 'MODERATOR',
-}
-
-export enum ListStatus {
-  WATCHING = 'WATCHING',
-  COMPLETED = 'COMPLETED',
-  ON_HOLD = 'ON_HOLD',
-  DROPPED = 'DROPPED',
-  PLAN_TO_WATCH = 'PLAN_TO_WATCH',
-}
-
-export enum VideoQuality {
-  Q360P = 'Q360P',
-  Q480P = 'Q480P',
-  Q720P = 'Q720P',
-  Q1080P = 'Q1080P',
-}
-
-export enum DownloadStatus {
-  DOWNLOADING = 'DOWNLOADING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  QUEUED = 'QUEUED',
+export interface Trailer {
+  url: string | null;
+  site: string | null;
 }
 
 export interface Anime {
@@ -59,22 +46,19 @@ export interface Anime {
   coverImage: string;
   bannerImage: string | null;
   rating: number;
-  status: Status;
-  type: AnimeType;
-  episodeCount: number;
+  status: AnimeStatus;
+  type: AnimeKind;
+  episodes: number;
   duration: number;
   year: number;
   season: Season;
   source: string;
+  genres: Genre[];
+  studios: Studio[];
+  tags: Tag[];
+  trailer?: Trailer | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
-  genres?: AnimeGenre[];
-  studios?: AnimeStudio[];
-  tags?: AnimeTag[];
-  episodes?: Episode[];
-  history?: HistoryEntry[];
-  favorites?: AnimeListEntry[];
-  downloads?: Download[];
 }
 
 export interface Episode {
@@ -90,92 +74,64 @@ export interface Episode {
   airDate: ISODateString | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
-  anime?: Anime;
-  downloads?: Download[];
-  history?: HistoryEntry[];
 }
 
-export interface Genre {
-  id: string;
-  name: string;
-  description: string | null;
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
-  animeGenres?: AnimeGenre[];
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNext: boolean;
 }
 
-export interface AnimeGenre {
-  id: string;
-  animeId: string;
-  genreId: string;
-  anime?: Anime;
-  genre?: Genre;
+export interface SearchResult {
+  animes: Anime[];
+  total: number;
+  page: number;
+  hasNext: boolean;
 }
 
-export interface Studio {
-  id: string;
-  name: string;
-  logo: string | null;
-  url: string | null;
-  animeStudios?: AnimeStudio[];
+export type Schedule = Record<string, Anime[]>;
+
+export interface UserPreferences {
+  player: PlayerType;
+  preferredQuality: VideoQuality;
+  theme: Theme;
+  subtitles: boolean;
+  dub: boolean;
+  autoplay?: boolean;
+  autoNext?: boolean;
+  autoSkipIntro?: boolean;
+  autoSkipOutro?: boolean;
+  language?: string;
 }
 
-export interface AnimeStudio {
-  id: string;
-  animeId: string;
-  studioId: string;
-  anime?: Anime;
-  studio?: Studio;
-}
-
-export interface Tag {
-  id: string;
-  name: string;
-  description: string | null;
-  category: string;
-  isRestricted: boolean;
-  rank: number | null;
-  animeTags?: AnimeTag[];
-}
-
-export interface AnimeTag {
-  id: string;
-  animeId: string;
-  tagId: string;
-  anime?: Anime;
-  tag?: Tag;
-}
+export const DEFAULT_USER_PREFERENCES: UserPreferences = {
+  player: 'auto',
+  preferredQuality: '1080p',
+  theme: 'dark',
+  subtitles: false,
+  dub: false,
+};
 
 export interface User {
   id: string;
   username: string;
   email: string;
-  password: string;
-  role: UserRole;
+  role: 'user' | 'admin' | 'moderator';
   avatar: string | null;
   preferences: Record<string, unknown>;
   createdAt: ISODateString;
   updatedAt: ISODateString;
   lastSeenAt: ISODateString | null;
-  history?: HistoryEntry[];
-  favorites?: AnimeListEntry[];
-  downloads?: Download[];
 }
 
-export interface HistoryEntry {
-  id: string;
-  userId: string;
-  animeId: string;
-  episodeId: string;
-  episodeNumber: number;
-  currentTime: number;
-  duration: number;
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
-  user?: User;
-  anime?: Anime;
-  episode?: Episode;
-}
+export type ListStatus =
+  | 'watching'
+  | 'completed'
+  | 'on_hold'
+  | 'dropped'
+  | 'plan_to_watch';
 
 export interface AnimeListEntry {
   id: string;
@@ -190,16 +146,33 @@ export interface AnimeListEntry {
   completedAt: ISODateString | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
-  user?: User;
+  // Enriched client-side by @samren/api-client — the gateway does not join
+  // anime data onto this resource.
+  anime: Anime;
+}
+
+export interface HistoryEntry {
+  id: string;
+  userId: string;
+  animeId: string;
+  episodeId: string;
+  episodeNumber: number;
+  currentTime: number;
+  duration: number;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+  // Enriched client-side by @samren/api-client.
   anime?: Anime;
 }
+
+export type DownloadStatus = 'downloading' | 'completed' | 'failed' | 'queued';
 
 export interface Download {
   id: string;
   userId: string;
   animeId: string;
   episodeId: string;
-  quality: VideoQuality;
+  quality: string;
   filename: string;
   fileSize: number;
   status: DownloadStatus;
@@ -209,15 +182,4 @@ export interface Download {
   completedAt: ISODateString | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
-  user?: User;
-  anime?: Anime;
-  episode?: Episode;
-}
-
-export interface Cache {
-  id: string;
-  key: string;
-  value: Record<string, unknown> | unknown[] | string | number | boolean | null;
-  expiresAt: ISODateString;
-  createdAt: ISODateString;
 }

@@ -29,8 +29,10 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app/apps/web
 
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV PNPM_HOME="/pnpm"
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable
 
 COPY --from=builder /app/apps/web/.next ./.next
 COPY --from=builder /app/apps/web/public ./public
@@ -39,4 +41,9 @@ COPY --from=builder /app/apps/web/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+# NOTE: this runs `next start` against the full .next build output (not
+# Next's `standalone` output), since `standalone` requires careful output
+# file tracing across a pnpm monorepo that isn't configured here. This is
+# a heavier image than `standalone` would produce, but it's what actually
+# runs correctly — verified directly against this Dockerfile's own build.
+CMD ["pnpm", "start"]

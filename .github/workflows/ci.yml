@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: |
+          pnpm --filter web typecheck
+          pnpm --filter admin typecheck
+      - name: Build
+        run: |
+          pnpm --filter web build
+          pnpm --filter admin build
+
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: pip install -r requirements.txt
+      - name: Compile check
+        working-directory: apps/api
+        run: python -m py_compile src/main.py
+      - name: Run tests
+        working-directory: apps/api
+        env:
+          DATABASE_URL: "sqlite:///./test_ci.db?check_same_thread=false"
+          JWT_SECRET: "ci-test-secret"
+          REDIS_URL: "redis://localhost:6379"
+          SHIVRA_API_URL: "http://localhost:8000"
+          SKIP_SEED_ADMIN: "true"
+        run: python -m pytest tests/ -v
+
+  content-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: services/shivra-api
+        run: pip install -r requirements.txt
+      - name: Compile check
+        working-directory: services/shivra-api
+        run: python -m py_compile main.py scrapers/*.py

@@ -15,10 +15,7 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "clean": "turbo run clean",
-    "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio",
-    "prisma:migrate": "prisma migrate dev"
+    "clean": "turbo run clean"
   },
   "workspaces": [
     "apps/*",
@@ -33,7 +30,6 @@
     "@samren/prettier-config": "workspace:*",
     "husky": "^9.1.0",
     "prettier": "^3.4.0",
-    "prisma": "^6.2.0",
     "turbo": "^2.1.0",
     "typescript": "^5.7.0"
   }
