@@ -1,13 +1,10 @@
 import asyncio
 import logging
 import os
-import re
-import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-import httpx
 from sqlalchemy import and_, or_
 from sqlmodel import Session, select
 
@@ -22,7 +19,7 @@ POLL_INTERVAL = max(1.0, float(os.getenv("DOWNLOAD_POLL_INTERVAL", "2")))
 MAX_CONCURRENT = max(1, int(os.getenv("DOWNLOAD_CONCURRENCY", "2")))
 STALE_AFTER = max(300, int(os.getenv("DOWNLOAD_STALE_AFTER", "21600")))
 DOWNLOAD_DIR = Path(os.getenv("DOWNLOAD_DIR", "/downloads"))
-SHIVRA_API_URL = os.getenv("SHIVRA_API_URL", "http://shivra-api:8000").rstrip("/")
+DOWNLOAD_MAX_BYTES = max(1, int(os.getenv("DOWNLOAD_MAX_BYTES", str(5 * 1024 * 1024 * 1024))))
 
 
 def now() -> datetime:
@@ -90,11 +87,6 @@ def resolve_episode_number(episodes: list[dict], episode_id: str) -> Optional[in
     return None
 
 
-def safe_filename(name: str, fallback: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
-    return cleaned or fallback
-
-
 async def ffmpeg_download(url: str, output: Path, duration_seconds: Optional[float], job_id: str) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     command = [
@@ -110,6 +102,8 @@ async def ffmpeg_download(url: str, output: Path, duration_seconds: Optional[flo
         "copy",
         "-movflags",
         "+faststart",
+        "-fs",
+        str(DOWNLOAD_MAX_BYTES),
         "-progress",
         "pipe:1",
         str(output),
@@ -127,6 +121,7 @@ async def ffmpeg_download(url: str, output: Path, duration_seconds: Optional[flo
         return await process.stderr.read()
 
     stderr_task = asyncio.create_task(consume_stderr())
+    last_progress = 0
 
     try:
         while True:
@@ -139,7 +134,9 @@ async def ffmpeg_download(url: str, output: Path, duration_seconds: Optional[flo
             try:
                 out_time_us = int(text.split("=", 1)[1])
                 progress = min(99, max(1, int((out_time_us / 1_000_000) / duration_seconds * 100)))
-                await asyncio.to_thread(update_job, job_id, progress=progress)
+                if progress >= last_progress + 5:
+                    last_progress = progress
+                    await asyncio.to_thread(update_job, job_id, progress=progress)
             except ValueError:
                 continue
 
