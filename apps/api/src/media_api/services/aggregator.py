@@ -45,7 +45,7 @@ class Aggregator:
                 logger.warning(
                     "Media provider failed",
                     extra={"provider": adapter.source, "error": str(result)},
-                    exc_info=result,
+                    exc_info=(type(result), result, result.__traceback__),
                 )
                 continue
             merged.extend(result)
