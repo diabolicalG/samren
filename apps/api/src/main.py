@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -19,10 +20,8 @@ from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, sele
 import redis.asyncio as aioredis
 
 # Environment
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/samren?schema=public",
-)
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/samren?schema=public")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
@@ -30,6 +29,20 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGIN", "http://localhost:3000,http://localhost:3001").split(",") if origin.strip()]
 SHIVRA_API_URL = os.getenv("SHIVRA_API_URL", "http://localhost:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+PROXY_CONCURRENCY = max(1, int(os.getenv("API_PROXY_CONCURRENCY", "32")))
+STREAM_CONCURRENCY = max(1, int(os.getenv("API_STREAM_CONCURRENCY", "8")))
+
+if APP_ENV == "production":
+    if JWT_SECRET == "change-me-in-production" or len(JWT_SECRET) < 32:
+        raise RuntimeError("JWT_SECRET must be a unique secret of at least 32 characters in production")
+    if not os.getenv("DATABASE_URL"):
+        raise RuntimeError("DATABASE_URL must be set in production")
+    if not os.getenv("REDIS_URL"):
+        raise RuntimeError("REDIS_URL must be set in production")
+    if not os.getenv("SHIVRA_API_URL"):
+        raise RuntimeError("SHIVRA_API_URL must be set in production")
+if ACCESS_TOKEN_EXPIRE_MINUTES <= 0 or REFRESH_TOKEN_EXPIRE_DAYS <= 0:
+    raise RuntimeError("JWT token lifetimes must be positive")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -196,7 +209,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, storage_uri=REDIS_URL, headers_enabled=True)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -211,6 +224,8 @@ app.add_middleware(
 )
 
 _redis: Optional[aioredis.Redis] = None
+_proxy_semaphore = asyncio.Semaphore(PROXY_CONCURRENCY)
+_stream_semaphore = asyncio.Semaphore(STREAM_CONCURRENCY)
 
 
 async def get_redis() -> aioredis.Redis:
@@ -289,13 +304,18 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 @app.on_event("startup")
 def on_startup() -> None:
     create_db_and_tables()
-    if os.getenv("SKIP_SEED_ADMIN", "false").lower() in ("1", "true", "yes"):
+    if os.getenv("SEED_ADMIN", "false").lower() not in ("1", "true", "yes"):
         return
+    username = os.getenv("ADMIN_BOOTSTRAP_USERNAME", "").strip()
+    email = os.getenv("ADMIN_BOOTSTRAP_EMAIL", "").strip()
+    password = os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "")
+    if not username or not email or len(password) < 16:
+        raise RuntimeError("SEED_ADMIN=true requires ADMIN_BOOTSTRAP_USERNAME, ADMIN_BOOTSTRAP_EMAIL, and ADMIN_BOOTSTRAP_PASSWORD (minimum 16 characters)")
     with Session(engine) as session:
         admin = session.exec(select(User).where(User.role == "admin")).first()
         if not admin:
-            hashed = get_password_hash("Admin123!")
-            session.add(User(username="admin", email="admin@samren.app", hashed_password=hashed, role="admin"))
+            hashed = get_password_hash(password)
+            session.add(User(username=username, email=email, hashed_password=hashed, role="admin"))
             session.commit()
 
 
@@ -321,10 +341,11 @@ async def _proxy_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict
         redis = None
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{SHIVRA_API_URL}{path}", params=params)
-            response.raise_for_status()
-            data = response.json()
+        async with _proxy_semaphore:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(f"{SHIVRA_API_URL}{path}", params=params)
+                response.raise_for_status()
+                data = response.json()
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -353,6 +374,7 @@ async def _proxy_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict
 # --- Public anime endpoints (proxied to ShivraAPI with Redis cache) ---
 
 @app.get("/api/anime")
+@limiter.limit("60/minute")
 async def list_anime(request: Request):
     params = dict(request.query_params)
     data = await _proxy_get("/anime", params)
@@ -360,25 +382,30 @@ async def list_anime(request: Request):
 
 
 @app.get("/api/anime/{anime_id}")
-async def get_anime(anime_id: str):
+@limiter.limit("60/minute")
+async def get_anime(anime_id: str, request: Request):
     data = await _proxy_get(f"/anime/{anime_id}")
     return data
 
 
 @app.get("/api/anime/{anime_id}/episodes")
-async def get_episodes(anime_id: str):
+@limiter.limit("30/minute")
+async def get_episodes(anime_id: str, request: Request):
     data = await _proxy_get(f"/anime/{anime_id}/episodes")
     return data
 
 
 @app.get("/api/anime/{anime_id}/stream/{episode}")
+@limiter.limit("12/minute")
 async def get_stream(anime_id: str, episode: int, request: Request):
     params = dict(request.query_params)
-    data = await _proxy_get(f"/anime/{anime_id}/stream/{episode}", params)
+    async with _stream_semaphore:
+        data = await _proxy_get(f"/anime/{anime_id}/stream/{episode}", params)
     return data
 
 
 @app.get("/api/search")
+@limiter.limit("30/minute")
 async def search(request: Request):
     params = dict(request.query_params)
     data = await _proxy_get("/search", params)
@@ -386,6 +413,7 @@ async def search(request: Request):
 
 
 @app.get("/api/top")
+@limiter.limit("30/minute")
 async def get_top(request: Request):
     params = dict(request.query_params)
     data = await _proxy_get("/top", params)
@@ -393,12 +421,14 @@ async def get_top(request: Request):
 
 
 @app.get("/api/genres")
-async def get_genres():
+@limiter.limit("30/minute")
+async def get_genres(request: Request):
     data = await _proxy_get("/genres")
     return data
 
 
 @app.get("/api/schedule")
+@limiter.limit("30/minute")
 async def get_schedule(request: Request):
     params = dict(request.query_params)
     data = await _proxy_get("/schedule", params)
@@ -440,7 +470,8 @@ def login(request: Request, payload: LoginRequest, session: Session = Depends(ge
 
 
 @app.post("/api/auth/refresh", response_model=TokenResponse)
-def refresh_token(refresh_token: str, session: Session = Depends(get_session)) -> TokenResponse:
+@limiter.limit("20/minute")
+def refresh_token(request: Request, refresh_token: str, session: Session = Depends(get_session)) -> TokenResponse:
     try:
         payload = jwt.decode(refresh_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
@@ -458,14 +489,16 @@ def refresh_token(refresh_token: str, session: Session = Depends(get_session)) -
 
 
 @app.get("/api/auth/me", response_model=UserRead)
-def get_profile(current_user: User = Depends(get_current_user)) -> UserRead:
+@limiter.limit("60/minute")
+def get_profile(request: Request, current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.from_orm(current_user)
 
 
 # --- User preferences ---
 
 @app.get("/api/users/{user_id}/preferences")
-def get_preferences(user_id: str, current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
+@limiter.limit("60/minute")
+def get_preferences(request: Request, user_id: str, current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     prefs = json.loads(current_user.preferences or "{}")
@@ -473,7 +506,8 @@ def get_preferences(user_id: str, current_user: User = Depends(get_current_user)
 
 
 @app.patch("/api/users/{user_id}/preferences")
-def update_preferences(user_id: str, updates: PreferencesUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, Any]:
+@limiter.limit("30/minute")
+def update_preferences(request: Request, user_id: str, updates: PreferencesUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, Any]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     prefs = json.loads(current_user.preferences or "{}")
@@ -490,14 +524,16 @@ def update_preferences(user_id: str, updates: PreferencesUpdate, current_user: U
 # --- Favorites / Anime list ---
 
 @app.get("/api/users/{user_id}/favorites")
-def list_favorites(user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[AnimeListEntry]:
+@limiter.limit("60/minute")
+def list_favorites(request: Request, user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[AnimeListEntry]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     return session.exec(select(AnimeListEntry).where(AnimeListEntry.user_id == user_id).order_by(AnimeListEntry.created_at.desc())).all()
 
 
 @app.post("/api/users/{user_id}/favorites")
-def add_favorite(user_id: str, body: Dict[str, str], current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
+@limiter.limit("30/minute")
+def add_favorite(request: Request, user_id: str, body: Dict[str, str], current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     anime_id = body.get("animeId")
@@ -513,7 +549,8 @@ def add_favorite(user_id: str, body: Dict[str, str], current_user: User = Depend
 
 
 @app.delete("/api/users/{user_id}/favorites/{anime_id}")
-def remove_favorite(user_id: str, anime_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
+@limiter.limit("30/minute")
+def remove_favorite(request: Request, user_id: str, anime_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     entry = session.exec(select(AnimeListEntry).where(AnimeListEntry.user_id == user_id, AnimeListEntry.anime_id == anime_id)).first()
@@ -527,14 +564,16 @@ def remove_favorite(user_id: str, anime_id: str, current_user: User = Depends(ge
 # --- History ---
 
 @app.get("/api/users/{user_id}/history")
-def list_history(user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[HistoryEntry]:
+@limiter.limit("60/minute")
+def list_history(request: Request, user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[HistoryEntry]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     return session.exec(select(HistoryEntry).where(HistoryEntry.user_id == user_id).order_by(HistoryEntry.created_at.desc())).all()
 
 
 @app.post("/api/users/{user_id}/history")
-def add_history(user_id: str, body: HistoryCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> HistoryEntry:
+@limiter.limit("60/minute")
+def add_history(request: Request, user_id: str, body: HistoryCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> HistoryEntry:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     entry = HistoryEntry(
@@ -554,14 +593,16 @@ def add_history(user_id: str, body: HistoryCreate, current_user: User = Depends(
 # --- Downloads ---
 
 @app.get("/api/downloads/{user_id}")
-def list_downloads(user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[Download]:
+@limiter.limit("30/minute")
+def list_downloads(request: Request, user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> List[Download]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     return session.exec(select(Download).where(Download.user_id == user_id).order_by(Download.created_at.desc())).all()
 
 
 @app.post("/api/downloads")
-def create_download(body: DownloadCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Download:
+@limiter.limit("10/minute")
+def create_download(request: Request, body: DownloadCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Download:
     entry = Download(
         user_id=current_user.id,
         anime_id=body.anime_id,
@@ -580,7 +621,8 @@ def create_download(body: DownloadCreate, current_user: User = Depends(get_curre
 
 
 @app.delete("/api/downloads/cache/{user_id}")
-def clear_downloads(user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
+@limiter.limit("5/minute")
+def clear_downloads(request: Request, user_id: str, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)) -> Dict[str, str]:
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     downloads = session.exec(select(Download).where(Download.user_id == user_id)).all()
@@ -593,7 +635,8 @@ def clear_downloads(user_id: str, current_user: User = Depends(get_current_user)
 # --- Admin ---
 
 @app.get("/api/admin/users")
-def list_all_users(admin: User = Depends(require_admin), session: Session = Depends(get_session)) -> List[UserRead]:
+@limiter.limit("30/minute")
+def list_all_users(request: Request, admin: User = Depends(require_admin), session: Session = Depends(get_session)) -> List[UserRead]:
     users = session.exec(select(User).order_by(User.created_at.desc())).all()
     return [UserRead.from_orm(user) for user in users]
 
