@@ -1,5 +1,6 @@
 import asyncio
 import json
+import weakref
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 import redis.asyncio as aioredis
@@ -7,7 +8,7 @@ import redis.asyncio as aioredis
 from .config import settings
 
 _redis: Optional[aioredis.Redis] = None
-_locks: Dict[str, asyncio.Lock] = {}
+_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 _locks_guard = asyncio.Lock()
 
 
