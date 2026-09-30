@@ -25,6 +25,9 @@ class ProviderHealthRegistry:
             "last_success_at": None,
             "open_until": None,
         })
+        if state.get("status") == "half_open":
+            return False
+
         open_until = state.get("open_until")
         if not open_until:
             return True
