@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Dependencies layer
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY packages/*/package.json packages/*/
 RUN pnpm install --frozen-lockfile --filter "web" --filter "@samren/types" --filter "@samren/ui" --filter "@samren/hooks" --filter "@samren/api-client" --filter "@samren/utils"
