@@ -11,9 +11,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY apps/api/requirements.txt /tmp/api-requirements.txt
-COPY services/shivra-api/requirements.txt /tmp/shivra-requirements.txt
-RUN pip install --no-cache-dir -r /tmp/api-requirements.txt -r /tmp/shivra-requirements.txt
+COPY apps/api/requirements.txt apps/api/requirements.txt
+COPY services/download-worker/requirements.txt services/download-worker/requirements.txt
+RUN pip install --no-cache-dir -r services/download-worker/requirements.txt
 
 COPY apps/api/src ./src
 COPY services/shivra-api/scrapers ./scrapers
