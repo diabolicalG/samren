@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -160,7 +160,8 @@ class UserRead(BaseModel):
     updated_at: datetime
     last_seen_at: Optional[datetime]
 
-    @validator("preferences", pre=True)
+    @field_validator("preferences", mode="before")
+    @classmethod
     def parse_preferences(cls, value: Any) -> Dict[str, Any]:
         # `User.preferences` is stored as a raw JSON string column; decode it
         # here so the response model always sees a real dict.
@@ -171,8 +172,7 @@ class UserRead(BaseModel):
                 return {}
         return value or {}
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LoginRequest(BaseModel):
@@ -474,7 +474,7 @@ def register(request: Request, user_create: UserCreate, session: Session = Depen
     session.add(user)
     session.commit()
     session.refresh(user)
-    return UserRead.from_orm(user)
+    return UserRead.model_validate(user)
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
@@ -535,7 +535,7 @@ def update_preferences(request: Request, user_id: str, updates: PreferencesUpdat
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     prefs = json.loads(current_user.preferences or "{}")
-    update_data = updates.dict(exclude_none=True)
+    update_data = updates.model_dump(exclude_none=True)
     prefs.update(update_data)
     current_user.preferences = json.dumps(prefs)
     current_user.updated_at = datetime.utcnow()
@@ -662,7 +662,7 @@ def clear_downloads(request: Request, user_id: str, current_user: User = Depends
 @limiter.limit("30/minute")
 def list_all_users(request: Request, admin: User = Depends(require_admin), session: Session = Depends(get_session)) -> List[UserRead]:
     users = session.exec(select(User).order_by(User.created_at.desc())).all()
-    return [UserRead.from_orm(user) for user in users]
+    return [UserRead.model_validate(user) for user in users]
 
 
 if __name__ == "__main__":
