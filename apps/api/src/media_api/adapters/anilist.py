@@ -41,11 +41,20 @@ class AniListAdapter(ProviderAdapter):
     source = MediaSource.ANILIST.value
 
     async def _post(self, query: str, variables: dict) -> dict:
-        return await request_json(
+        data = await request_json(
             "POST", settings.anilist_url,
             json_body={"query": query, "variables": variables},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
+        errors = data.get("errors")
+        if errors:
+            messages = "; ".join(
+                str(error.get("message", "GraphQL error"))
+                for error in errors
+                if isinstance(error, dict)
+            )
+            raise RuntimeError(f"AniList GraphQL error: {messages or 'unknown error'}")
+        return data
 
     def _map(self, node: dict) -> Media:
         titles = node.get("title") or {}
@@ -71,7 +80,10 @@ class AniListAdapter(ProviderAdapter):
         return [self._map(n) for n in ((data.get("data") or {}).get("Page", {}).get("media") or [])]
 
     async def get_media(self, source_id: str) -> Optional[Media]:
-        data = await self._post(DETAIL_QUERY, {"id": int(source_id)})
+        ident = source_id.removeprefix("anime:")
+        if not ident.isdigit():
+            return None
+        data = await self._post(DETAIL_QUERY, {"id": int(ident)})
         node = (data.get("data") or {}).get("Media")
         if not node:
             return None
