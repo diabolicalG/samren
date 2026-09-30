@@ -39,7 +39,7 @@ class Aggregator:
     def _filter_types(items: List[Media], types: Optional[List[MediaType]]) -> List[Media]:
         return [m for m in items if m.type in set(types)] if types else items
 
-    async def _gather(self, coros) -> List[Media]:
+    async def _gather(self, operation: str, *args) -> List[Media]:
         active_adapters = [
             adapter
             for adapter in self.adapters
@@ -49,7 +49,7 @@ class Aggregator:
             raise RuntimeError("All media providers are temporarily unavailable")
 
         results = await asyncio.gather(
-            *[coro for adapter, coro in zip(self.adapters, coros) if provider_health.can_request(adapter.source)],
+            *[getattr(adapter, operation)(*args) for adapter in active_adapters],
             return_exceptions=True,
         )
         merged = []
@@ -71,7 +71,7 @@ class Aggregator:
         cache_key = f"media:search:{normalized}:{','.join(sorted(t.value for t in types)) if types else 'all'}:{limit}"
 
         async def fetch():
-            merged = await self._gather([a.search(query, limit) for a in self.adapters])
+            merged = await self._gather("search", query, limit)
             return [m.model_dump() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_search, fetch)
@@ -106,7 +106,7 @@ class Aggregator:
         cache_key = f"media:trending:{','.join(sorted(t.value for t in types)) if types else 'all'}:{limit}"
 
         async def fetch():
-            merged = await self._gather([a.trending(limit) for a in self.adapters])
+            merged = await self._gather("trending", limit)
             return [m.model_dump() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_trending, fetch)
@@ -116,7 +116,7 @@ class Aggregator:
         cache_key = f"media:schedule:{date}:{country.upper()}"
 
         async def fetch():
-            merged = await self._gather([a.schedule(date, country.upper()) for a in self.adapters])
+            merged = await self._gather("schedule", date, country.upper())
             return [m.model_dump() for m in self._dedupe(merged)]
 
         raw = await cached_json(cache_key, settings.cache_ttl_schedule, fetch)
