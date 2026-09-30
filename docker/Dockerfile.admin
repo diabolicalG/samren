@@ -18,6 +18,7 @@ RUN pnpm install --frozen-lockfile --filter "admin" --filter "@samren/types" --f
 # Build layer
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
 COPY apps/admin ./apps/admin
 COPY packages ./packages
 COPY tsconfig.json ./
