@@ -1,4 +1,4 @@
-from apps.api.src.media_api.health import ProviderHealthRegistry
+from src.media_api.health import ProviderHealthRegistry
 
 
 def test_provider_circuit_opens_after_threshold():
