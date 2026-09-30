@@ -133,6 +133,9 @@ importers:
 
   packages/hooks:
     dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.60.0
+        version: 5.101.4(react@19.2.8)
       '@samren/api-client':
         specifier: workspace:*
         version: link:../api-client
@@ -140,9 +143,6 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
-      '@tanstack/react-query':
-        specifier: ^5.60.0
-        version: 5.101.4(react@19.2.8)
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
