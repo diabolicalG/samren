@@ -8,7 +8,7 @@ from ..adapters.tmdb import TMDBAdapter
 from ..adapters.tvmaze import TVmazeAdapter
 from ..cache import cached_json
 from ..config import settings
-from ..health import provider_health
+from ..health import ProviderUnavailableError, provider_health
 from ..models import Media, MediaType
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class Aggregator:
             if provider_health.can_request(adapter.source)
         ]
         if not active_adapters:
-            raise RuntimeError("All media providers are temporarily unavailable")
+            raise ProviderUnavailableError("All media providers are temporarily unavailable")
 
         results = await asyncio.gather(
             *[getattr(adapter, operation)(*args) for adapter in active_adapters],
@@ -90,7 +90,7 @@ class Aggregator:
 
         async def fetch():
             if not provider_health.can_request(adapter.source):
-                raise RuntimeError(f"Provider circuit is open: {adapter.source}")
+                raise ProviderUnavailableError(f"Provider temporarily unavailable: {adapter.source}")
             try:
                 media = await adapter.get_media(source_id)
                 provider_health.record_success(adapter.source)
