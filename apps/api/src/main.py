@@ -46,7 +46,19 @@ if ACCESS_TOKEN_EXPIRE_MINUTES <= 0 or REFRESH_TOKEN_EXPIRE_DAYS <= 0:
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-engine = create_engine(DATABASE_URL, echo=False)
+DB_POOL_SIZE = max(1, int(os.getenv("DB_POOL_SIZE", "10")))
+DB_MAX_OVERFLOW = max(0, int(os.getenv("DB_MAX_OVERFLOW", "20")))
+
+_engine_kwargs: Dict[str, Any] = {"echo": False}
+if DATABASE_URL.startswith("postgresql"):
+    _engine_kwargs.update(
+        pool_size=DB_POOL_SIZE,
+        max_overflow=DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+    )
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 
 
 def generate_uuid() -> str:
