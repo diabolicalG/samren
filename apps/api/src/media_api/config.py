@@ -10,9 +10,12 @@ class Settings:
     tvmaze_base_url: str = os.getenv("TVMAZE_BASE_URL", "https://api.tvmaze.com").rstrip("/")
     http_timeout: float = float(os.getenv("MEDIA_API_HTTP_TIMEOUT", "10"))
     http_retries: int = int(os.getenv("MEDIA_API_HTTP_RETRIES", "2"))
+    http_retry_base_delay: float = float(os.getenv("MEDIA_API_HTTP_RETRY_BASE_DELAY", "0.5"))
+    http_retry_max_delay: float = float(os.getenv("MEDIA_API_HTTP_RETRY_MAX_DELAY", "5"))
     cache_ttl_search: int = int(os.getenv("MEDIA_API_CACHE_TTL_SEARCH", "300"))
     cache_ttl_detail: int = int(os.getenv("MEDIA_API_CACHE_TTL_DETAIL", "86400"))
     cache_ttl_trending: int = int(os.getenv("MEDIA_API_CACHE_TTL_TRENDING", "900"))
+    cache_ttl_schedule: int = int(os.getenv("MEDIA_API_CACHE_TTL_SCHEDULE", "300"))
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
