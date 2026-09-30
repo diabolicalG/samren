@@ -44,9 +44,23 @@ class WCOStreamScraper:
         "1080p": "https://stream.crackers.world",
     }
 
-    def __init__(self, base_url: str = WCO_BASE_URL, timeout: float = 15.0):
+    def __init__(self, base_url: str = WCO_BASE_URL, timeout: float = 15.0, client: Optional[httpx.AsyncClient] = None):
         self.base_url = base_url
         self.timeout = timeout
+        self._client = client
+
+    def set_client(self, client: httpx.AsyncClient) -> None:
+        self._client = client
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout, headers=self.HEADERS)
+        return self._client
+
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     @staticmethod
     def slugify(title: str) -> str:
@@ -71,19 +85,19 @@ class WCOStreamScraper:
         Mirrors the conceptual snippet:
             iframe = soup.find('iframe', id='cizgi-film-izle')
         """
-        async with httpx.AsyncClient(timeout=self.timeout, headers=self.HEADERS) as client:
-            try:
-                response = await client.get(episode_url)
-            except httpx.HTTPError:
-                return None
+        client = self._get_client()
+        try:
+            response = await client.get(episode_url)
+        except httpx.HTTPError:
+            return None
 
-            if response.status_code != 200:
-                logger.warning(
-                    "Non-200 status for %s (status=%s)", episode_url, response.status_code
-                )
-                return None
+        if response.status_code != 200:
+            logger.warning(
+                "Non-200 status for %s (status=%s)", episode_url, response.status_code
+            )
+            return None
 
-            html = response.text
+        html = response.text
 
         # Parse synchronously (BeautifulSoup is CPU-bound, fast enough to run in-thread)
         from bs4 import BeautifulSoup
