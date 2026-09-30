@@ -68,3 +68,27 @@ jobs:
       - name: Run tests
         working-directory: services/shivra-api
         run: python -m pytest tests/ -v
+
+  download-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r apps/api/requirements.txt
+          pip install -r services/shivra-api/requirements.txt
+      - name: Compile check
+        env:
+          PYTHONPATH: .:services/shivra-api
+        run: python -m py_compile services/download-worker/worker.py
+      - name: Run tests
+        working-directory: services/download-worker
+        env:
+          APP_ENV: worker
+          DATABASE_URL: "sqlite:///./test_worker.db?check_same_thread=false"
+          REDIS_URL: "redis://localhost:6379"
+          PYTHONPATH: ../..:../shivra-api
+        run: python -m pytest tests/ -v
