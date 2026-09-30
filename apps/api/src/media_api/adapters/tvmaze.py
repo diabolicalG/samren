@@ -35,7 +35,8 @@ class TVmazeAdapter(ProviderAdapter):
         return [self._map(item["show"]) for item in data[:limit] if item.get("show")]
 
     async def get_media(self, source_id: str) -> Optional[Media]:
-        if not source_id.isdigit(): return None
+        ident = source_id.removeprefix("tv:")
+        if not ident.isdigit(): return None
         node = await request_json("GET", f"{settings.tvmaze_base_url}/shows/{source_id}", params={"embed": "episodes,cast"})
         if not node: return None
         media = self._map(node)
