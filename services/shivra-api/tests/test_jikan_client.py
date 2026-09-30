@@ -1,4 +1,4 @@
-import pytest
+import asyncio
 
 from scrapers.jikan_client import JikanClient
 
@@ -46,14 +46,13 @@ class FakeAsyncClient:
         })
 
 
-@pytest.mark.asyncio
-async def test_fetch_episodes_follows_all_pages(monkeypatch):
+def test_fetch_episodes_follows_all_pages(monkeypatch):
     import scrapers.jikan_client as module
 
     client = FakeAsyncClient()
     monkeypatch.setattr(module.httpx, "AsyncClient", lambda *args, **kwargs: client)
 
-    result = await JikanClient().fetch_episodes("1")
+    result = asyncio.run(JikanClient().fetch_episodes("1"))
 
     assert [episode["mal_id"] for episode in result["data"]] == [1, 2, 3]
     assert [params["page"] for _, params in client.calls] == [1, 2]
