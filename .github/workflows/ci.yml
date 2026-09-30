@@ -65,3 +65,6 @@ jobs:
       - name: Compile check
         working-directory: services/shivra-api
         run: python -m py_compile main.py scrapers/*.py
+      - name: Run tests
+        working-directory: services/shivra-api
+        run: python -m pytest tests/ -v
