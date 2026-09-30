@@ -40,9 +40,20 @@ class Aggregator:
         return [m for m in items if m.type in set(types)] if types else items
 
     async def _gather(self, coros) -> List[Media]:
-        results = await asyncio.gather(*coros, return_exceptions=True)
+        active_adapters = [
+            adapter
+            for adapter in self.adapters
+            if provider_health.can_request(adapter.source)
+        ]
+        if not active_adapters:
+            raise RuntimeError("All media providers are temporarily unavailable")
+
+        results = await asyncio.gather(
+            *[coro for adapter, coro in zip(self.adapters, coros) if provider_health.can_request(adapter.source)],
+            return_exceptions=True,
+        )
         merged = []
-        for adapter, result in zip(self.adapters, results):
+        for adapter, result in zip(active_adapters, results):
             if isinstance(result, Exception):
                 provider_health.record_failure(adapter.source, result)
                 logger.warning(
@@ -78,6 +89,8 @@ class Aggregator:
         cache_key = f"media:detail:{media_id}"
 
         async def fetch():
+            if not provider_health.can_request(adapter.source):
+                raise RuntimeError(f"Provider circuit is open: {adapter.source}")
             try:
                 media = await adapter.get_media(source_id)
                 provider_health.record_success(adapter.source)
