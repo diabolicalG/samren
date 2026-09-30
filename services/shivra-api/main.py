@@ -1,5 +1,8 @@
+from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import httpx
 import asyncio
 from typing import Optional, List, Dict, Any
@@ -14,7 +17,19 @@ from scrapers.transform import (
 )
 
 
+SHIVRA_CONCURRENCY = max(1, int(os.getenv("SHIVRA_CONCURRENCY", "32")))
+_request_semaphore = asyncio.Semaphore(SHIVRA_CONCURRENCY)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await jikan.close()
+    await wco.close()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="ShivraAPI",
     description="ShivraAPI - Anime data source and video stream scraper",
     version="0.1.0",
@@ -26,6 +41,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def concurrency_limit(request, call_next):
+    try:
+        await asyncio.wait_for(_request_semaphore.acquire(), timeout=0.25)
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "ShivraAPI is at concurrency capacity; retry later"},
+            headers={"Retry-After": "1"},
+        )
+    try:
+        return await call_next(request)
+    finally:
+        _request_semaphore.release()
 
 jikan = JikanClient()
 wco = WCOStreamScraper()
