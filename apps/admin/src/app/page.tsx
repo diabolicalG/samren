@@ -1,6 +1,7 @@
 'use client';
 
 import { useTopAnime, useAnimeList, useGenres } from '@samren/hooks';
+import type { Anime, Genre } from '@samren/types';
 import { RatingBadge } from '@samren/ui';
 import Link from 'next/link';
 
@@ -13,9 +14,9 @@ export default function AdminDashboard() {
   });
   const { data: genresData } = useGenres();
 
-  const topAnime = topData?.data?.items ?? [];
-  const ongoingAnime = ongoingData?.data?.items ?? [];
-  const genres = genresData?.data ?? [];
+  const topAnime: Anime[] = topData?.data?.items ?? [];
+  const ongoingAnime: Anime[] = ongoingData?.data?.items ?? [];
+  const genres: Genre[] = genresData?.data ?? [];
 
   const totalAnime = topData?.data?.total ?? 0;
   const totalGenres = genres.length;
