@@ -214,6 +214,7 @@ class DownloadCreate(BaseModel):
 
 
 from .media_api.app import router as unified_media_router
+from .media_api.health import ProviderUnavailableError
 
 app = FastAPI(
     title="Samren API",
@@ -224,6 +225,15 @@ app = FastAPI(
 limiter = Limiter(key_func=get_remote_address, storage_uri=REDIS_URL, headers_enabled=True, default_limits=["120/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(ProviderUnavailableError)
+async def provider_unavailable_handler(request: Request, exc: ProviderUnavailableError):
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": str(exc)},
+        headers={"Retry-After": "30"},
+    )
 
 app.include_router(unified_media_router)
 
