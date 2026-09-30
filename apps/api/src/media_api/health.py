@@ -2,6 +2,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 
+class ProviderUnavailableError(RuntimeError):
+    pass
+
+
 class ProviderHealthRegistry:
     def __init__(self, providers: list[str], failure_threshold: int = 5, cooldown_seconds: int = 30) -> None:
         self.failure_threshold = failure_threshold
