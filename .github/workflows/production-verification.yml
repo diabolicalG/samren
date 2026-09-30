@@ -1,0 +1,140 @@
+name: Production Verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  production-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      POSTGRES_USER: samren
+      POSTGRES_PASSWORD: ci-production-password
+      POSTGRES_DB: samren
+      JWT_SECRET: ci-production-jwt-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+      APP_ENV: production
+      CORS_ORIGIN: http://localhost,http://localhost:3000,http://localhost:3001
+      API_WORKERS: 2
+      API_LIMIT_CONCURRENCY: 100
+      SHIVRA_WORKERS: 2
+      SHIVRA_LIMIT_CONCURRENCY: 100
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose configuration
+        run: docker compose -f docker/docker-compose.yml config
+
+      - name: Build production images
+        run: docker compose -f docker/docker-compose.yml build --pull
+
+      - name: Start production stack
+        run: docker compose -f docker/docker-compose.yml up -d
+
+      - name: Wait for stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1/health/ >/dev/null; then
+              break
+            fi
+            sleep 5
+          done
+          curl -fsS http://127.0.0.1/health/ >/dev/null
+
+      - name: Production smoke and integration checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          check() {
+            local name="$1"
+            local url="$2"
+            echo "== $name =="
+            curl --fail --silent --show-error --max-time 20 "$url" -o /tmp/response
+            test -s /tmp/response
+            head -c 500 /tmp/response
+            echo
+          }
+
+          check "web" "http://127.0.0.1/"
+          check "admin" "http://127.0.0.1/admin/"
+          check "api health" "http://127.0.0.1/health/"
+          check "provider health" "http://127.0.0.1/v1/providers/health"
+          check "unified search" "http://127.0.0.1/v1/search?q=one%20piece&limit=5"
+          check "legacy anime detail" "http://127.0.0.1/api/anime/21"
+          check "legacy episodes" "http://127.0.0.1/api/anime/21/episodes"
+
+          python - <<'PY'
+          import json, urllib.request
+          checks = [
+              ("provider-health", "http://127.0.0.1/v1/providers/health"),
+              ("unified-search", "http://127.0.0.1/v1/search?q=one%20piece&limit=5"),
+          ]
+          for name, url in checks:
+              with urllib.request.urlopen(url, timeout=20) as r:
+                  data = json.load(r)
+                  assert data is not None, name
+                  print(name, "status=", r.status)
+          PY
+
+      - name: Database and Redis integration checks
+        run: |
+          docker compose -f docker/docker-compose.yml exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          docker compose -f docker/docker-compose.yml exec -T redis redis-cli ping
+          docker compose -f docker/docker-compose.yml ps
+
+      - name: Warm-cache capacity test
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio, statistics, time, urllib.parse
+          import httpx
+
+          URL = "http://127.0.0.1/v1/search?" + urllib.parse.urlencode({"q": "one piece", "limit": 5})
+
+          async def run(concurrency, duration=30):
+              results = []
+              stop = time.monotonic() + duration
+              limits = httpx.Limits(max_connections=concurrency * 4, max_keepalive_connections=concurrency)
+              timeout = httpx.Timeout(10.0)
+              async with httpx.AsyncClient(limits=limits, timeout=timeout) as client:
+                  async def worker():
+                      while time.monotonic() < stop:
+                          started = time.perf_counter()
+                          try:
+                              r = await client.get(URL)
+                              elapsed = (time.perf_counter() - started) * 1000
+                              results.append((r.status_code, elapsed))
+                          except Exception:
+                              elapsed = (time.perf_counter() - started) * 1000
+                              results.append(("error", elapsed))
+                  await asyncio.gather(*(worker() for _ in range(concurrency)))
+              lat = sorted(x[1] for x in results)
+              statuses = {}
+              for s, _ in results:
+                  statuses[s] = statuses.get(s, 0) + 1
+              def pct(p):
+                  return lat[min(len(lat)-1, int((p/100)*(len(lat)-1)))]
+              print({"concurrency": concurrency, "requests": len(results), "statuses": statuses,
+                     "p50_ms": round(pct(50),1), "p95_ms": round(pct(95),1),
+                     "p99_ms": round(pct(99),1), "max_ms": round(max(lat),1)})
+              assert results and statuses.get(200, 0) == len(results), statuses
+              assert pct(95) < 2000, pct(95)
+
+          async def main():
+              for c in (10, 25, 50, 100):
+                  await run(c)
+          asyncio.run(main())
+          PY
+
+      - name: Capture resource snapshot
+        if: always()
+        run: |
+          docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}'
+          docker compose -f docker/docker-compose.yml logs --tail=100 api shivra-api nginx download-worker
+
+      - name: Shutdown
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
