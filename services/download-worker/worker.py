@@ -182,9 +182,7 @@ async def probe_duration(url: str) -> Optional[float]:
         return None
 
 
-async def process_job(job: Download) -> None:
-    jikan = JikanClient()
-    wco = WCOStreamScraper()
+async def process_job(job: Download, jikan: JikanClient, wco: WCOStreamScraper) -> None:
     output = DOWNLOAD_DIR / f"{job.id}.mp4"
 
     try:
@@ -228,31 +226,38 @@ async def process_job(job: Download) -> None:
             logger.warning("Could not remove partial download %s", output)
         update_job(job.id, status="failed", progress=0, completed_at=now(), path="")
     finally:
-        await jikan.close()
-        await wco.close()
+        pass
 
 
 async def worker_loop() -> None:
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    jikan = JikanClient()
+    wco = WCOStreamScraper()
 
     async def run_claimed(job: Download) -> None:
         async with semaphore:
-            await process_job(job)
+            await process_job(job, jikan, wco)
 
     tasks: set[asyncio.Task[None]] = set()
-    while True:
-        while len(tasks) < MAX_CONCURRENT:
-            job = await asyncio.to_thread(claim_job)
-            if job is None:
-                break
-            task = asyncio.create_task(run_claimed(job))
-            tasks.add(task)
-            task.add_done_callback(tasks.discard)
+    try:
+        while True:
+            while len(tasks) < MAX_CONCURRENT:
+                job = await asyncio.to_thread(claim_job)
+                if job is None:
+                    break
+                task = asyncio.create_task(run_claimed(job))
+                tasks.add(task)
+                task.add_done_callback(tasks.discard)
 
+            if tasks:
+                await asyncio.sleep(POLL_INTERVAL)
+            else:
+                await asyncio.sleep(POLL_INTERVAL)
+    finally:
         if tasks:
-            await asyncio.sleep(POLL_INTERVAL)
-        else:
-            await asyncio.sleep(POLL_INTERVAL)
+            await asyncio.gather(*tasks, return_exceptions=True)
+        await jikan.close()
+        await wco.close()
 
 
 if __name__ == "__main__":
