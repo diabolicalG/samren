@@ -22,6 +22,7 @@ COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY apps/web ./apps/web
 COPY packages ./packages
 COPY tsconfig.json ./
+COPY apps/tsconfig.json ./apps/tsconfig.json
 
 WORKDIR /app/apps/web
 RUN pnpm build
