@@ -12,6 +12,7 @@ import {
 } from '@samren/ui';
 import { PlayCircle, Calendar, Clock, Tv2, Film } from 'lucide-react';
 import { PlayerType, VideoQuality } from '@samren/types';
+import { createDownload } from '@samren/api-client';
 
 const STATUS_LABELS: Record<string, string> = {
   ongoing: 'Ongoing',
@@ -39,10 +40,14 @@ export default function AnimeDetailPage() {
 
   const { data: animeData, isLoading: animeLoading } = useAnime(animeId ?? '');
   const { data: episodesData, isLoading: episodesLoading } = useEpisodes(animeId ?? '');
-  const { data: streamData, isLoading: streamLoading } = useStreamUrl(
+  const selectedEpisodeData = episodesData?.data?.find(
+    (episode) => episode.number === selectedEpisode,
+  );
+  const { data: streamData, isLoading: streamLoading, error: streamError } = useStreamUrl(
     animeId ?? '',
-    selectedEpisode,
+    selectedEpisodeData?.number ?? 0,
     quality,
+    { enabled: !episodesLoading && !!selectedEpisodeData },
   );
 
   const anime = animeData?.data;
@@ -66,10 +71,13 @@ export default function AnimeDetailPage() {
 
   const handleDownload = async (q: VideoQuality) => {
     setQuality(q);
-    if (anime && episodes.length > 0) {
-      const episode = episodes.find((e) => e.number === selectedEpisode) ?? episodes[0];
-      console.log('Queueing download', { animeId: anime.id, episodeId: episode.id, quality: q });
-    }
+    if (!anime || !selectedEpisodeData) return;
+
+    await createDownload({
+      animeId: anime.id,
+      episodeId: selectedEpisodeData.id,
+      quality: q,
+    });
   };
 
   return (
@@ -154,6 +162,11 @@ export default function AnimeDetailPage() {
             <PlayCircle size={20} />
             EP {selectedEpisode}
           </h2>
+          {streamError && (
+            <p className="text-xs text-red-400 mb-2">
+              Stream request failed: {streamError instanceof Error ? streamError.message : 'Unknown error'}.
+            </p>
+          )}
           {streamData?.data && !streamData.data.verified && (
             <p className="text-xs text-yellow-500 mb-2">
               This stream link couldn&apos;t be verified and may not work — the source page
@@ -224,7 +237,7 @@ export default function AnimeDetailPage() {
         <div className="pt-4 border-t border-gray-800">
           <DownloadEpisode
             animeId={anime.id}
-            episodeId={String(episodes[0]?.id ?? '')}
+            episodeId={String(selectedEpisodeData?.id ?? '')}
             episodeNumber={selectedEpisode}
             episodeTitle={episodes.find((e) => e.number === selectedEpisode)?.title}
             onDownload={handleDownload}
