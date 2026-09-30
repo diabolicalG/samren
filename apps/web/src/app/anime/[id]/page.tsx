@@ -193,7 +193,7 @@ export default function AnimeDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">
-                    S{anime.season ?? 1} · E{selectedEpisode} {selectedEpisodeData?.title ?? ''}
+                    E{selectedEpisode} {selectedEpisodeData?.title ?? ''}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">{anime.title}</p>
                 </div>
