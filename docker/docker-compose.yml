@@ -69,7 +69,7 @@ services:
       - ADMIN_BOOTSTRAP_USERNAME=${ADMIN_BOOTSTRAP_USERNAME:-}
       - ADMIN_BOOTSTRAP_EMAIL=${ADMIN_BOOTSTRAP_EMAIL:-}
       - ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD:-}
-    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "4000", "--workers", "${API_WORKERS:-2}", "--limit-concurrency", "${API_LIMIT_CONCURRENCY:-100}"]
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "4000", "--workers", "${API_WORKERS:-2}", "--limit-concurrency", "${API_LIMIT_CONCURRENCY:-100}", "--proxy-headers", "--forwarded-allow-ips", "172.16.0.0/12"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health', timeout=2)"]
       interval: 10s
