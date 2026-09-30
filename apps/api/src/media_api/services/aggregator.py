@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Dict, List, Optional
 
 from ..adapters.anilist import AniListAdapter
@@ -8,6 +9,8 @@ from ..adapters.tvmaze import TVmazeAdapter
 from ..cache import cached_json
 from ..config import settings
 from ..models import Media, MediaType
+
+logger = logging.getLogger(__name__)
 
 
 class Aggregator:
@@ -37,8 +40,13 @@ class Aggregator:
     async def _gather(self, coros) -> List[Media]:
         results = await asyncio.gather(*coros, return_exceptions=True)
         merged = []
-        for result in results:
+        for adapter, result in zip(self.adapters, results):
             if isinstance(result, Exception):
+                logger.warning(
+                    "Media provider failed",
+                    extra={"provider": adapter.source, "error": str(result)},
+                    exc_info=result,
+                )
                 continue
             merged.extend(result)
         return merged
