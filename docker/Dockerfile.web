@@ -23,8 +23,8 @@ COPY packages ./packages
 COPY tsconfig.json ./
 COPY apps/tsconfig.json ./apps/tsconfig.json
 
-WORKDIR /app/apps/web
-RUN pnpm build
+WORKDIR /app
+RUN pnpm --filter web build
 
 # Runtime layer
 FROM node:20-alpine AS runner
