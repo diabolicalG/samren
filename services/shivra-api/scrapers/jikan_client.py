@@ -43,12 +43,32 @@ class JikanClient:
             return response.json()
 
     async def fetch_episodes(self, anime_id: str) -> Dict[str, Any]:
-        """Fetch the episode list for a given anime."""
+        """Fetch all episodes for an anime, following Jikan pagination."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             url = f"{self.BASE_URL}/anime/{anime_id}/episodes"
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
+            page = 1
+            all_data = []
+            last_response: Dict[str, Any] = {}
+
+            while True:
+                response = await client.get(url, params={"page": page})
+                response.raise_for_status()
+                payload = response.json()
+                last_response = payload
+                all_data.extend(payload.get("data") or [])
+
+                pagination = payload.get("pagination") or {}
+                last_page = pagination.get("last_visible_page")
+                if not pagination.get("has_next_page") or not last_page or page >= last_page:
+                    break
+                page += 1
+
+            last_response["data"] = all_data
+            pagination = last_response.setdefault("pagination", {})
+            pagination["current_page"] = 1
+            pagination["has_next_page"] = False
+            pagination["last_visible_page"] = page
+            return last_response
 
     async def fetch_top_anime(self, page: int = 1, limit: int = 50) -> Dict[str, Any]:
         """Fetch top/popular anime."""
