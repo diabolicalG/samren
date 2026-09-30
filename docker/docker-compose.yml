@@ -55,7 +55,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - SHIVRA_API_URL=http://shivra-api:8000
       - CORS_ORIGIN=http://localhost:3000,http://localhost:3001
-      - JWT_SECRET=change-me-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in the environment}
       - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
       - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
     depends_on:
