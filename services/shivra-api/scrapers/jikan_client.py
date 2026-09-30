@@ -1,5 +1,9 @@
+import logging
+from typing import Any, Dict, Optional
+
 import httpx
-from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class JikanClient:
@@ -26,12 +30,10 @@ class JikanClient:
             self._client = None
 
     async def fetch_anime(self, anime_id: str) -> Dict[str, Any]:
-        """Fetch anime details by Jikan ID or slug."""
         client = self._get_client()
-            url = f"{self.BASE_URL}/anime/{anime_id}"
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(f"{self.BASE_URL}/anime/{anime_id}")
+        response.raise_for_status()
+        return response.json()
 
     async def fetch_anime_list(
         self,
@@ -41,7 +43,6 @@ class JikanClient:
         page: int = 1,
         limit: int = 20,
     ) -> Dict[str, Any]:
-        """Fetch a paginated list of anime, optionally filtered by status/genre/search."""
         params: Dict[str, Any] = {"page": page, "limit": limit}
         if status:
             params["status"] = status
@@ -51,88 +52,85 @@ class JikanClient:
             params["q"] = q
 
         client = self._get_client()
-            url = f"{self.BASE_URL}/anime"
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(f"{self.BASE_URL}/anime", params=params)
+        response.raise_for_status()
+        return response.json()
 
     async def fetch_episodes(self, anime_id: str) -> Dict[str, Any]:
-        """Fetch all episodes for an anime, following Jikan pagination."""
         client = self._get_client()
-            url = f"{self.BASE_URL}/anime/{anime_id}/episodes"
-            page = 1
-            all_data = []
-            last_response: Dict[str, Any] = {}
+        url = f"{self.BASE_URL}/anime/{anime_id}/episodes"
+        page = 1
+        all_data = []
+        last_response: Dict[str, Any] = {}
 
-            while True:
-                response = await client.get(url, params={"page": page})
-                response.raise_for_status()
-                payload = response.json()
-                last_response = payload
-                all_data.extend(payload.get("data") or [])
+        while True:
+            response = await client.get(url, params={"page": page})
+            response.raise_for_status()
+            payload = response.json()
+            last_response = payload
+            all_data.extend(payload.get("data") or [])
 
-                pagination = payload.get("pagination") or {}
-                last_page = pagination.get("last_visible_page")
-                if not pagination.get("has_next_page") or not last_page or page >= last_page:
-                    break
-                page += 1
+            pagination = payload.get("pagination") or {}
+            last_page = pagination.get("last_visible_page")
+            if (
+                not pagination.get("has_next_page")
+                or not last_page
+                or page >= last_page
+            ):
+                break
+            page += 1
 
-            last_response["data"] = all_data
-            pagination = last_response.setdefault("pagination", {})
-            pagination["current_page"] = 1
-            pagination["has_next_page"] = False
-            pagination["last_visible_page"] = page
-            return last_response
+        last_response["data"] = all_data
+        pagination = last_response.setdefault("pagination", {})
+        pagination["current_page"] = 1
+        pagination["has_next_page"] = False
+        pagination["last_visible_page"] = page
+        return last_response
 
     async def fetch_top_anime(self, page: int = 1, limit: int = 50) -> Dict[str, Any]:
-        """Fetch top/popular anime."""
         client = self._get_client()
-            url = f"{self.BASE_URL}/top/anime"
-            response = await client.get(url, params={"page": page, "limit": limit})
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(
+            f"{self.BASE_URL}/top/anime",
+            params={"page": page, "limit": limit},
+        )
+        response.raise_for_status()
+        return response.json()
 
-    async def search_anime(self, query: str, page: int = 1, limit: int = 20) -> Dict[str, Any]:
-        """Search for anime by keyword."""
+    async def search_anime(
+        self, query: str, page: int = 1, limit: int = 20
+    ) -> Dict[str, Any]:
         client = self._get_client()
-            url = f"{self.BASE_URL}/anime"
-            response = await client.get(
-                url,
-                params={"q": query, "page": page, "limit": limit},
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(
+            f"{self.BASE_URL}/anime",
+            params={"q": query, "page": page, "limit": limit},
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def fetch_genres(self) -> Dict[str, Any]:
-        """Fetch the list of anime genres from Jikan."""
         client = self._get_client()
-            url = f"{self.BASE_URL}/genres/anime"
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(f"{self.BASE_URL}/genres/anime")
+        response.raise_for_status()
+        return response.json()
 
     async def fetch_schedule(
         self, day: Optional[str] = None, page: int = 1
     ) -> Dict[str, Any]:
-        """Fetch the anime schedule, optionally filtered by day of week."""
         params: Dict[str, Any] = {"page": page}
         if day:
             params["day"] = day
 
         client = self._get_client()
-            url = f"{self.BASE_URL}/schedule"
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+        response = await client.get(f"{self.BASE_URL}/schedule", params=params)
+        response.raise_for_status()
+        return response.json()
 
     async def fetch_title(self, anime_id: str) -> Optional[str]:
-        """Fetch only the primary title for an anime by Jikan ID.
-
-        Returns the raw title string (used for slug resolution) or ``None``.
-        """
         try:
             data = await self.fetch_anime(anime_id)
-        except Exception:
+        except httpx.HTTPError:
+            logger.warning("Failed to resolve title for anime_id=%s", anime_id, exc_info=True)
             return None
         anime = data.get("data") or {}
-        return anime.get("title")
+        title = anime.get("title")
+        return title if isinstance(title, str) and title.strip() else None
