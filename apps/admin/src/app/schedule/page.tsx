@@ -2,6 +2,7 @@
 
 import { useSchedule } from '@samren/hooks';
 import { AnimeCard, RatingBadge } from '@samren/ui';
+import type { Schedule } from '@samren/types';
 import Link from 'next/link';
 
 const DAYS = [
@@ -16,7 +17,7 @@ const DAYS = [
 
 export default function AdminSchedulePage() {
   const { data, isLoading, error } = useSchedule();
-  const schedule = data?.data ?? {};
+  const schedule: Schedule = data?.data ?? {};
 
   if (error) {
     return <div className="p-6 text-red-500">Error loading schedule.</div>;
