@@ -225,8 +225,6 @@ async def process_job(job: Download, jikan: JikanClient, wco: WCOStreamScraper) 
         except OSError:
             logger.warning("Could not remove partial download %s", output)
         update_job(job.id, status="failed", progress=0, completed_at=now(), path="")
-    finally:
-        pass
 
 
 async def worker_loop() -> None:
