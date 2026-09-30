@@ -2,7 +2,6 @@
 FROM node:20-alpine AS base
 
 ENV PNPM_HOME="/pnpm"
-ENV NODE_ENV=production
 
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
@@ -13,7 +12,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY packages/*/package.json packages/*/
-RUN pnpm install --frozen-lockfile --filter "web" --filter "@samren/types" --filter "@samren/ui" --filter "@samren/hooks" --filter "@samren/api-client" --filter "@samren/utils"
+RUN pnpm install --frozen-lockfile
 
 # Build layer
 FROM base AS builder
