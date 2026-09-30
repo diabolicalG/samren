@@ -8,6 +8,7 @@ from ..adapters.tmdb import TMDBAdapter
 from ..adapters.tvmaze import TVmazeAdapter
 from ..cache import cached_json
 from ..config import settings
+from ..health import provider_health
 from ..models import Media, MediaType
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,14 @@ class Aggregator:
         merged = []
         for adapter, result in zip(self.adapters, results):
             if isinstance(result, Exception):
+                provider_health.record_failure(adapter.source, result)
                 logger.warning(
                     "Media provider failed",
                     extra={"provider": adapter.source, "error": str(result)},
                     exc_info=(type(result), result, result.__traceback__),
                 )
                 continue
+            provider_health.record_success(adapter.source)
             merged.extend(result)
         return merged
 
@@ -75,8 +78,13 @@ class Aggregator:
         cache_key = f"media:detail:{media_id}"
 
         async def fetch():
-            media = await adapter.get_media(source_id)
-            return media.model_dump() if media else None
+            try:
+                media = await adapter.get_media(source_id)
+                provider_health.record_success(adapter.source)
+                return media.model_dump() if media else None
+            except Exception as exc:
+                provider_health.record_failure(adapter.source, exc)
+                raise
 
         raw = await cached_json(cache_key, settings.cache_ttl_detail, fetch)
         return Media.model_validate(raw) if raw else None
