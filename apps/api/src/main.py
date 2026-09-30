@@ -188,6 +188,8 @@ class DownloadCreate(BaseModel):
     quality: str
 
 
+from .media_api.app import router as unified_media_router
+
 app = FastAPI(
     title="Samren API",
     description="Samren - Anime streaming marketplace backend gateway",
@@ -197,6 +199,8 @@ app = FastAPI(
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.include_router(unified_media_router)
 
 app.add_middleware(
     CORSMiddleware,
