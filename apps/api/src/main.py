@@ -209,7 +209,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-limiter = Limiter(key_func=get_remote_address, storage_uri=REDIS_URL, headers_enabled=True)
+limiter = Limiter(key_func=get_remote_address, storage_uri=REDIS_URL, headers_enabled=True, default_limits=["120/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
