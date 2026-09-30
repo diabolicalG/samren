@@ -8,12 +8,26 @@ class JikanClient:
     BASE_URL = "https://api.jikan.moe/v4"
     TIMEOUT = 30.0
 
-    def __init__(self, timeout: float = TIMEOUT):
+    def __init__(self, timeout: float = TIMEOUT, client: Optional[httpx.AsyncClient] = None):
         self.timeout = timeout
+        self._client = client
+
+    def set_client(self, client: httpx.AsyncClient) -> None:
+        self._client = client
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
+
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def fetch_anime(self, anime_id: str) -> Dict[str, Any]:
         """Fetch anime details by Jikan ID or slug."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/anime/{anime_id}"
             response = await client.get(url)
             response.raise_for_status()
@@ -36,7 +50,7 @@ class JikanClient:
         if q:
             params["q"] = q
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/anime"
             response = await client.get(url, params=params)
             response.raise_for_status()
@@ -44,7 +58,7 @@ class JikanClient:
 
     async def fetch_episodes(self, anime_id: str) -> Dict[str, Any]:
         """Fetch all episodes for an anime, following Jikan pagination."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/anime/{anime_id}/episodes"
             page = 1
             all_data = []
@@ -72,7 +86,7 @@ class JikanClient:
 
     async def fetch_top_anime(self, page: int = 1, limit: int = 50) -> Dict[str, Any]:
         """Fetch top/popular anime."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/top/anime"
             response = await client.get(url, params={"page": page, "limit": limit})
             response.raise_for_status()
@@ -80,7 +94,7 @@ class JikanClient:
 
     async def search_anime(self, query: str, page: int = 1, limit: int = 20) -> Dict[str, Any]:
         """Search for anime by keyword."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/anime"
             response = await client.get(
                 url,
@@ -91,7 +105,7 @@ class JikanClient:
 
     async def fetch_genres(self) -> Dict[str, Any]:
         """Fetch the list of anime genres from Jikan."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/genres/anime"
             response = await client.get(url)
             response.raise_for_status()
@@ -105,7 +119,7 @@ class JikanClient:
         if day:
             params["day"] = day
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        client = self._get_client()
             url = f"{self.BASE_URL}/schedule"
             response = await client.get(url, params=params)
             response.raise_for_status()
