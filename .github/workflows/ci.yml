@@ -93,3 +93,98 @@ jobs:
           REDIS_URL: "redis://localhost:6379"
           PYTHONPATH: ../..:../shivra-api
         run: python -m pytest tests/ -v
+  production-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start production stack
+        env:
+          POSTGRES_PASSWORD: ci-production-password
+          JWT_SECRET: ci-production-verification-secret-32-characters-min
+          CORS_ORIGIN: http://localhost
+          NEXT_PUBLIC_API_URL: http://localhost
+          API_WORKERS: 2
+          API_LIMIT_CONCURRENCY: 100
+          SHIVRA_WORKERS: 2
+          SHIVRA_LIMIT_CONCURRENCY: 100
+        run: |
+          docker compose -f docker/docker-compose.yml up -d --build
+          docker compose -f docker/docker-compose.yml ps
+
+      - name: Wait for public health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost/health/ >/tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker/docker-compose.yml logs --tail=200 api shivra-api nginx
+          exit 1
+
+      - name: Production smoke — web, API, providers and auth
+        env:
+          CI_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          curl -fsS http://localhost/ >/tmp/web.html
+          test -s /tmp/web.html
+          curl -fsS http://localhost/api/anime/21 >/tmp/anime.json
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/anime.json"))
+          assert data.get("success") is True, data
+          assert data.get("data"), data
+          PY
+          curl -fsS http://localhost/v1/providers/health >/tmp/providers.json
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/providers.json"))
+          assert set(data) >= {"anilist","tmdb","tvmaze"}, data
+          PY
+
+          username="ci_${CI_RUN_ID}"
+          email="ci_${CI_RUN_ID}@example.invalid"
+          password="CI-production-password-2026-strong"
+          curl -fsS -X POST http://localhost/api/auth/register             -H 'Content-Type: application/json'             -d "{\"username\":\"$username\",\"email\":\"$email\",\"password\":\"$password\"}" >/tmp/register.json
+          curl -fsS -X POST http://localhost/api/auth/login             -H 'Content-Type: application/json'             -d "{\"email\":\"$email\",\"password\":\"$password\"}" >/tmp/login.json
+          token=$(python -c 'import json; print(json.load(open("/tmp/login.json"))["access_token"])')
+          test -n "$token"
+          curl -fsS http://localhost/api/auth/me             -H "Authorization: Bearer $token" >/tmp/me.json
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/me.json"))
+          assert data["username"].startswith("ci_"), data
+          PY
+
+      - name: Load capacity sweep
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/load-results
+          for users in 10 25 50 100; do
+            echo "=== concurrent users: $users ==="
+            python scripts/load_test.py --base-url http://localhost --users "$users" --duration 10 | tee "/tmp/load-results/users-$users.txt"
+          done
+          cat /tmp/load-results/users-*.txt
+
+      - name: Capture container resource state
+        if: always()
+        run: |
+          docker stats --no-stream || true
+          docker compose -f docker/docker-compose.yml ps || true
+          docker compose -f docker/docker-compose.yml logs --tail=200 api shivra-api nginx || true
+
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-verification-results
+          path: /tmp/load-results/
+          if-no-files-found: ignore
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
