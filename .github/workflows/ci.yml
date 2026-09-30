@@ -49,7 +49,9 @@ jobs:
           JWT_SECRET: "ci-test-secret"
           REDIS_URL: "redis://localhost:6379"
           SHIVRA_API_URL: "http://localhost:8000"
-          SKIP_SEED_ADMIN: "true"
+          RATE_LIMIT_STORAGE_URI: "memory://"
+          APP_ENV: "test"
+          SEED_ADMIN: "false"
         run: python -m pytest tests/ -v
 
   content-service:
@@ -78,8 +80,7 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          pip install -r apps/api/requirements.txt
-          pip install -r services/shivra-api/requirements.txt
+          pip install -r services/download-worker/requirements.txt
       - name: Compile check
         env:
           PYTHONPATH: .:services/shivra-api
