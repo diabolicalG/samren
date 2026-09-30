@@ -139,7 +139,7 @@ async def ffmpeg_download(url: str, output: Path, duration_seconds: Optional[flo
             try:
                 out_time_us = int(text.split("=", 1)[1])
                 progress = min(99, max(1, int((out_time_us / 1_000_000) / duration_seconds * 100)))
-                update_job(job_id, progress=progress)
+                await asyncio.to_thread(update_job, job_id, progress=progress)
             except ValueError:
                 continue
 
