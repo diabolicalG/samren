@@ -169,8 +169,14 @@ class WCOStreamScraper:
 
         if not resolved_slug:
             logger.warning("Could not resolve slug for anime_id %s", anime_id)
+            fallback = (
+                f"{self.FALLBACK_HOSTS.get(quality, self.FALLBACK_HOSTS['1080p'])}"
+                f"/{anime_id}/{episode}/{quality}"
+            )
+            logger.warning("Falling back to unverified guessed stream URL: %s", fallback)
+            return StreamResult(url=fallback, verified=False)
 
-        # Build a set of candidate episode URLs to try
+        # Build the episode page URL and try the live WCO page.
         episode_url = self.build_episode_url(resolved_slug, episode)
         embed_url = await self.extract_wco_embed_link(episode_url)
 
