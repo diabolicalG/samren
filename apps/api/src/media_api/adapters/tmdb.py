@@ -19,7 +19,7 @@ class TMDBAdapter(ProviderAdapter):
         year = int(date[:4]) if len(date) >= 4 and date[:4].isdigit() else None
         return Media(
             id=self.make_id(str(node["id"]), media_type), source=MediaSource.TMDB,
-            source_id=f"{media_type.value}:{node['id']}", type=media_type, title=title,
+            source_id=str(node["id"]), type=media_type, title=title,
             title_original=node.get("original_title") or node.get("original_name"), synopsis=node.get("overview"),
             poster_url=self._img(node.get("poster_path")), backdrop_url=self._img(node.get("backdrop_path"), "w1280"),
             rating=node.get("vote_average"), genres=[], status=None, release_year=year,
