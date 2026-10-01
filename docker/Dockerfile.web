@@ -49,4 +49,4 @@ EXPOSE 3000
 # file tracing across a pnpm monorepo that isn't configured here. This is
 # a heavier image than `standalone` would produce, but it's what actually
 # runs correctly — verified directly against this Dockerfile's own build.
-CMD ["pnpm", "start"]
+CMD ["node", "/app/node_modules/next/dist/bin/next", "start"]
