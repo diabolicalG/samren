@@ -112,13 +112,7 @@ services:
         condition: service_healthy
 
   web:
-    build    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 20s
-:
+    build:
       context: ..
       dockerfile: docker/Dockerfile.web
     restart: unless-stopped
@@ -128,15 +122,15 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     depends_on:
       - api
-
-  admin:
-    build    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 6
       start_period: 20s
-:
+
+  admin:
+    build:
       context: ..
       dockerfile: docker/Dockerfile.admin
     restart: unless-stopped
@@ -146,6 +140,12 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     depends_on:
       - api
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
 
   nginx:
     image: nginx:alpine
