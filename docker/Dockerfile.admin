@@ -27,6 +27,7 @@ WORKDIR /app/apps/admin
 # Invoke the hoisted Next binary directly; the app's own directory is the
 # build context so Next can discover its app/ directory.
 RUN node /app/node_modules/next/dist/bin/next build
+RUN find /app/apps/admin/.next/standalone -maxdepth 4 -type f | sort | head -80
 
 # Runtime layer
 FROM node:20-alpine AS runner
