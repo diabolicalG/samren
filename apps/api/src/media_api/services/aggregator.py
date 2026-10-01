@@ -75,7 +75,7 @@ class Aggregator:
             return [m.dict() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_search, fetch)
-        return [Media.model_validate(item) for item in raw]
+        return [Media.parse_obj(item) for item in raw]
 
     async def get_media(self, media_id: str) -> Optional[Media]:
         parts = media_id.split(":", 2)
@@ -94,20 +94,20 @@ class Aggregator:
             try:
                 media = await adapter.get_media(source_id)
                 provider_health.record_success(adapter.source)
-                return media.model_dump() if media else None
+                return media.dict() if media else None
             except Exception as exc:
                 provider_health.record_failure(adapter.source, exc)
                 raise
 
         raw = await cached_json(cache_key, settings.cache_ttl_detail, fetch)
-        return Media.model_validate(raw) if raw else None
+        return Media.parse_obj(raw) if raw else None
 
     async def trending(self, types: Optional[List[MediaType]], limit: int) -> List[Media]:
         cache_key = f"media:trending:{','.join(sorted(t.value for t in types)) if types else 'all'}:{limit}"
 
         async def fetch():
             merged = await self._gather("trending", limit)
-            return [m.model_dump() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
+            return [m.dict() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_trending, fetch)
         return [Media.model_validate(item) for item in raw]
