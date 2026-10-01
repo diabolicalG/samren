@@ -133,7 +133,7 @@ jobs:
         if: always()
         run: |
           docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}'
-          docker compose -f docker/docker-compose.yml logs --tail=100 api shivra-api nginx download-worker
+          docker compose -f docker/docker-compose.yml logs --tail=200 api shivra-api nginx web admin download-worker
 
       - name: Shutdown
         if: always()
