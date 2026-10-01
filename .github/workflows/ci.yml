@@ -91,7 +91,7 @@ jobs:
           APP_ENV: worker
           DATABASE_URL: "sqlite:///./test_worker.db?check_same_thread=false"
           REDIS_URL: "redis://localhost:6379"
-          PYTHONPATH: ../..:../shivra-api
+          PYTHONPATH: ../..:../../apps/api:../shivra-api
         run: python -m pytest tests/ -v
   production-integration:
     runs-on: ubuntu-latest
