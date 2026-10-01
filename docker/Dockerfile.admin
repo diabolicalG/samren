@@ -30,19 +30,15 @@ RUN node /app/node_modules/next/dist/bin/next build
 
 # Runtime layer
 FROM node:20-alpine AS runner
-WORKDIR /app/apps/admin
+WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable
+ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 
-COPY --from=builder /app/apps/admin/.next ./.next
-COPY --from=builder /app/apps/admin/package.json ./package.json
-COPY --from=builder /app/apps/admin/next.config.mjs ./next.config.mjs
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
 
 EXPOSE 3001
-# See Dockerfile.web for why this uses `next start` rather than
-# `node server.js` / Next's `standalone` output.
-CMD ["node", "/app/node_modules/next/dist/bin/next", "start", "/app/apps/admin", "-p", "3001"]
+CMD ["node", "apps/admin/server.js"]
