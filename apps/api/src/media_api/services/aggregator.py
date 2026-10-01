@@ -72,7 +72,7 @@ class Aggregator:
 
         async def fetch():
             merged = await self._gather("search", query, limit)
-            return [m.model_dump() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
+            return [m.dict() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_search, fetch)
         return [Media.model_validate(item) for item in raw]
