@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import and_, or_
 from sqlmodel import Session, select
 
-from apps.api.src.main import Download, engine
+from src.main import Download, engine
 from scrapers.jikan_client import JikanClient
 from scrapers.wco_scraper import WCOStreamScraper
 
