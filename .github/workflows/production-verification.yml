@@ -159,7 +159,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/samren-browser
+          mkdir -p /tmp/samren-browser /tmp/samren-browser-test
+          cd /tmp/samren-browser-test
           npm init -y >/dev/null 2>&1
           npm install --no-save playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
