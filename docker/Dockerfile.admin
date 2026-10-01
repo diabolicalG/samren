@@ -45,4 +45,4 @@ COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3001
 # See Dockerfile.web for why this uses `next start` rather than
 # `node server.js` / Next's `standalone` output.
-CMD ["node", "/app/node_modules/next/dist/bin/next", "start", "-p", "3001"]
+CMD ["node", "/app/node_modules/next/dist/bin/next", "start", "/app/apps/admin", "-p", "3001"]
