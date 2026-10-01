@@ -23,10 +23,6 @@ import redis.asyncio as aioredis
 # Environment
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/samren?schema=public")
-# SQLModel 0.0.9 defaults PostgreSQL URLs to psycopg2. The production image
-# installs psycopg (v3), so normalize plain PostgreSQL URLs to that driver.
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
