@@ -224,7 +224,8 @@ app = FastAPI(
 )
 
 RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI", REDIS_URL)
-limiter = Limiter(key_func=get_remote_address, storage_uri=RATE_LIMIT_STORAGE_URI, headers_enabled=False, default_limits=["120/minute"])
+RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
+limiter = Limiter(key_func=get_remote_address, storage_uri=RATE_LIMIT_STORAGE_URI, headers_enabled=False, default_limits=[RATE_LIMIT_DEFAULT])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
