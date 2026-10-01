@@ -155,6 +155,75 @@ jobs:
           asyncio.run(main())
           PY
 
+      - name: Browser navigation and screenshot verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/samren-browser
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          node <<'NODE'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const browser = await chromium.launch({headless: true});
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+            page.setDefaultTimeout(15000);
+
+            const snap = async (name) => {
+              await page.screenshot({ path: '/tmp/samren-browser/' + name + '.png', fullPage: true });
+              console.log('SCREENSHOT', name, 'url=', page.url(), 'title=', await page.title());
+            };
+
+            await page.goto('http://127.0.0.1/', { waitUntil: 'networkidle' });
+            await snap('01-home');
+            if ((await page.locator('text=Samren').count()) === 0) throw new Error('Homepage did not render Samren navigation');
+
+            await page.getByRole('link', { name: 'Search' }).click();
+            await page.waitForURL('**/search');
+            await snap('02-search-empty');
+
+            const input = page.getByPlaceholder('Search anime...');
+            await input.fill('one piece');
+            await input.press('Enter');
+            await page.waitForTimeout(5000);
+            await snap('03-search-results');
+
+            const resultLinks = page.locator('a[href^="/anime/"]');
+            const resultCount = await resultLinks.count();
+            console.log('SEARCH_RESULT_LINKS', resultCount);
+            if (resultCount === 0) throw new Error('Unified search produced no navigable anime result');
+
+            await resultLinks.first().click();
+            await page.waitForURL('**/anime/**');
+            await page.waitForTimeout(3000);
+            await snap('04-anime-detail-watch');
+
+            const episodeButtons = page.locator('button[aria-current="true"]');
+            console.log('ACTIVE_EPISODE_BUTTONS', await episodeButtons.count());
+            if ((await page.locator('text=Watch experience').count()) === 0) throw new Error('Anime watch experience did not render');
+
+            const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+            await mobile.goto('http://127.0.0.1/', { waitUntil: 'networkidle' });
+            await mobile.screenshot({ path: '/tmp/samren-browser/05-home-mobile.png', fullPage: true });
+            console.log('SCREENSHOT', '05-home-mobile', 'url=', mobile.url());
+
+            await browser.close();
+          })().catch(async (err) => {
+            console.error(err.stack || err);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: samren-browser-screenshots
+          path: /tmp/samren-browser/
+          if-no-files-found: error
+
       - name: Capture resource snapshot
         if: always()
         run: |
