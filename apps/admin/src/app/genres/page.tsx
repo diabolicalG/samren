@@ -1,10 +1,11 @@
 'use client';
 
 import { useGenres } from '@samren/hooks';
+import type { Genre } from '@samren/types';
 
 export default function AdminGenresPage() {
   const { data, isLoading, error } = useGenres();
-  const genres = data?.data ?? [];
+  const genres: Genre[] = data?.data ?? [];
 
   if (error) {
     return <div className="p-6 text-red-500">Error loading genres.</div>;

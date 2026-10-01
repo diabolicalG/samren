@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { useAnimeList } from '@samren/hooks';
 import { AnimeGrid, SearchBar } from '@samren/ui';
+import type { Anime } from '@samren/types';
 
 export default function AdminAnimePage() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const { data, isLoading, error } = useAnimeList({ q: query, page, limit: 20 });
 
-  const animes = data?.data?.items ?? [];
+  const animes: Anime[] = data?.data?.items ?? [];
 
   return (
     <div className="p-6">

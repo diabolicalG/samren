@@ -16,7 +16,7 @@ import type {
 // .env.local; falls back to the default docker-compose/dev port.
 const API_BASE_URL =
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
-  'http://localhost:4000';
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000');
 
 // --- Auth token storage -----------------------------------------------
 // NOTE: there is currently no login UI anywhere in apps/web or apps/admin

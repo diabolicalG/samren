@@ -1,6 +1,7 @@
 'use client';
 
 import { useDownloads } from '@samren/hooks';
+import type { Download } from '@samren/types';
 import { Download as DownloadIcon } from 'lucide-react';
 import { formatBytes, formatDate } from '@samren/utils';
 
@@ -21,7 +22,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminDownloadsPage() {
-  const { downloads, isLoading, error } = useDownloads(DEMO_USER_ID);
+  const downloadsQuery = useDownloads(DEMO_USER_ID);
+  const { isLoading, error } = downloadsQuery;
+  const downloads: Download[] = downloadsQuery.downloads ?? [];
 
   if (error) {
     return <div className="p-6 text-red-500">Error loading downloads.</div>;

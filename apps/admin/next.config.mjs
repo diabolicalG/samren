@@ -2,6 +2,7 @@
 export default {
   transpilePackages: ['@samren/ui', '@samren/hooks', '@samren/types', '@samren/utils'],
   reactStrictMode: true,
+  output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },

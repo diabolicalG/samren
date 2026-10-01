@@ -2,45 +2,48 @@
 FROM node:20-alpine AS base
 
 ENV PNPM_HOME="/pnpm"
-ENV NODE_ENV=production
 
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 WORKDIR /app
 
 # Dependencies layer
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY apps/admin/package.json apps/admin/
 COPY packages/*/package.json packages/*/
-RUN pnpm install --frozen-lockfile --filter "admin" --filter "@samren/types" --filter "@samren/ui" --filter "@samren/hooks" --filter "@samren/utils"
+RUN pnpm install --frozen-lockfile --node-linker=hoisted
 
 # Build layer
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
 COPY apps/admin ./apps/admin
 COPY packages ./packages
 COPY tsconfig.json ./
+COPY apps/tsconfig.json ./apps/tsconfig.json
 
 WORKDIR /app/apps/admin
-RUN pnpm build
+# Invoke the hoisted Next binary directly; the app's own directory is the
+# build context so Next can discover its app/ directory.
+RUN node /app/node_modules/next/dist/bin/next build
+RUN find /app/apps/admin/.next/standalone -maxdepth 4 -type f | sort | head -80
 
 # Runtime layer
 FROM node:20-alpine AS runner
-WORKDIR /app/apps/admin
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable
+ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 
-COPY --from=builder /app/apps/admin/.next ./.next
-COPY --from=builder /app/apps/admin/public ./public
-COPY --from=builder /app/apps/admin/package.json ./package.json
-COPY --from=builder /app/apps/admin/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/.next/static ./.next/static
 COPY --from=builder /app/node_modules ./node_modules
 
+RUN node server.js > /tmp/next-start.log 2>&1 & pid=$!; sleep 5; if kill -0 $pid 2>/dev/null; then kill $pid; wait $pid || true; else cat /tmp/next-start.log; exit 1; fi
+
 EXPOSE 3001
-# See Dockerfile.web for why this uses `next start` rather than
-# `node server.js` / Next's `standalone` output.
-CMD ["pnpm", "start", "--", "-p", "3001"]
+CMD ["node", "server.js"]

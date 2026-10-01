@@ -34,11 +34,16 @@ export function useEpisodes(animeId: string) {
   });
 }
 
-export function useStreamUrl(animeId: string, episode: number, quality: string) {
+export function useStreamUrl(
+  animeId: string,
+  episode: number,
+  quality: string,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ['stream', animeId, episode, quality],
     queryFn: () => api.getStreamUrl(animeId, episode, quality),
-    enabled: !!animeId && !!episode,
+    enabled: (options.enabled ?? true) && !!animeId && !!episode,
   });
 }
 

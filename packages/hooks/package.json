@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@samren/api-client": "workspace:*",
-    "@samren/types": "workspace:*"
+    "@samren/types": "workspace:*",
+    "@tanstack/react-query": "^5.60.0"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.60.0",
