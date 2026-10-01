@@ -260,7 +260,14 @@ async def get_redis() -> aioredis.Redis:
 
 
 def create_db_and_tables() -> None:
-    SQLModel.metadata.create_all(engine)
+    # Uvicorn may start multiple API workers concurrently. Serialize the
+    # first schema initialization so workers cannot race on CREATE TABLE.
+    with engine.begin() as connection:
+        connection.exec_driver_sql("SELECT pg_advisory_lock(7483921)")
+        try:
+            SQLModel.metadata.create_all(connection)
+        finally:
+            connection.exec_driver_sql("SELECT pg_advisory_unlock(7483921)")
 
 
 def get_session():
