@@ -41,6 +41,7 @@ ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/apps/admin/.next/standalone ./
 COPY --from=builder /app/apps/admin/.next/static ./.next/static
+COPY --from=builder /app/node_modules ./node_modules
 
 RUN node server.js > /tmp/next-start.log 2>&1 & pid=$!; sleep 5; if kill -0 $pid 2>/dev/null; then kill $pid; wait $pid || true; else cat /tmp/next-start.log; exit 1; fi
 
