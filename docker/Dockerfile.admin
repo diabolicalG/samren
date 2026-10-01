@@ -24,7 +24,9 @@ COPY tsconfig.json ./
 COPY apps/tsconfig.json ./apps/tsconfig.json
 
 WORKDIR /app
-RUN pnpm --filter admin build
+# With pnpm's hoisted linker, invoke the hoisted Next binary directly so
+# production builds do not depend on workspace .bin symlink layout.
+RUN node /app/node_modules/next/dist/bin/next build
 
 # Runtime layer
 FROM node:20-alpine AS runner
