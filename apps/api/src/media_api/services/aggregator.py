@@ -110,17 +110,17 @@ class Aggregator:
             return [m.dict() for m in self._dedupe(self._filter_types(merged, types))[:limit]]
 
         raw = await cached_json(cache_key, settings.cache_ttl_trending, fetch)
-        return [Media.model_validate(item) for item in raw]
+        return [Media.parse_obj(item) for item in raw]
 
     async def schedule(self, date: str, country: str) -> List[Media]:
         cache_key = f"media:schedule:{date}:{country.upper()}"
 
         async def fetch():
             merged = await self._gather("schedule", date, country.upper())
-            return [m.model_dump() for m in self._dedupe(merged)]
+            return [m.dict() for m in self._dedupe(merged)]
 
         raw = await cached_json(cache_key, settings.cache_ttl_schedule, fetch)
-        return [Media.model_validate(item) for item in raw]
+        return [Media.parse_obj(item) for item in raw]
 
 
 aggregator = Aggregator()
