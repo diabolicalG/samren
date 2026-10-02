@@ -53,8 +53,8 @@ class AniListAdapter(ProviderAdapter):
         cover = node.get("coverImage") or {}
         score = node.get("averageScore")
         return Media(
-            id=self.make_id(str(node.get("idMal") or node["id"]), MediaType.ANIME), source=MediaSource.ANILIST,
-            source_id=str(node["id"]), type=MediaType.ANIME, title=title,
+            id=self.make_id(str(node["id"]), MediaType.ANIME), source=MediaSource.ANILIST,
+            source_id=str(node["id"]), mal_id=str(node["idMal"]) if node.get("idMal") else None, type=MediaType.ANIME, title=title,
             title_original=titles.get("native"), synopsis=node.get("description"),
             poster_url=cover.get("extraLarge") or cover.get("large"), backdrop_url=node.get("bannerImage"),
             rating=score / 10 if score is not None else None, genres=node.get("genres") or [],
