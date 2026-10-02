@@ -189,6 +189,8 @@ class DownloadCreate(BaseModel):
 
 
 from .media_api.app import router as unified_media_router
+from .media_api.models import MediaType
+from .media_api.services.aggregator import aggregator
 
 app = FastAPI(
     title="Samren API",
@@ -350,13 +352,64 @@ async def _proxy_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict
     return data
 
 
+# --- Unified metadata fallback ------------------------------------------------
+
+def _media_to_anime(media: Any) -> Dict[str, Any]:
+    """Adapt normalized unified media to the legacy Anime API contract.
+
+    The normalized AniList adapter deliberately exposes the MAL id when one is
+    available, so the existing episode/stream service can continue using its
+    Jikan/WCO path without introducing a second playback system.
+    """
+    return {
+        "id": media.id,
+        "title": media.title,
+        "nativeTitle": media.title_original,
+        "description": media.synopsis or "",
+        "coverImage": media.poster_url or "",
+        "bannerImage": media.backdrop_url,
+        "rating": media.rating or 0,
+        "status": media.status or "released",
+        "type": "tv",
+        "episodes": media.total_episodes or 0,
+        "duration": media.runtime_minutes or 0,
+        "year": media.release_year or 0,
+        "season": None,
+        "genres": [{"id": str(i), "name": name, "description": None} for i, name in enumerate(media.genres)],
+        "studios": [],
+        "tags": [],
+        "source": media.source.value,
+        "trailer": None,
+        "createdAt": datetime.utcnow().isoformat(),
+        "updatedAt": datetime.utcnow().isoformat(),
+    }
+
+
+async def _unified_anime_list(limit: int, page: int = 1) -> Dict[str, Any]:
+    # The unified provider currently exposes page-1 trending data. Keep the
+    # legacy pagination contract so the existing UI remains compatible.
+    items = await aggregator.trending([MediaType.ANIME], min(limit, 50))
+    anime = [_media_to_anime(item) for item in items]
+    return {"success": True, "data": {"items": anime, "total": len(anime), "page": page, "limit": limit, "hasNext": False}}
+
+
+async def _unified_search(query: str, limit: int, page: int = 1) -> Dict[str, Any]:
+    items = await aggregator.search(query, [MediaType.ANIME], min(limit, 50))
+    anime = [_media_to_anime(item) for item in items]
+    return {"success": True, "data": {"animes": anime, "total": len(anime), "page": page, "hasNext": False}}
+
+
 # --- Public anime endpoints (proxied to ShivraAPI with Redis cache) ---
 
 @app.get("/api/anime")
 async def list_anime(request: Request):
     params = dict(request.query_params)
-    data = await _proxy_get("/anime", params)
-    return data
+    try:
+        return await _proxy_get("/anime", params)
+    except HTTPException as exc:
+        if exc.status_code not in {502, 503, 504}:
+            raise
+        return await _unified_anime_list(int(params.get("limit", 20)), int(params.get("page", 1)))
 
 
 @app.get("/api/anime/{anime_id}")
@@ -381,15 +434,26 @@ async def get_stream(anime_id: str, episode: int, request: Request):
 @app.get("/api/search")
 async def search(request: Request):
     params = dict(request.query_params)
-    data = await _proxy_get("/search", params)
-    return data
+    try:
+        return await _proxy_get("/search", params)
+    except HTTPException as exc:
+        if exc.status_code not in {502, 503, 504}:
+            raise
+        query = str(params.get("q", "")).strip()
+        if not query:
+            raise
+        return await _unified_search(query, int(params.get("limit", 20)), int(params.get("page", 1)))
 
 
 @app.get("/api/top")
 async def get_top(request: Request):
     params = dict(request.query_params)
-    data = await _proxy_get("/top", params)
-    return data
+    try:
+        return await _proxy_get("/top", params)
+    except HTTPException as exc:
+        if exc.status_code not in {502, 503, 504}:
+            raise
+        return await _unified_anime_list(int(params.get("limit", 50)), int(params.get("page", 1)))
 
 
 @app.get("/api/genres")
