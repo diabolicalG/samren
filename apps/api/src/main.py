@@ -362,7 +362,7 @@ def _media_to_anime(media: Any) -> Dict[str, Any]:
     Jikan/WCO path without introducing a second playback system.
     """
     return {
-        "id": media.id,
+        "id": media.mal_id or media.source_id,
         "title": media.title,
         "nativeTitle": media.title_original,
         "description": media.synopsis or "",
