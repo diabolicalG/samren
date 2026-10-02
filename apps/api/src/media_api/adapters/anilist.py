@@ -9,7 +9,7 @@ SEARCH_QUERY = """
 query ($search: String, $perPage: Int) {
   Page(page: 1, perPage: $perPage) {
     media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
-      id title { romaji english native } description(asHtml: false)
+      id idMal title { romaji english native } description(asHtml: false)
       coverImage { extraLarge large } bannerImage averageScore genres episodes status startDate { year }
     }
   }
@@ -19,7 +19,7 @@ TRENDING_QUERY = """
 query ($perPage: Int) {
   Page(page: 1, perPage: $perPage) {
     media(type: ANIME, sort: TRENDING_DESC) {
-      id title { romaji english native } description(asHtml: false)
+      id idMal title { romaji english native } description(asHtml: false)
       coverImage { extraLarge large } bannerImage averageScore genres episodes status startDate { year }
     }
   }
@@ -28,7 +28,7 @@ query ($perPage: Int) {
 DETAIL_QUERY = """
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
-    id title { romaji english native } description(asHtml: false)
+    id idMal title { romaji english native } description(asHtml: false)
     coverImage { extraLarge large } bannerImage averageScore genres episodes duration status startDate { year }
     characters(sort: ROLE, perPage: 15) { edges { role node { id name { full } image { large } } } }
   }
@@ -54,7 +54,7 @@ class AniListAdapter(ProviderAdapter):
         score = node.get("averageScore")
         return Media(
             id=self.make_id(str(node["id"]), MediaType.ANIME), source=MediaSource.ANILIST,
-            source_id=str(node["id"]), type=MediaType.ANIME, title=title,
+            source_id=str(node["id"]), mal_id=str(node["idMal"]) if node.get("idMal") else None, type=MediaType.ANIME, title=title,
             title_original=titles.get("native"), synopsis=node.get("description"),
             poster_url=cover.get("extraLarge") or cover.get("large"), backdrop_url=node.get("bannerImage"),
             rating=score / 10 if score is not None else None, genres=node.get("genres") or [],
