@@ -19,7 +19,7 @@ TRENDING_QUERY = """
 query ($perPage: Int) {
   Page(page: 1, perPage: $perPage) {
     media(type: ANIME, sort: TRENDING_DESC) {
-      id title { romaji english native } description(asHtml: false)
+      id idMal title { romaji english native } description(asHtml: false)
       coverImage { extraLarge large } bannerImage averageScore genres episodes status startDate { year }
     }
   }
@@ -28,7 +28,7 @@ query ($perPage: Int) {
 DETAIL_QUERY = """
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
-    id title { romaji english native } description(asHtml: false)
+    id idMal title { romaji english native } description(asHtml: false)
     coverImage { extraLarge large } bannerImage averageScore genres episodes duration status startDate { year }
     characters(sort: ROLE, perPage: 15) { edges { role node { id name { full } image { large } } } }
   }
