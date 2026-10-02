@@ -54,6 +54,7 @@ class Media(BaseModel):
     id: str
     source: MediaSource
     source_id: str
+    mal_id: Optional[str] = None
     type: MediaType
     title: str
     title_original: Optional[str] = None
