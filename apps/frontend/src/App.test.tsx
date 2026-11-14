@@ -53,12 +53,20 @@ describe("frontend foundation", () => {
     });
   });
 
-  it("shows the honest not-yet-available browse state", () => {
+  it("renders the database-backed browse filters and catalogue empty state", async () => {
     vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogGenres").mockResolvedValue([]);
+    vi.spyOn(apiClient, "catalogAnime").mockResolvedValue({
+      items: [],
+      pagination: { page: 1, pageSize: 24, totalItems: 0, totalPages: 0 },
+    });
 
     renderApp("/browse");
 
-    expect(screen.getByRole("heading", { name: "Browse" })).toBeTruthy();
-    expect(screen.getByText(/application-owned catalogue arrives in phase 2/i)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /browse the catalogue/i })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Search titles" })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText(/no titles match those filters/i)).toBeTruthy();
+    });
   });
 });
