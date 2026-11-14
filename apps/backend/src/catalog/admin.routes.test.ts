@@ -110,13 +110,14 @@ describe("admin catalogue management", () => {
     expect(asset.status).toBe(201);
     expect(asset.body.data.sizeBytes).toBe("4096");
     expect(asset.body.data.processingState).toBe("PENDING");
-    assetId = asset.body.data.id;
-    relatedAssetIds.push(assetId);
+    const posterAssetId = asset.body.data.id as string;
+    assetId = posterAssetId;
+    relatedAssetIds.push(posterAssetId);
 
     const linked = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
-      .set("Origin", origin).send({ posterAssetId: assetId });
+      .set("Origin", origin).send({ posterAssetId });
     expect(linked.status).toBe(200);
-    expect(linked.body.data.posterAssetId).toBe(assetId);
+    expect(linked.body.data.posterAssetId).toBe(posterAssetId);
 
     const episode = await agent.post("/api/v1/admin/catalog/episodes").set("Origin", origin).send({
       animeId: created.body.data.id,
@@ -194,7 +195,7 @@ describe("admin catalogue management", () => {
     const publicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(publicLookup.status).toBe(200);
     expect(publicLookup.body.data.title).toBe("Phase Two Admin Edited Title");
-    expect(publicLookup.body.data.posterAsset).toMatchObject({ id: assetId, mimeType: "image/webp", width: 600, height: 800 });
+    expect(publicLookup.body.data.posterAsset).toMatchObject({ id: posterAssetId, mimeType: "image/webp", width: 600, height: 800 });
     expect(publicLookup.body.data.posterAsset).not.toHaveProperty("storageKey");
     expect(publicLookup.body.data.episodes).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: episode.body.data.id, title: "The Edited Pilot" }),
