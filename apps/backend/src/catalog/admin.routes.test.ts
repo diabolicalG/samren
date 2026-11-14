@@ -201,7 +201,7 @@ describe("admin catalogue management", () => {
       expect.objectContaining({ id: episode.body.data.id, title: "The Edited Pilot" }),
     ]));
 
-    const protectedAssetDelete = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
+    const protectedAssetDelete = await agent.delete("/api/v1/admin/catalog/assets/" + posterAssetId).set("Origin", origin);
     expect(protectedAssetDelete.status).toBe(409);
     expect(protectedAssetDelete.body.error.code).toBe("IN_USE");
 
