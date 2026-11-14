@@ -95,6 +95,22 @@ describe("admin catalogue management", () => {
     });
     expect(created.body.data).not.toHaveProperty("posterAsset.storageKey");
 
+    const episode = await agent.post("/api/v1/admin/catalog/episodes").set("Origin", origin).send({
+      animeId: created.body.data.id,
+      episodeNumber: 1,
+      title: "A First-Party Pilot",
+      publicationStatus: "PUBLISHED",
+      durationSeconds: 1440,
+    });
+    expect(episode.status).toBe(201);
+    expect(episode.body.data.title).toBe("A First-Party Pilot");
+
+    const updatedEpisode = await agent.patch("/api/v1/admin/catalog/episodes/" + episode.body.data.id)
+      .set("Origin", origin).send({ title: "The Edited Pilot", isRecap: true });
+    expect(updatedEpisode.status).toBe(200);
+    expect(updatedEpisode.body.data.title).toBe("The Edited Pilot");
+    expect(updatedEpisode.body.data.isRecap).toBe(true);
+
     const draftPublicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(draftPublicLookup.status).toBe(404);
 
@@ -111,6 +127,13 @@ describe("admin catalogue management", () => {
     const publicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(publicLookup.status).toBe(200);
     expect(publicLookup.body.data.title).toBe("Phase Two Admin Edited Title");
+    expect(publicLookup.body.data.episodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: episode.body.data.id, title: "The Edited Pilot" }),
+    ]));
+
+    const archivedEpisode = await agent.delete("/api/v1/admin/catalog/episodes/" + episode.body.data.id).set("Origin", origin);
+    expect(archivedEpisode.status).toBe(200);
+    expect(archivedEpisode.body.data.publicationStatus).toBe("ARCHIVED");
 
     const archived = await agent
       .delete(`/api/v1/admin/catalog/anime/${created.body.data.id}`)
