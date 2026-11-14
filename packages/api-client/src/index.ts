@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminMediaAsset, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -48,6 +48,10 @@ export function createApiClient(options: ApiClientOptions = {}) {
     authLogout: () => request<void>("/auth/logout", { method: "POST" }),
     adminCatalogAnime: () => request<{ items: AdminCatalogAnime[] }>("/admin/catalog/anime"),
     adminCatalogEpisodes: (animeId: string) => request<AdminCatalogEpisode[]>("/admin/catalog/anime/" + encodeURIComponent(animeId) + "/episodes"),
+    adminCatalogAssets: () => request<AdminMediaAsset[]>("/admin/catalog/assets"),
+    adminCreateAsset: (input: { storageKey: string; originalFilename: string; mediaKind: AdminMediaAsset["mediaKind"]; mimeType: string; sizeBytes: number; width?: number | null; height?: number | null; durationSeconds?: number | null; checksumSha256?: string | null }) => request<AdminMediaAsset>("/admin/catalog/assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminUpdateAsset: (id: string, input: { originalFilename?: string; mimeType?: string; sizeBytes?: number; width?: number | null; height?: number | null; durationSeconds?: number | null; checksumSha256?: string | null }) => request<AdminMediaAsset>("/admin/catalog/assets/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminDeleteAsset: (id: string) => request<void>("/admin/catalog/assets/" + encodeURIComponent(id), { method: "DELETE" }),
     adminCreateEpisode: (input: { animeId: string; episodeNumber: number; title: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminUpdateEpisode: (id: string, input: { episodeNumber?: number; title?: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminArchiveEpisode: (id: string) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "DELETE" }),
