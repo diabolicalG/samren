@@ -13,7 +13,8 @@
     "db:format": "prisma format --schema prisma/schema.prisma",
     "db:validate": "prisma validate --schema prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "admin:bootstrap": "tsx prisma/bootstrap-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
