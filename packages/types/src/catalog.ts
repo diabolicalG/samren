@@ -137,4 +137,4 @@ export type AdminAnimeWriteInput = {
   seasonGroupId?: string | null;
   genreSlugs?: string[];
   studioSlugs?: string[];
-}
+};
