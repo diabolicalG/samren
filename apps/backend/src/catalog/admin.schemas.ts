@@ -74,12 +74,12 @@ export const adminEpisodeCreateSchema = z.object({
 export const adminEpisodeUpdateSchema = adminEpisodeCreateSchema.omit({ animeId: true }).partial().strict();
 
 const safeStorageKeySchema = z.string().trim().min(1).max(500)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9/_\\-.]*$/)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9/_.-]*$/)
   .refine((value) => !value.split("/").some((segment) => segment === "." || segment === ".."), "Storage key path traversal is not allowed");
 
 export const adminAssetCreateSchema = z.object({
   storageKey: safeStorageKeySchema,
-  originalFilename: z.string().trim().min(1).max(255).refine((value) => !/[\\\\/\\0]/.test(value), "Filename must not contain a path"),
+  originalFilename: z.string().trim().min(1).max(255).refine((value) => !value.includes("/") && !value.includes("\\\\") && !value.includes("\\0"), "Filename must not contain a path"),
   mediaKind: z.enum(["POSTER", "BANNER", "VIDEO", "SUBTITLE"]),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "text/vtt", "application/x-subrip", "application/x-ass"]),
   sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
