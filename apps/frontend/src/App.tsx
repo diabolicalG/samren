@@ -1,5 +1,8 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles } from "lucide-react";
+import { Link, Route, Routes } from "react-router-dom";
+import { apiClient } from "@samren/api-client";
+import { ActionLink, StatusBadge, Surface } from "./components/ui";
 
 function HomePage() {
   return (
@@ -9,7 +12,7 @@ function HomePage() {
           <span className="eyebrow"><Sparkles size={14} /> YOUR ANIME SPACE</span>
           <h1 id="hero-title">A quieter way<br />to <span>find your next</span><br />favorite story.</h1>
           <p>Build your own collection, keep track of every episode, and make your watchlist feel like home.</p>
-          <Link className="primary-action" to="/browse">Explore your library <span aria-hidden="true">↗</span></Link>
+          <ActionLink className="primary-action" to="/browse">Explore your library <span aria-hidden="true">↗</span></ActionLink>
         </div>
         <div className="hero-orbit" aria-hidden="true">
           <div className="orbit-ring orbit-ring-one" />
@@ -24,11 +27,11 @@ function HomePage() {
         <div><span className="section-kicker">THE COLLECTION STARTS HERE</span><h2>Your next chapter awaits.</h2></div>
         <p>Samren is being rebuilt around a catalogue you own and control. No third-party anime feeds or stream providers.</p>
       </section>
-      <section className="empty-library" aria-label="Library status">
+      <Surface className="empty-library" aria-label="Library status">
         <div className="empty-icon"><Library size={22} /></div>
         <div><h3>Your library is taking shape</h3><p>Catalogue collections will appear here once they are added by an administrator.</p></div>
         <span className="status-pill">FOUNDATION</span>
-      </section>
+      </Surface>
     </main>
   );
 }
@@ -38,6 +41,18 @@ function BrowsePage() {
 }
 
 export default function App() {
+  const healthQuery = useQuery({
+    queryKey: ["system", "health"],
+    queryFn: () => apiClient.health(),
+    retry: false,
+    refetchInterval: 60_000,
+  });
+  const apiStatus = healthQuery.isSuccess
+    ? { label: "API CONNECTED", tone: "positive" as const, accessible: "API status: connected" }
+    : healthQuery.isError
+      ? { label: "API UNAVAILABLE", tone: "warning" as const, accessible: "API status: unavailable" }
+      : { label: "API CHECKING", tone: "neutral" as const, accessible: "API status: checking" };
+
   return (
     <div className="app-frame">
       <header className="topbar">
@@ -48,7 +63,7 @@ export default function App() {
           <Link to="/search"><Search size={15} /> Search</Link>
           <Link to="/library"><Library size={15} /> My Library</Link>
         </nav>
-        <span className="topbar-note">YOUR PERSONAL ANIME SPACE</span>
+        <StatusBadge tone={apiStatus.tone} label={apiStatus.accessible}>{apiStatus.label}</StatusBadge>
       </header>
       <Routes>
         <Route path="/" element={<HomePage />} />
