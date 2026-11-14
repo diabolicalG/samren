@@ -166,3 +166,38 @@ export type AdminMediaAsset = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AdminEpisodeMedia = {
+  id: string;
+  episodeId: string;
+  assetId: string;
+  qualityLabel: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  asset: {
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+    width: number | null;
+    height: number | null;
+    durationSeconds: number | null;
+    processingState: "PENDING" | "READY" | "FAILED";
+  };
+};
+
+export type AdminSubtitleTrack = {
+  id: string;
+  episodeId: string;
+  assetId: string;
+  languageCode: string;
+  label: string;
+  format: "SRT" | "VTT" | "ASS";
+  isDefault: boolean;
+  createdAt: string;
+  asset: {
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+    processingState: "PENDING" | "READY" | "FAILED";
+  };
+};
