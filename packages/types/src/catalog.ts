@@ -136,6 +136,8 @@ export type AdminAnimeWriteInput = {
   ageRating?: CatalogAgeRating | null;
   score?: number | null;
   featured?: boolean;
+  posterAssetId?: string | null;
+  bannerAssetId?: string | null;
   seasonGroupId?: string | null;
   genreSlugs?: string[];
   studioSlugs?: string[];
