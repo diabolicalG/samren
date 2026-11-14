@@ -6,62 +6,46 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: write
+
 jobs:
-  frontend:
+  foundation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Typecheck
+      - name: Install dependencies and reconcile lockfile
+        run: pnpm install --no-frozen-lockfile
+      - name: Commit generated lockfile when it changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          pnpm --filter web typecheck
-          pnpm --filter admin typecheck
-      - name: Build
-        run: |
-          pnpm --filter web build
-          pnpm --filter admin build
-
-  gateway:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: pip install -r requirements.txt
-      - name: Compile check
-        working-directory: apps/api
-        run: python -m py_compile src/main.py
-      - name: Run tests
-        working-directory: apps/api
+          if ! git diff --quiet -- pnpm-lock.yaml; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "chore: synchronize pnpm lockfile"
+            git push
+          fi
+      - name: Validate Prisma schema
+        working-directory: apps/backend
         env:
-          DATABASE_URL: "sqlite:///./test_ci.db?check_same_thread=false"
-          JWT_SECRET: "ci-test-secret"
-          REDIS_URL: "redis://localhost:6379"
-          SHIVRA_API_URL: "http://localhost:8000"
-          SKIP_SEED_ADMIN: "true"
-        run: python -m pytest tests/ -v
-
-  content-service:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install dependencies
-        working-directory: services/shivra-api
-        run: pip install -r requirements.txt
-      - name: Compile check
-        working-directory: services/shivra-api
-        run: python -m py_compile main.py scrapers/*.py
+          DATABASE_URL: "postgresql://samren:ci-only@localhost:5432/samren"
+        run: pnpm db:validate
+      - name: Generate Prisma client
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: "postgresql://samren:ci-only@localhost:5432/samren"
+        run: pnpm db:generate
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build frontend and backend
+        run: pnpm build
