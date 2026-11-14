@@ -197,6 +197,10 @@ function AdminPage() {
   const [seasonYear, setSeasonYear] = useState("2026");
   const [seasonName, setSeasonName] = useState<"WINTER" | "SPRING" | "SUMMER" | "FALL">("WINTER");
   const [seasonLabel, setSeasonLabel] = useState("");
+  const [activeEpisodeAnimeId, setActiveEpisodeAnimeId] = useState<string | null>(null);
+  const [newEpisodeNumber, setNewEpisodeNumber] = useState("1");
+  const [newEpisodeTitle, setNewEpisodeTitle] = useState("");
+  const [newEpisodeDuration, setNewEpisodeDuration] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const loginMutation = useMutation({
     mutationFn: () => apiClient.authLogin(email, password),
@@ -216,6 +220,7 @@ function AdminPage() {
   const adminGenresQuery = useQuery({ queryKey: ["admin", "genres"], queryFn: apiClient.adminCatalogGenres, enabled: isAdmin });
   const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.adminCatalogStudios, enabled: isAdmin });
   const adminSeasonsQuery = useQuery({ queryKey: ["admin", "seasons"], queryFn: apiClient.adminCatalogSeasons, enabled: isAdmin });
+  const adminEpisodesQuery = useQuery({ queryKey: ["admin", "episodes", activeEpisodeAnimeId], queryFn: () => apiClient.adminCatalogEpisodes(activeEpisodeAnimeId ?? ""), enabled: isAdmin && Boolean(activeEpisodeAnimeId) });
   const catalogQuery = useQuery({
     queryKey: ["admin", "catalog"],
     queryFn: apiClient.adminCatalogAnime,
@@ -277,6 +282,26 @@ function AdminPage() {
     mutationFn: apiClient.adminDeleteSeason,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "seasons"] }),
   });
+  const createEpisodeMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateEpisode({
+      animeId: activeEpisodeAnimeId ?? "",
+      episodeNumber: Number(newEpisodeNumber),
+      title: newEpisodeTitle.trim(),
+      durationSeconds: newEpisodeDuration ? Number(newEpisodeDuration) * 60 : null,
+      publicationStatus: "DRAFT",
+    }),
+    onSuccess: async () => {
+      setNewEpisodeTitle("");
+      setNewEpisodeNumber(String((Number(newEpisodeNumber) || 0) + 1));
+      setNewEpisodeDuration("");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
+    },
+  });
+  const archiveEpisodeMutation = useMutation({
+    mutationFn: apiClient.adminArchiveEpisode,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }),
+  });
 
   if (sessionQuery.isLoading) {
     return <main className="page-shell admin-page"><div className="catalog-loading" role="status">Checking administrator session…</div></main>;
@@ -330,11 +355,26 @@ function AdminPage() {
                 <article className="admin-record">
                   <div className="admin-record-copy"><div className="admin-record-meta"><span className={"admin-status admin-status--" + item.publicationStatus.toLowerCase()}>{item.publicationStatus}</span><span>{item._count.episodes} episodes</span></div><h3>{item.title}</h3><p>/{item.slug}</p></div>
                   <div className="admin-record-actions">
-                    {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); }} aria-label={"Edit " + item.title}>Edit</button> : null}
+                    {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => setActiveEpisodeAnimeId((current) => current === item.id ? null : item.id)} aria-expanded={activeEpisodeAnimeId === item.id}>{activeEpisodeAnimeId === item.id ? "Hide episodes" : "Episodes"}</button>
+                    <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); }} aria-label={"Edit " + item.title}>Edit</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
                   </div>
                 </article>
+                {activeEpisodeAnimeId === item.id ? (
+                  <Surface className="admin-edit admin-episodes">
+                    <div className="catalog-section-heading"><div><span className="section-kicker">EPISODE GUIDE</span><h2>Manage episodes</h2></div><span>{adminEpisodesQuery.data?.length ?? 0} records</span></div>
+                    <form onSubmit={(event) => { event.preventDefault(); createEpisodeMutation.mutate(); }}>
+                      <TextField id={"episode-number-" + item.id} label="Episode number" required inputMode="numeric" value={newEpisodeNumber} onChange={(event) => setNewEpisodeNumber(event.target.value.replace(/[^0-9]/g, "").slice(0, 5))} />
+                      <TextField id={"episode-title-" + item.id} label="Episode title" required maxLength={240} value={newEpisodeTitle} onChange={(event) => setNewEpisodeTitle(event.target.value)} />
+                      <TextField id={"episode-duration-" + item.id} label="Duration (minutes)" inputMode="numeric" value={newEpisodeDuration} onChange={(event) => setNewEpisodeDuration(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
+                      <button className="ui-button ui-button--secondary" type="submit" disabled={createEpisodeMutation.isPending || !newEpisodeTitle.trim() || Number(newEpisodeNumber) < 1 || (newEpisodeDuration !== "" && Number(newEpisodeDuration) < 1)}>Add episode draft</button>
+                    </form>
+                    {createEpisodeMutation.isError || archiveEpisodeMutation.isError ? <p className="admin-error" role="alert">{(createEpisodeMutation.error ?? archiveEpisodeMutation.error)?.message}</p> : null}
+                    {adminEpisodesQuery.isLoading ? <div className="catalog-loading">Loading episodes…</div> : null}
+                    <ul className="admin-taxonomy-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending || episode.publicationStatus === "ARCHIVED"}>Archive</button></li>)}</ul>
+                  </Surface>
+                ) : null}
                 {editingId === item.id ? (
                   <Surface className="admin-edit">
                     <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs } }); }}>
