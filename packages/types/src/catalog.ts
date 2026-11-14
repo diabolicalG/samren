@@ -111,6 +111,8 @@ export type AdminCatalogAnime = {
   ageRating: CatalogAgeRating | null;
   score: number | null;
   featured: boolean;
+  posterAssetId: string | null;
+  bannerAssetId: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
