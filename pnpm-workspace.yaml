@@ -1,4 +1,7 @@
 packages:
   - "apps/frontend"
   - "apps/backend"
-  - "packages/*"
+  - "packages/api-client"
+  - "packages/types"
+  - "packages/prettier-config"
+  - "packages/typescript-config"
