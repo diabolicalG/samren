@@ -1,6 +1,6 @@
 # Samren Phase 2 — Application-Owned Catalogue
 
-**Status:** IN PROGRESS — public catalogue and authenticated anime admin slice implemented; taxonomy, episode and asset administration remain outstanding  
+**Status:** COMPLETE — application-owned catalogue, public browsing and authenticated admin management implemented and CI-verified  
 **Repository:** `diabolicalG/samren`  
 **Branch:** `main`  
 **Phase 1 baseline:** `fa471ba986bdd462d20d17e0f002218b540567f8`  
@@ -62,7 +62,7 @@ Admin write routes:
 - Home shows published featured and recently added catalogue records, with explicit empty states when no records exist.
 - Browse supports search, genre/status/type/year filters, pagination, loading/error/empty states and responsive layouts.
 - Add catalogue detail route with synopsis, metadata, genre/studio links and episode listing.
-- Add an admin catalogue workspace; the authenticated anime management screen is implemented. Taxonomy, episode and asset metadata screens remain outstanding.
+- Add an authenticated admin catalogue workspace for anime, taxonomy, episodes, first-party asset metadata and episode media/subtitle associations.
 - Keep the Obsidian visual language, accessible controls, keyboard navigation and reduced-motion behavior.
 - Artwork is displayed only from safe application-owned asset references. No hotlinked external anime artwork.
 
@@ -89,15 +89,15 @@ Admin write routes:
 
 ## 8. Acceptance gates
 
-- [ ] Normalized Prisma catalogue schema validates and client generation succeeds.
-- [ ] Migration is created and tested against PostgreSQL, or the exact limitation is documented.
-- [ ] Seed fixtures are deterministic, local-only and idempotent.
-- [ ] Public catalogue API returns only PUBLISHED records and validates all filters/pagination.
-- [ ] Catalogue services and routes have meaningful tests, including error cases.
-- [ ] Frontend home/browse/detail consume the real API and show loading/error/empty states.
-- [ ] No external anime API, scraper, provider, embed, arbitrary remote media URL or fallback is present in the active runtime.
-- [ ] Admin mutations are protected by server-side ADMIN authorization; no bypass or insecure temporary credential.
-- [ ] Lint, typecheck, tests and production builds pass in CI.
-- [ ] Anime-streaming remains unchanged; legacy source remains untouched.
+- [x] Normalized Prisma catalogue schema validates and client generation succeeds.
+- [x] Migration is created and tested against PostgreSQL in CI.
+- [x] Seed fixtures are deterministic, local-only and idempotent; CI executes the seed twice.
+- [x] Public catalogue API returns only PUBLISHED records and validates all filters/pagination.
+- [x] Catalogue services and routes have integration tests, including validation, visibility, not-found, conflict and relation cases.
+- [x] Frontend home/browse/detail consume the real API and show loading/error/empty states.
+- [x] No external anime API, scraper, provider, embed, arbitrary remote media URL or fallback is present in the active runtime.
+- [x] Admin mutations are protected by server-side ADMIN authorization and exact Origin checks; no bypass or insecure temporary credential.
+- [x] Lint, typecheck, PostgreSQL-backed API tests, frontend tests and production builds pass in CI.
+- [x] Anime-streaming remains unchanged; legacy source remains untouched.
 
 **Phase boundary:** Phase 2 is catalogue-only. First-party playback and secure media delivery are Phase 3. Full user accounts and personal library are Phase 4.
