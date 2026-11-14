@@ -6,6 +6,10 @@ import { loginSchema } from "./auth.schemas.js";
 import { verifyPassword } from "./password.js";
 
 export const authRouter = Router();
+authRouter.use((_request, response, next) => {
+  response.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 const failedLogins = new Map<string, { count: number; resetAt: number }>();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
