@@ -183,3 +183,6 @@ export interface Download {
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
+
+// New provider-neutral contracts for the rebuilt application.
+export * from "./platform";
