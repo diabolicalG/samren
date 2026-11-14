@@ -85,6 +85,7 @@ function BrowsePage() {
   const [genre, setGenre] = useState("");
   const [studio, setStudio] = useState("");
   const [year, setYear] = useState("");
+  const [season, setSeason] = useState("");
   const [sort, setSort] = useState("title");
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
@@ -97,6 +98,7 @@ function BrowsePage() {
     genre: genre || undefined,
     studio: studio || undefined,
     year: year.length === 4 ? Number(year) : undefined,
+    season: season ? season as CatalogListParams["season"] : undefined,
     page,
     pageSize: 24,
     sort: sort as CatalogListParams["sort"],
@@ -118,6 +120,7 @@ function BrowsePage() {
           <label className="ui-field" htmlFor="catalog-status">Release status<select className="ui-input" id="catalog-status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">All statuses</option><option value="AIRING">Airing</option><option value="FINISHED">Finished</option><option value="NOT_YET_AIRED">Upcoming</option><option value="CANCELLED">Cancelled</option></select></label>
           <label className="ui-field" htmlFor="catalog-genre">Genre<select className="ui-input" id="catalog-genre" value={genre} onChange={(event) => { setGenre(event.target.value); setPage(1); }}><option value="">All genres</option>{(genresQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
           <TextField id="catalog-year" label="Release year" inputMode="numeric" placeholder="e.g. 2025" value={year} onChange={(event) => { setYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPage(1); }} />
+          <label className="ui-field" htmlFor="catalog-season">Season<select className="ui-input" id="catalog-season" value={season} onChange={(event) => { setSeason(event.target.value); setPage(1); }}><option value="">All seasons</option><option value="WINTER">Winter</option><option value="SPRING">Spring</option><option value="SUMMER">Summer</option><option value="FALL">Fall</option></select></label>
           <label className="ui-field" htmlFor="catalog-studio">Studio<select className="ui-input" id="catalog-studio" value={studio} onChange={(event) => { setStudio(event.target.value); setPage(1); }}><option value="">All studios</option>{(studiosQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
           <label className="ui-field" htmlFor="catalog-sort">Sort by<select className="ui-input" id="catalog-sort" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="title">Title</option><option value="recent">Recently added</option><option value="score">Highest score</option></select></label>
         </div>
