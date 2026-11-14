@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -47,6 +47,10 @@ export function createApiClient(options: ApiClientOptions = {}) {
     authLogin: (email: string, password: string) => request<{ user: AdminAuthUser; expiresAt: string }>("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }),
     authLogout: () => request<void>("/auth/logout", { method: "POST" }),
     adminCatalogAnime: () => request<{ items: AdminCatalogAnime[] }>("/admin/catalog/anime"),
+    adminCatalogEpisodes: (animeId: string) => request<AdminCatalogEpisode[]>("/admin/catalog/anime/" + encodeURIComponent(animeId) + "/episodes"),
+    adminCreateEpisode: (input: { animeId: string; episodeNumber: number; title: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminUpdateEpisode: (id: string, input: { episodeNumber?: number; title?: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminArchiveEpisode: (id: string) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "DELETE" }),
     adminCatalogGenres: () => request<CatalogTaxonomyItem[]>("/admin/catalog/genres"),
     adminCatalogStudios: () => request<CatalogTaxonomyItem[]>("/admin/catalog/studios"),
     adminCatalogSeasons: () => request<CatalogSeason[]>("/admin/catalog/seasons"),
