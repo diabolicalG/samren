@@ -122,10 +122,19 @@ export type AdminCatalogAnime = {
 export type AdminAnimeWriteInput = {
   slug?: string;
   title?: string;
+  englishTitle?: string | null;
+  nativeTitle?: string | null;
+  alternateTitles?: string[];
   synopsis?: string | null;
+  type?: CatalogAnimeType;
+  releaseStatus?: CatalogReleaseStatus;
   publicationStatus?: CatalogPublicationStatus;
-  featured?: boolean;
   releaseYear?: number | null;
+  releaseSeason?: CatalogSeasonName | null;
+  ageRating?: CatalogAgeRating | null;
+  score?: number | null;
+  featured?: boolean;
+  seasonGroupId?: string | null;
   genreSlugs?: string[];
   studioSlugs?: string[];
-};
+}
