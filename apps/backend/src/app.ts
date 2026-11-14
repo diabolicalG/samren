@@ -3,13 +3,17 @@ import express from "express";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { catalogRouter } from "./catalog/catalog.routes.js";
+import { authRouter } from "./auth/auth.routes.js";
+import { authenticateSession } from "./auth/session.js";
 
 export const app = express();
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN.split(",").map((value) => value.trim()), credentials: true }));
 app.use(express.json({ limit: "1mb" }));
+app.use(authenticateSession);
 
+app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/catalog", catalogRouter);
 
 app.get("/api/v1/health", (_request, response) => {
