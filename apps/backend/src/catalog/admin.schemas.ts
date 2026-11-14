@@ -18,6 +18,8 @@ export const adminAnimeCreateSchema = z.object({
   ageRating: z.enum(["G", "PG", "PG_13", "R", "R_PLUS", "RX"]).nullable().optional(),
   score: z.number().int().min(0).max(100).nullable().optional(),
   featured: z.boolean().default(false),
+  posterAssetId: z.string().cuid().nullable().optional(),
+  bannerAssetId: z.string().cuid().nullable().optional(),
   seasonGroupId: z.string().cuid().nullable().optional(),
   genreSlugs: z.array(slugSchema.max(100)).max(20).default([]),
   studioSlugs: z.array(slugSchema.max(140)).max(20).default([]),
