@@ -253,3 +253,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-taxonomy-list .ui-button { padding: 5px 8px; font-size: 9px; }
 @media (max-width: 900px) { .admin-taxonomy-grid { grid-template-columns: 1fr 1fr; }.admin-taxonomy-card:last-child { grid-column: 1 / -1; } }
 @media (max-width: 560px) { .admin-taxonomy-grid { grid-template-columns: 1fr; }.admin-taxonomy-card:last-child { grid-column: auto; } }
+
+.admin-episodes { margin-top: 8px; }
+.admin-episodes .catalog-section-heading { margin-bottom: 16px; }
+.admin-episodes .catalog-section-heading h2 { font-size: 18px; }
+.admin-episodes form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: end; gap: 12px; }
+.admin-episodes form > .ui-button { grid-column: 1 / -1; justify-self: start; }
+.admin-episode-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.admin-episode-actions .ui-button { padding: 5px 8px; font-size: 9px; }
+@media (max-width: 560px) { .admin-episodes form { grid-template-columns: 1fr; }.admin-episodes form > .ui-button { grid-column: auto; } }
