@@ -139,6 +139,13 @@ describe("administrator workspace", () => {
     vi.spyOn(apiClient, "adminCatalogStudios").mockResolvedValue([{ id: "studio-1", slug: "samren-studio", name: "Samren Studio" }]);
     vi.spyOn(apiClient, "adminCatalogSeasons").mockResolvedValue([]);
     const update = vi.spyOn(apiClient, "adminUpdateAnime").mockResolvedValue({ ...item, title: "Clockwork Orbit Revisited" });
+    vi.spyOn(apiClient, "adminCatalogEpisodes").mockResolvedValue([]);
+    const createEpisode = vi.spyOn(apiClient, "adminCreateEpisode").mockResolvedValue({
+      id: "episode-1", animeId: "anime-1", seasonId: null, episodeNumber: 1, absoluteNumber: null,
+      title: "A New Beginning", synopsis: null, durationSeconds: null, airDate: null,
+      publicationStatus: "DRAFT", isFiller: false, isRecap: false,
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    });
 
     renderApp("/admin");
 
@@ -152,6 +159,19 @@ describe("administrator workspace", () => {
         slug: "clockwork-orbit",
         genreSlugs: ["adventure"],
         studioSlugs: ["samren-studio"],
+      }));
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Episodes" }));
+    expect(await screen.findByRole("heading", { name: "Manage episodes" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Episode title"), { target: { value: "A New Beginning" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add episode draft" }));
+    await waitFor(() => {
+      expect(createEpisode).toHaveBeenCalledWith(expect.objectContaining({
+        animeId: "anime-1",
+        episodeNumber: 1,
+        title: "A New Beginning",
+        publicationStatus: "DRAFT",
       }));
     });
   });
