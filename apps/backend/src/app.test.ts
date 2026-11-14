@@ -79,3 +79,46 @@ describe("public catalogue API", () => {
     expect(response.body.error.code).toBe("NOT_FOUND");
   });
 });
+
+describe("first-party authentication boundaries", () => {
+  it("does not expose session details to an unauthenticated request", async () => {
+    const response = await request(app).get("/api/v1/auth/session");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("requires an allowed browser origin for login and logout", async () => {
+    const rejectedLogin = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: "admin@example.test", password: "not-a-real-password" });
+
+    expect(rejectedLogin.status).toBe(403);
+    expect(rejectedLogin.body.error.code).toBe("ORIGIN_NOT_ALLOWED");
+
+    const rejectedLogout = await request(app).post("/api/v1/auth/logout");
+    expect(rejectedLogout.status).toBe(403);
+    expect(rejectedLogout.body.error.code).toBe("ORIGIN_NOT_ALLOWED");
+  });
+
+  it("accepts the Vite development origin and validates login input", async () => {
+    const response = await request(app)
+      .post("/api/v1/auth/login")
+      .set("Origin", "http://localhost:5173")
+      .send({ email: "not-an-email", password: "" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("revokes a logout session and clears the HttpOnly cookie", async () => {
+    const response = await request(app)
+      .post("/api/v1/auth/logout")
+      .set("Origin", "http://localhost:5173");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^samren_session=;.*HttpOnly.*Max-Age=0/)]),
+    );
+  });
+});
