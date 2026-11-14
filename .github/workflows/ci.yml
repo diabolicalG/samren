@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   foundation:
@@ -40,19 +40,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Install dependencies and reconcile lockfile
-        run: pnpm install --no-frozen-lockfile
-      - name: Commit generated lockfile when it changes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if ! git diff --quiet -- pnpm-lock.yaml; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add pnpm-lock.yaml
-            git commit -m "chore: synchronize pnpm lockfile"
-            git pull --rebase origin main
-            git push
-          fi
+      - name: Install dependencies from the committed lockfile
+        run: pnpm install --frozen-lockfile
       - name: Validate Prisma schema
         working-directory: apps/backend
         run: pnpm db:validate
