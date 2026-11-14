@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
-import type { AdminAnimeWriteInput, CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminMediaAsset, CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
 import { apiClient } from "@samren/api-client";
 import { ActionLink, StatusBadge, Surface, TextField } from "./components/ui";
 
@@ -170,6 +170,72 @@ function AnimeDetailPage() {
   );
 }
 
+
+
+function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets: AdminMediaAsset[] }) {
+  const queryClient = useQueryClient();
+  const [videoAssetId, setVideoAssetId] = useState("");
+  const [qualityLabel, setQualityLabel] = useState("1080p");
+  const [subtitleAssetId, setSubtitleAssetId] = useState("");
+  const [subtitleLabel, setSubtitleLabel] = useState("English");
+  const [languageCode, setLanguageCode] = useState("en");
+  const [subtitleFormat, setSubtitleFormat] = useState<"SRT" | "VTT" | "ASS">("VTT");
+  const mediaQuery = useQuery({
+    queryKey: ["admin", "episode-media", episodeId],
+    queryFn: () => apiClient.adminEpisodeMedia(episodeId),
+  });
+  const subtitleQuery = useQuery({
+    queryKey: ["admin", "episode-subtitles", episodeId],
+    queryFn: () => apiClient.adminSubtitleTracks(episodeId),
+  });
+  const createMediaMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateEpisodeMedia(episodeId, { assetId: videoAssetId, qualityLabel: qualityLabel.trim() || null, isDefault: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episode-media", episodeId] }),
+  });
+  const deleteMediaMutation = useMutation({
+    mutationFn: apiClient.adminDeleteEpisodeMedia,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episode-media", episodeId] }),
+  });
+  const createSubtitleMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateSubtitleTrack(episodeId, { assetId: subtitleAssetId, languageCode: languageCode.trim(), label: subtitleLabel.trim(), format: subtitleFormat, isDefault: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episode-subtitles", episodeId] }),
+  });
+  const deleteSubtitleMutation = useMutation({
+    mutationFn: apiClient.adminDeleteSubtitleTrack,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episode-subtitles", episodeId] }),
+  });
+  const videoAssets = assets.filter((asset) => asset.mediaKind === "VIDEO");
+  const subtitleAssets = assets.filter((asset) => asset.mediaKind === "SUBTITLE");
+
+  return (
+    <div className="episode-assets">
+      <div className="episode-assets-grid">
+        <section>
+          <h4>Video assets</h4>
+          <form onSubmit={(event) => { event.preventDefault(); createMediaMutation.mutate(); }}>
+            <label className="ui-field" htmlFor={"episode-video-" + episodeId}>First-party video asset<select className="ui-input" id={"episode-video-" + episodeId} value={videoAssetId} onChange={(event) => setVideoAssetId(event.target.value)}><option value="">Select registered video</option>{videoAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.originalFilename} · {asset.processingState}</option>)}</select></label>
+            <TextField id={"episode-quality-" + episodeId} label="Quality label" maxLength={40} value={qualityLabel} onChange={(event) => setQualityLabel(event.target.value)} />
+            <button className="ui-button ui-button--quiet" type="submit" disabled={createMediaMutation.isPending || !videoAssetId}>Attach video metadata</button>
+          </form>
+          {createMediaMutation.isError || deleteMediaMutation.isError ? <p className="admin-error" role="alert">{(createMediaMutation.error ?? deleteMediaMutation.error)?.message}</p> : null}
+          <ul className="admin-taxonomy-list">{(mediaQuery.data ?? []).map((media) => <li key={media.id}><span>{media.qualityLabel || "Video"} · {media.asset.originalFilename}{media.isDefault ? " · Default" : ""}</span><button type="button" className="ui-button ui-button--quiet" onClick={() => deleteMediaMutation.mutate(media.id)} disabled={deleteMediaMutation.isPending}>Detach</button></li>)}</ul>
+        </section>
+        <section>
+          <h4>Subtitle tracks</h4>
+          <form onSubmit={(event) => { event.preventDefault(); createSubtitleMutation.mutate(); }}>
+            <label className="ui-field" htmlFor={"episode-subtitle-" + episodeId}>Subtitle asset<select className="ui-input" id={"episode-subtitle-" + episodeId} value={subtitleAssetId} onChange={(event) => { const id = event.target.value; setSubtitleAssetId(id); const asset = subtitleAssets.find((item) => item.id === id); setSubtitleFormat(asset?.mimeType === "application/x-subrip" ? "SRT" : asset?.mimeType === "application/x-ass" ? "ASS" : "VTT"); }}><option value="">Select registered subtitle</option>{subtitleAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.originalFilename} · {asset.processingState}</option>)}</select></label>
+            <TextField id={"episode-subtitle-label-" + episodeId} label="Track label" required maxLength={80} value={subtitleLabel} onChange={(event) => setSubtitleLabel(event.target.value)} />
+            <TextField id={"episode-language-" + episodeId} label="Language code" required maxLength={16} value={languageCode} onChange={(event) => setLanguageCode(event.target.value)} />
+            <label className="ui-field" htmlFor={"episode-subtitle-format-" + episodeId}>Format<select className="ui-input" id={"episode-subtitle-format-" + episodeId} value={subtitleFormat} onChange={(event) => setSubtitleFormat(event.target.value as typeof subtitleFormat)}><option value="VTT">WebVTT</option><option value="SRT">SRT</option><option value="ASS">ASS</option></select></label>
+            <button className="ui-button ui-button--quiet" type="submit" disabled={createSubtitleMutation.isPending || !subtitleAssetId || !languageCode.trim() || !subtitleLabel.trim()}>Attach subtitle metadata</button>
+          </form>
+          {createSubtitleMutation.isError || deleteSubtitleMutation.isError ? <p className="admin-error" role="alert">{(createSubtitleMutation.error ?? deleteSubtitleMutation.error)?.message}</p> : null}
+          <ul className="admin-taxonomy-list">{(subtitleQuery.data ?? []).map((track) => <li key={track.id}><span>{track.label} ({track.languageCode}){track.isDefault ? " · Default" : ""}</span><button type="button" className="ui-button ui-button--quiet" onClick={() => deleteSubtitleMutation.mutate(track.id)} disabled={deleteSubtitleMutation.isPending}>Detach</button></li>)}</ul>
+        </section>
+      </div>
+    </div>
+  );
+}
 
 function AdminPage() {
   const queryClient = useQueryClient();
@@ -403,7 +469,7 @@ function AdminPage() {
                     </form>
                     {createEpisodeMutation.isError || archiveEpisodeMutation.isError || updateEpisodeMutation.isError ? <p className="admin-error" role="alert">{(createEpisodeMutation.error ?? archiveEpisodeMutation.error ?? updateEpisodeMutation.error)?.message}</p> : null}
                     {adminEpisodesQuery.isLoading ? <div className="catalog-loading">Loading episodes…</div> : null}
-                    <ul className="admin-taxonomy-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span>{episode.publicationStatus !== "ARCHIVED" ? <div className="admin-episode-actions"><button className="ui-button ui-button--quiet" type="button" onClick={() => updateEpisodeMutation.mutate({ id: episode.id, publicationStatus: episode.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateEpisodeMutation.isPending}>{episode.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending}>Archive</button></div> : null}</li>)}</ul>
+                    <ul className="admin-taxonomy-list admin-episode-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><div className="admin-episode-row"><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span>{episode.publicationStatus !== "ARCHIVED" ? <div className="admin-episode-actions"><button className="ui-button ui-button--quiet" type="button" onClick={() => updateEpisodeMutation.mutate({ id: episode.id, publicationStatus: episode.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateEpisodeMutation.isPending}>{episode.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending}>Archive</button></div> : null}</div><EpisodeAssetManager episodeId={episode.id} assets={adminAssetsQuery.data ?? []} /></li>)}</ul>
                   </Surface>
                 ) : null}
                 {editingId === item.id ? (
