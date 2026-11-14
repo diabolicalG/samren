@@ -1,7 +1,4 @@
 packages:
-  - "apps/*"
+  - "apps/frontend"
+  - "apps/backend"
   - "packages/*"
-allowBuilds:
-  '@prisma/engines': true
-  prisma: true
-  sharp: true
