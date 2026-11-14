@@ -15,6 +15,8 @@ import {
   adminSeasonUpdateSchema,
   adminEpisodeCreateSchema,
   adminEpisodeUpdateSchema,
+  adminAssetCreateSchema,
+  adminAssetUpdateSchema,
 } from "./admin.schemas.js";
 
 export const adminCatalogRouter = Router();
@@ -221,6 +223,109 @@ adminCatalogRouter.delete("/seasons/:id", requireTrustedOrigin, async (request, 
       return;
     }
     await prisma.season.delete({ where: { id: id.data } });
+    response.status(204).end();
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+
+const adminAssetSelect = {
+  id: true, storageKey: true, originalFilename: true, mediaKind: true, mimeType: true,
+  sizeBytes: true, checksumSha256: true, processingState: true, width: true,
+  height: true, durationSeconds: true, createdAt: true, updatedAt: true,
+} satisfies Prisma.MediaAssetSelect;
+
+function serializeAdminAsset<T extends { sizeBytes: bigint }>(asset: T) {
+  return { ...asset, sizeBytes: asset.sizeBytes.toString() };
+}
+
+adminCatalogRouter.get("/assets", async (_request, response, next) => {
+  try {
+    const items = await prisma.mediaAsset.findMany({
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: 200,
+      select: adminAssetSelect,
+    });
+    response.json({ data: items.map(serializeAdminAsset), error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.post("/assets", requireTrustedOrigin, async (request, response) => {
+  const parsed = adminAssetCreateSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The media asset metadata is invalid" } });
+    return;
+  }
+  try {
+    const { sizeBytes, ...data } = parsed.data;
+    const item = await prisma.mediaAsset.create({
+      data: { ...data, sizeBytes: BigInt(sizeBytes) },
+      select: adminAssetSelect,
+    });
+    response.status(201).json({ data: serializeAdminAsset(item), error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/assets/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminAssetUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The media asset update is invalid" } });
+    return;
+  }
+  try {
+    const existing = await prisma.mediaAsset.findUnique({ where: { id: id.data }, select: { mediaKind: true } });
+    if (!existing) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The media asset was not found" } });
+      return;
+    }
+    if (parsed.data.mimeType) {
+      const allowedMime: Record<typeof existing.mediaKind, string[]> = {
+        POSTER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
+        BANNER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
+        VIDEO: ["video/mp4", "video/webm"],
+        SUBTITLE: ["text/vtt", "application/x-subrip", "application/x-ass"],
+      };
+      if (!allowedMime[existing.mediaKind].includes(parsed.data.mimeType)) {
+        response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "MIME type does not match the asset kind" } });
+        return;
+      }
+    }
+    const { sizeBytes, ...fields } = parsed.data;
+    const item = await prisma.mediaAsset.update({
+      where: { id: id.data },
+      data: { ...fields, sizeBytes: sizeBytes === undefined ? undefined : BigInt(sizeBytes) },
+      select: adminAssetSelect,
+    });
+    response.json({ data: serializeAdminAsset(item), error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/assets/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The media asset identifier is invalid" } });
+    return;
+  }
+  try {
+    const [posterCount, bannerCount, episodeMediaCount, subtitleCount] = await Promise.all([
+      prisma.anime.count({ where: { posterAssetId: id.data } }),
+      prisma.anime.count({ where: { bannerAssetId: id.data } }),
+      prisma.episodeMedia.count({ where: { assetId: id.data } }),
+      prisma.subtitleTrack.count({ where: { assetId: id.data } }),
+    ]);
+    if (posterCount || bannerCount || episodeMediaCount || subtitleCount) {
+      response.status(409).json({ data: null, error: { code: "IN_USE", message: "This asset is attached to catalogue content and cannot be deleted" } });
+      return;
+    }
+    await prisma.mediaAsset.delete({ where: { id: id.data } });
     response.status(204).end();
   } catch (error) {
     sendError(response, error);
