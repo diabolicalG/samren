@@ -12,6 +12,7 @@ const userPassword = "phase2-ci-catalog-user-password";
 const animeSlug = "phase-two-admin-managed-title";
 let adminId: string;
 let userId: string;
+let assetId: string | undefined;
 
 async function login(email: string, password: string) {
   const agent = request.agent(app);
@@ -41,6 +42,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.anime.deleteMany({ where: { slug: animeSlug } });
+  if (assetId) await prisma.mediaAsset.deleteMany({ where: { id: assetId } });
   const userIds = [adminId, userId].filter((id): id is string => Boolean(id));
   if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 });
@@ -95,6 +97,25 @@ describe("admin catalogue management", () => {
     });
     expect(created.body.data).not.toHaveProperty("posterAsset.storageKey");
 
+    const asset = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin).send({
+      storageKey: "samren/catalogue/posters/phase-two-test.webp",
+      originalFilename: "phase-two-test.webp",
+      mediaKind: "POSTER",
+      mimeType: "image/webp",
+      sizeBytes: 4096,
+      width: 600,
+      height: 800,
+    });
+    expect(asset.status).toBe(201);
+    expect(asset.body.data.sizeBytes).toBe("4096");
+    expect(asset.body.data.processingState).toBe("PENDING");
+    assetId = asset.body.data.id;
+
+    const linked = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
+      .set("Origin", origin).send({ posterAssetId: assetId });
+    expect(linked.status).toBe(200);
+    expect(linked.body.data.posterAssetId).toBe(assetId);
+
     const episode = await agent.post("/api/v1/admin/catalog/episodes").set("Origin", origin).send({
       animeId: created.body.data.id,
       episodeNumber: 1,
@@ -127,9 +148,15 @@ describe("admin catalogue management", () => {
     const publicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(publicLookup.status).toBe(200);
     expect(publicLookup.body.data.title).toBe("Phase Two Admin Edited Title");
+    expect(publicLookup.body.data.posterAsset).toMatchObject({ id: assetId, mimeType: "image/webp", width: 600, height: 800 });
+    expect(publicLookup.body.data.posterAsset).not.toHaveProperty("storageKey");
     expect(publicLookup.body.data.episodes).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: episode.body.data.id, title: "The Edited Pilot" }),
     ]));
+
+    const protectedAssetDelete = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
+    expect(protectedAssetDelete.status).toBe(409);
+    expect(protectedAssetDelete.body.error.code).toBe("IN_USE");
 
     const archivedEpisode = await agent.delete("/api/v1/admin/catalog/episodes/" + episode.body.data.id).set("Origin", origin);
     expect(archivedEpisode.status).toBe(200);
