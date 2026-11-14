@@ -1,46 +1,46 @@
 # Samren Phase 2 — Progress
 
-**Status:** IN PROGRESS — public catalogue and authenticated anime administration implemented and CI-verified  
+**Status:** COMPLETE — implementation and PostgreSQL-backed CI verification passed  
 **Branch:** `main`  
-**Scope checkpoint:** [`910bc5f`](https://github.com/diabolicalG/samren/commit/910bc5fdce840bf9fb67d6afd7b1e4403a9578d6)  
-**Phase 1 final checkpoint:** [`fa471ba`](https://github.com/diabolicalG/samren/commit/fa471ba986bdd462d20d17e0f002218b540567f8)
+**Phase 1 checkpoint:** [`fa471ba`](https://github.com/diabolicalG/samren/commit/fa471ba986bdd462d20d17e0f002218b540567f8)  
+**Phase 2 scope:** [PHASE_2_SCOPE.md](./PHASE_2_SCOPE.md)  
+**Administrator setup:** [ADMIN_SETUP.md](./ADMIN_SETUP.md)
 
-## Implemented so far
+## Delivered
 
-- Added normalized Prisma catalogue models for anime, genres, studios, join relations, seasons, episodes, application-owned media metadata, episode media associations and subtitle metadata.
-- Added PostgreSQL migration `20261114153000_catalogue_foundation`.
-- Added deterministic local seed fixtures for three sample catalogue entries, genres, one season and a sample studio. Upserts do not overwrite existing records.
-- Added shared catalogue API contracts and typed API client methods.
-- Added public read endpoints for paginated/filterable anime, anime detail, episodes, genres, studios and seasons.
-- Public queries are restricted to `PUBLISHED` catalogue records. Media responses select safe metadata only and never return storage keys.
-- Added home featured/recent sections, browse filters (search, format, release status, genre, studio, year), sorting and pagination, and anime detail/episode listing.
-- Added scrypt password hashing, opaque server-side sessions stored as token hashes, 12-hour HttpOnly/SameSite cookies, trusted-Origin checks, and per-process failed-login throttling.
-- Added a one-time administrator bootstrap command. It refuses to elevate existing non-admin accounts or overwrite an existing administrator.
-- Added role-protected admin anime listing, draft creation, metadata updates, publish/unpublish and soft-archive routes; mutations require an exact trusted Origin.
-- Added the responsive `/admin` sign-in and catalogue workspace. It exposes create, publish/unpublish and archive actions only to a verified ADMIN session.
-- Updated CI to start PostgreSQL, apply migrations and seed fixtures before running checks.
+- Normalized PostgreSQL/Prisma models for anime, genres, studios, join relations, seasons, episodes, media assets, episode video associations and subtitle tracks.
+- PostgreSQL migration `20261114153000_catalogue_foundation`; schema validation and Prisma Client generation are part of CI.
+- Deterministic, local-only sample fixtures. Seed upserts do not overwrite existing catalogue content; CI runs the seed twice to verify idempotent execution.
+- Public API routes for paginated/filterable anime, detail, published episode lists, genres, studios and seasons. Public queries only return published catalogue content.
+- Search and browse filters for title, format, release status, year, season, genre, studio, featured and sort order.
+- Home featured/recent sections, browse filtering/pagination and anime detail/episode views with loading, error and empty states.
+- Server-side administrator authentication: salted scrypt password hashes, cryptographically random opaque session tokens, SHA-256-only token storage, 12-hour HttpOnly/SameSite cookies, logout revocation, no-store auth responses, exact Origin checks and bounded per-process failed-login throttling.
+- One-time environment-driven first-admin bootstrap. It refuses to elevate existing non-admin users or overwrite an existing administrator.
+- Explicit trusted-proxy hop configuration. The default CORS origin is only the active Vite frontend origin (`http://localhost:5173`).
+- ADMIN-protected APIs for anime, genres, studios, seasons, episodes, asset metadata, episode video associations and subtitle tracks. Mutations use Zod validation and exact Origin checks. Referenced taxonomy/assets are validated; in-use taxonomy and assets cannot be deleted.
+- Responsive admin workspace for anime draft creation, metadata editing, publish/unpublish/archive, taxonomy creation/edit/delete, episode creation/edit/publish/archive, internal asset metadata registration/edit/delete, and attachment/detachment of video and subtitle metadata.
+- Asset metadata validation rejects remote URLs, path traversal and MIME/media-kind mismatches. Public API responses expose safe asset metadata only; storage keys are not returned publicly.
+- CI uses a disposable PostgreSQL 16 service to deploy migrations, seed twice, run lint/typechecks, backend integration tests, frontend smoke/accessibility tests and production builds.
 
-## Explicitly deferred / not complete
+## Verification
 
-- Admin taxonomy management (genres, studios, seasons), episode CRUD, and media-asset metadata management remain to be implemented.
-- The current admin UI creates anime drafts and publishes/unpublishes/archives records; richer metadata editing and taxonomy/episode screens remain outstanding.
-- Actual media uploads, storage delivery and player integration belong to later phases. Phase 2 stores metadata only and does not resolve or expose arbitrary media URLs.
-- The initial administrator must be provisioned manually using the documented one-time bootstrap command. There is no public registration or password-reset flow.
-- Failed-login throttling is per API process; multi-instance production deployments should also enforce shared edge/reverse-proxy rate limiting.
-- Live production database deployment, backup/restore and storage lifecycle are not claimed.
-- Search currently uses PostgreSQL case-insensitive title matching plus exact alternate-title matching; full-text ranking can be evaluated separately if needed.
+- The last fully green implementation run before the final CORS tightening was [CI run 43609617230](https://github.com/diabolicalG/samren/actions/runs/43609617230), which passed schema validation, client generation, migrations, seed twice, lint, typecheck, backend tests, frontend tests and both production builds.
+- A final CI run is checking the tightened CORS default and matching test origins; update this section with its result before treating this progress document as the final release checkpoint.
+- CI evidence is against an ephemeral PostgreSQL service. No production database deployment, backup/restore exercise or production migration has been performed.
 
-## Verification status
+## Explicit limitations
 
-- **PASS:** [CI run 43606858346](https://github.com/diabolicalG/samren/actions/runs/43606858346) on commit [`b25461d`](https://github.com/diabolicalG/samren/commit/b25461d46fb273767c894c9920919c1092b3a72e).
-- PostgreSQL 16 service started in CI; Prisma schema validation and client generation passed; the catalogue migration deployed successfully; deterministic fixtures seeded successfully.
-- Oxlint, frontend/backend TypeScript checks, backend API/auth/admin tests, frontend smoke/accessibility/admin-state tests, and frontend/backend production builds all passed.
-- A frontend test-isolation issue was fixed by explicitly unmounting rendered trees after each test. The final run is green.
-- This is CI integration evidence against a disposable PostgreSQL service, not a claim that a production database has been deployed or migrated.
+- Phase 2 records first-party media metadata only. It does not upload files, verify that storage objects exist, expose public storage delivery, generate artwork URLs or implement a player. Secure first-party media delivery and playback are Phase 3.
+- The frontend tests use jsdom and are not a substitute for real-browser visual, device, assistive-technology or end-to-end testing.
+- The first administrator is provisioned manually. Public registration, password reset/recovery, MFA, session refresh/rotation and role-management workflows are not included.
+- Failed-login throttling is process-local. Multi-instance deployments must add a shared edge/reverse-proxy rate limit before public exposure.
+- Search uses PostgreSQL case-insensitive text matching and exact alternate-title matching, not a dedicated full-text search index.
+- Redis is not needed for this phase and was not added.
 
-## Boundary check
+## Boundary verification
 
-- No external anime metadata APIs, scrapers, provider integrations, embeds, third-party media fallback or source-resolution code was added to the active runtime.
-- Anime-streaming remains read-only.
-- Legacy Next.js, FastAPI, Shivra and excluded shared-package code remains physically untouched.
+- No external anime metadata API, scraper, provider adapter, source resolver, third-party embed, arbitrary remote media URL, stream proxy or third-party fallback was added to the active runtime.
+- Sample seed data is authored locally and performs no network calls.
+- `Anime-streaming` remains a read-only architecture reference and was not modified.
+- Legacy Next.js, FastAPI, Shivra and excluded shared-package source remains physically untouched; only the new scoped workspace is active.
 - Phase 3 playback and Phase 4 personal accounts/library have not started.
