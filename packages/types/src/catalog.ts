@@ -146,3 +146,19 @@ export type AdminCatalogEpisode = CatalogEpisode & {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AdminMediaAsset = {
+  id: string;
+  storageKey: string;
+  originalFilename: string;
+  mediaKind: "POSTER" | "BANNER" | "VIDEO" | "SUBTITLE";
+  mimeType: string;
+  sizeBytes: string;
+  checksumSha256: string | null;
+  processingState: "PENDING" | "READY" | "FAILED";
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
