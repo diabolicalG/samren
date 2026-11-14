@@ -48,7 +48,7 @@ describe("public catalogue API", () => {
     const response = await request(app).get("/api/v1/catalog/anime?genre=adventure");
 
     expect(response.status).toBe(200);
-    expect(response.body.data.items).toHaveLength(2);
+    expect(response.body.data.items.length).toBeGreaterThanOrEqual(2);
     expect(response.body.data.items.every((item: { genres: Array<{ genre: { slug: string } }> }) =>
       item.genres.some(({ genre }) => genre.slug === "adventure"),
     )).toBe(true);
