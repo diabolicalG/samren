@@ -1,4 +1,4 @@
-import type { ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -22,6 +22,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
       credentials,
       headers: { Accept: "application/json", ...init.headers },
     });
+    if (response.status === 204) return undefined as T;
     const body = await response.json().catch(() => null) as ApiEnvelope<T> | null;
     if (!response.ok || !body || body.error) {
       const error = body && "error" in body ? body.error : null;
@@ -42,6 +43,13 @@ export function createApiClient(options: ApiClientOptions = {}) {
   return {
     request,
     health: () => request<HealthStatus>("/health"),
+    authSession: () => request<{ user: AdminAuthUser }>("/auth/session"),
+    authLogin: (email: string, password: string) => request<{ user: AdminAuthUser; expiresAt: string }>("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }),
+    authLogout: () => request<void>("/auth/logout", { method: "POST" }),
+    adminCatalogAnime: () => request<{ items: AdminCatalogAnime[] }>("/admin/catalog/anime"),
+    adminCreateAnime: (input: AdminAnimeWriteInput & { title: string }) => request<AdminCatalogAnime>("/admin/catalog/anime", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminUpdateAnime: (id: string, input: AdminAnimeWriteInput) => request<AdminCatalogAnime>("/admin/catalog/anime/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminArchiveAnime: (id: string) => request<{ id: string; slug: string; publicationStatus: "ARCHIVED" }>("/admin/catalog/anime/" + encodeURIComponent(id), { method: "DELETE" }),
     catalogAnime: (params: CatalogListParams = {}) => request<CatalogPage<CatalogAnimeCard>>(`/catalog/anime${queryString(params)}`),
     catalogAnimeBySlug: (slug: string) => request<CatalogAnimeDetail>(`/catalog/anime/${encodeURIComponent(slug)}`),
     catalogEpisodes: (slug: string) => request<CatalogEpisode[]>(`/catalog/anime/${encodeURIComponent(slug)}/episodes`),
