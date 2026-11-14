@@ -132,8 +132,8 @@ describe("administrator workspace", () => {
       _count: { episodes: 0 },
     };
     vi.spyOn(apiClient, "adminCatalogAnime").mockResolvedValue({ items: [item] });
-    vi.spyOn(apiClient, "catalogGenres").mockResolvedValue([{ id: "genre-1", slug: "adventure", name: "Adventure" }]);
-    vi.spyOn(apiClient, "catalogStudios").mockResolvedValue([{ id: "studio-1", slug: "samren-studio", name: "Samren Studio" }]);
+    vi.spyOn(apiClient, "adminCatalogGenres").mockResolvedValue([{ id: "genre-1", slug: "adventure", name: "Adventure" }]);
+    vi.spyOn(apiClient, "adminCatalogStudios").mockResolvedValue([{ id: "studio-1", slug: "samren-studio", name: "Samren Studio" }]);
     const update = vi.spyOn(apiClient, "adminUpdateAnime").mockResolvedValue({ ...item, title: "Clockwork Orbit Revisited" });
 
     renderApp("/admin");
