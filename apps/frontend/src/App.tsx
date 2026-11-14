@@ -4,7 +4,7 @@ import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } f
 import { Link, Route, Routes, useParams } from "react-router-dom";
 import type { CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
 import { apiClient } from "@samren/api-client";
-import { ActionLink, Card, StatusBadge, Surface, TextField } from "./components/ui";
+import { ActionLink, StatusBadge, Surface, TextField } from "./components/ui";
 
 function formatLabel(value: string) {
   return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
