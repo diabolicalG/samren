@@ -1,6 +1,6 @@
 # Phase 1 — Foundation and Obsidian design system
 
-**Status:** In progress — foundation scaffold and CI correction committed; awaiting a clean CI run and remaining acceptance work  
+**Status:** In progress — runtime health integration and frontend smoke tests added; latest CI verification pending  
 **Branch:** `main`  
 **Phase 0 baseline:** `ace2559ed8ffb8517b82dd4da710a62b1413c7a4`
 
@@ -10,32 +10,36 @@
 - Added `apps/backend`: Express + TypeScript runtime scaffold, Helmet security headers, bounded JSON body parsing, credentialed CORS configuration, versioned health route and JSON 404 response.
 - Added Zod environment parsing and a PostgreSQL Prisma foundation with User, RefreshToken (hashed token storage) and UserPreferences models. Catalogue models remain deferred to Phase 2.
 - Added provider-neutral platform contracts and a typed, credential-aware API client.
+- Connected the frontend shell to the typed API client health endpoint. The header reports connected, checking or unavailable based on the real API response; it does not claim a successful connection when the API is offline.
+- Added a Vite development proxy from `/api` to the backend on port 4000.
+- Added reusable Obsidian UI primitives for semantic surfaces, action links and API status badges, with visible keyboard focus styling.
+- Added frontend Vitest/jsdom smoke tests for home navigation, the API connection state and the honest not-yet-available browse page.
+- Added backend Vitest/Supertest tests for the health response and consistent JSON 404 envelope.
 - Added pnpm workspace configuration and aligned root/frontend/backend package manifests with the new runtime.
 - Removed the external Google Fonts CSS import. The foundation uses local system font fallbacks.
-- Replaced the legacy CI definition with a foundation pipeline for dependency installation, Prisma validation/generation, typechecking and production builds. On pushes to `main`, the pipeline reconciles and commits the pnpm lockfile if dependency manifests have changed.
+- Replaced the legacy CI definition with a foundation pipeline for dependency installation, Prisma validation/generation, typechecking, backend/frontend tests and production builds. On pushes to `main`, the pipeline reconciles and commits the pnpm lockfile if dependency manifests have changed.
 - Kept legacy Next.js, FastAPI and Shivra code physically in place; it is not part of the new runtime and must only be retired after replacement routes and consumers are migrated and checked.
 
 ## Current routes and behavior
 
 - Frontend: `/` and `/browse` are initial shell pages. Other paths display an honest not-ready state.
 - Backend: `GET /api/v1/health` reports service health; unknown API paths return a typed JSON 404 envelope.
+- The frontend health indicator calls the backend through the typed client; the Vite proxy is development-only.
 - No catalogue records, third-party anime metadata calls, scraper jobs, stream resolver, external embeds or provider fallback are implemented.
 
 ## Remaining Phase 1 acceptance work
 
-1. Confirm the updated CI workflow completes dependency installation and commits a synchronized lockfile.
-2. Resolve any TypeScript, Prisma or production-build failures surfaced by that run.
-3. Add shared Zod request/response contracts and connect the frontend to the typed API client through a development proxy.
-4. Build and test reusable Obsidian components (buttons, fields, cards, skeletons, dialogs, navigation and layout primitives).
-5. Add focused backend health/envelope tests and frontend smoke/accessibility checks.
-6. Run actual install, lint, typecheck, tests and production builds; capture a clean CI result.
-7. Keep Redis out until a concrete first-party requirement exists; no queues are needed for this foundation.
+1. Observe a clean CI run after adding frontend test dependencies and the API integration.
+2. Fix any lockfile, typecheck, test or production-build failures reported by that run.
+3. Expand the Obsidian design system only where the foundation routes require it; do not build unused UI primitives speculatively.
+4. Confirm the new runtime remains isolated from the legacy Next.js/FastAPI/Shivra code and from all external anime metadata/media providers.
+5. Mark Phase 1 complete only after install, Prisma validation/generation, typecheck, backend tests, frontend smoke tests and production builds all pass in CI.
 
 ## Verification and limitations
 
-- GitHub Actions for commit `9dd6d9c09424bb355ac60dbbe57a4e238b8fa4af` failed at dependency installation because `pnpm-lock.yaml` did not include the new backend package specifiers. Typecheck and build steps were therefore skipped. The legacy Python gateway and Shivra jobs passed, but those jobs are not acceptance evidence for the new runtime.
-- Commit `dc852fe5d7ae9aca87e855cfd281e04ce828b575` corrects the CI workflow to reconcile the lockfile and validate/build the new foundation. A successful run for this workflow revision has not yet been observed.
-- No local install, test run or build is claimed here. Phase 1 is not complete until the remaining acceptance work passes.
+- CI run `43603989248` for commit `c6028e57ff0004d150c3e62d42f1d90ac34800c0` completed successfully. It passed dependency installation, lockfile reconciliation, Prisma validation/generation, typechecking, backend API tests and frontend/backend production builds.
+- That successful run predates the current frontend API integration and frontend smoke tests. The current revision must pass a fresh CI run before these additions are considered verified.
+- No local install, test run or build is claimed here. Phase 1 is not complete until the new CI run passes.
 
 ## Exclusion gate
 
