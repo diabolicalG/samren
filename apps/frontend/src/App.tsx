@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
 import type { CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
@@ -170,6 +170,129 @@ function AnimeDetailPage() {
   );
 }
 
+
+function AdminPage() {
+  const queryClient = useQueryClient();
+  const sessionQuery = useQuery({
+    queryKey: ["auth", "session"],
+    queryFn: apiClient.authSession,
+    retry: false,
+  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [synopsis, setSynopsis] = useState("");
+  const [formMessage, setFormMessage] = useState("");
+  const loginMutation = useMutation({
+    mutationFn: () => apiClient.authLogin(email, password),
+    onSuccess: async () => {
+      setPassword("");
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+    },
+  });
+  const logoutMutation = useMutation({
+    mutationFn: apiClient.authLogout,
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["admin", "catalog"] });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+    },
+  });
+  const isAdmin = sessionQuery.data?.user.role === "ADMIN";
+  const catalogQuery = useQuery({
+    queryKey: ["admin", "catalog"],
+    queryFn: apiClient.adminCatalogAnime,
+    enabled: isAdmin,
+    retry: false,
+  });
+  const createMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateAnime({
+      title: title.trim(),
+      ...(slug.trim() ? { slug: slug.trim() } : {}),
+      ...(synopsis.trim() ? { synopsis: synopsis.trim() } : {}),
+    }),
+    onSuccess: async () => {
+      setTitle("");
+      setSlug("");
+      setSynopsis("");
+      setFormMessage("Draft created successfully.");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
+    },
+    onError: (error) => setFormMessage(error instanceof Error ? error.message : "The draft could not be created."),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, publicationStatus }: { id: string; publicationStatus: "DRAFT" | "PUBLISHED" }) =>
+      apiClient.adminUpdateAnime(id, { publicationStatus }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+  });
+  const archiveMutation = useMutation({
+    mutationFn: apiClient.adminArchiveAnime,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+  });
+
+  if (sessionQuery.isLoading) {
+    return <main className="page-shell admin-page"><div className="catalog-loading" role="status">Checking administrator session…</div></main>;
+  }
+
+  if (!sessionQuery.data) {
+    return (
+      <main className="page-shell admin-page">
+        <section className="admin-heading"><span className="section-kicker">SAMREN CONTROL ROOM</span><h1>Administrator <span>sign in.</span></h1><p>Sign in with the administrator account provisioned for this Samren installation.</p></section>
+        <Surface className="admin-login">
+          <form onSubmit={(event) => { event.preventDefault(); loginMutation.mutate(); }}>
+            <TextField id="admin-email" label="Email address" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
+            <TextField id="admin-password" label="Password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+            {loginMutation.isError ? <p className="admin-error" role="alert">{loginMutation.error.message}</p> : null}
+            <button className="ui-button ui-button--primary" type="submit" disabled={loginMutation.isPending}>{loginMutation.isPending ? "Signing in…" : "Sign in securely"}</button>
+          </form>
+        </Surface>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return <main className="page-shell admin-page"><section className="simple-page"><span className="section-kicker">ACCESS RESTRICTED</span><h1>Administrator access required.</h1><p>This account does not have permission to manage the catalogue.</p><button className="ui-button ui-button--secondary" onClick={() => logoutMutation.mutate()}>Sign out</button></section></main>;
+  }
+
+  return (
+    <main className="page-shell admin-page">
+      <section className="admin-heading">
+        <div><span className="section-kicker">SAMREN CONTROL ROOM</span><h1>Catalogue <span>management.</span></h1><p>Signed in as {sessionQuery.data.user.email}. Changes are written to the first-party catalogue.</p></div>
+        <button className="ui-button ui-button--secondary" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>Sign out</button>
+      </section>
+      <div className="admin-workspace">
+        <Surface className="admin-create">
+          <span className="section-kicker">NEW ENTRY</span><h2>Create a catalogue draft</h2>
+          <form onSubmit={(event) => { event.preventDefault(); setFormMessage(""); createMutation.mutate(); }}>
+            <TextField id="admin-anime-title" label="Anime title" required maxLength={240} value={title} onChange={(event) => setTitle(event.target.value)} />
+            <TextField id="admin-anime-slug" label="URL slug (optional)" maxLength={180} placeholder="generated-from-title" value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+            <label className="ui-field" htmlFor="admin-anime-synopsis">Synopsis<textarea id="admin-anime-synopsis" className="ui-input admin-textarea" maxLength={10000} rows={4} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} /></label>
+            <button className="ui-button ui-button--primary" type="submit" disabled={createMutation.isPending || !title.trim()}>{createMutation.isPending ? "Creating…" : "Create draft"}</button>
+            {formMessage ? <p className={createMutation.isError ? "admin-error" : "admin-success"} role="status">{formMessage}</p> : null}
+          </form>
+        </Surface>
+        <section className="admin-records">
+          <div className="catalog-section-heading"><div><span className="section-kicker">DATABASE RECORDS</span><h2>All catalogue entries</h2></div><span>{catalogQuery.data?.items.length ?? 0} entries</span></div>
+          {catalogQuery.isLoading ? <div className="catalog-loading" role="status">Loading admin catalogue…</div> : null}
+          {catalogQuery.isError ? <Surface className="catalog-empty" role="alert"><p>{catalogQuery.error.message}</p></Surface> : null}
+          {catalogQuery.data?.items.length === 0 ? <Surface className="catalog-empty"><p>No catalogue records exist yet. Create the first draft.</p></Surface> : null}
+          <div className="admin-record-list">
+            {catalogQuery.data?.items.map((item) => (
+              <article className="admin-record" key={item.id}>
+                <div className="admin-record-copy"><div className="admin-record-meta"><span className={"admin-status admin-status--" + item.publicationStatus.toLowerCase()}>{item.publicationStatus}</span><span>{item._count.episodes} episodes</span></div><h3>{item.title}</h3><p>/{item.slug}</p></div>
+                <div className="admin-record-actions">
+                  {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
+                  {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   const healthQuery = useQuery({
     queryKey: ["system", "health"],
@@ -192,6 +315,7 @@ export default function App() {
           <Link to="/browse"><Compass size={15} /> Discover</Link>
           <Link to="/search"><Search size={15} /> Search</Link>
           <Link to="/library"><Library size={15} /> My Library</Link>
+          <Link to="/admin">Admin</Link>
         </nav>
         <StatusBadge tone={apiStatus.tone} label={apiStatus.accessible}>{apiStatus.label}</StatusBadge>
       </header>
@@ -200,6 +324,7 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/search" element={<BrowsePage />} />
         <Route path="/anime/:slug" element={<AnimeDetailPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<main className="page-shell"><section className="simple-page"><span className="section-kicker">COMING INTO FOCUS</span><h1>That page is not ready yet.</h1><Link className="text-link" to="/">Return home</Link></section></main>} />
       </Routes>
       <footer className="site-footer"><span>© {new Date().getFullYear()} SAMREN</span><span>BUILT AROUND YOUR COLLECTION</span></footer>
