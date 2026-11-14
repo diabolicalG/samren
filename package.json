@@ -9,7 +9,7 @@
     "dev:backend": "pnpm --filter @samren/backend dev",
     "build": "pnpm --filter @samren/types build --if-present && pnpm --filter @samren/frontend build && pnpm --filter @samren/backend build",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "oxlint apps/frontend/src apps/backend/src packages/api-client/src packages/types/src",
     "typecheck": "pnpm --filter @samren/frontend typecheck && pnpm --filter @samren/backend typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -33,6 +33,7 @@
     "husky": "^9.1.0",
     "prettier": "^3.4.0",
     "turbo": "^2.1.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "oxlint": "^1.21.0"
   }
 }
