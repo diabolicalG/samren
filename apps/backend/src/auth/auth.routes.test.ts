@@ -6,7 +6,7 @@ import { hashPassword } from "./password.js";
 
 const email = "phase2-admin@samren.test";
 const username = "phase2-admin";
-const origin = "http://localhost:3000";
+const origin = "http://localhost:5173";
 let userId: string;
 
 beforeAll(async () => {
