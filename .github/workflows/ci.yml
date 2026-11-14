@@ -46,6 +46,8 @@ jobs:
         env:
           DATABASE_URL: "postgresql://samren:ci-only@localhost:5432/samren"
         run: pnpm db:generate
+      - name: Lint active foundation code
+        run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
       - name: Backend API tests
