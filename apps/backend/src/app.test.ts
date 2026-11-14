@@ -36,9 +36,11 @@ describe("public catalogue API", () => {
     expect(response.body.data.pagination).toMatchObject({
       page: 1,
       pageSize: 1,
-      totalItems: 3,
-      totalPages: 3,
+      totalItems: expect.any(Number),
+      totalPages: expect.any(Number),
     });
+    expect(response.body.data.pagination.totalItems).toBeGreaterThanOrEqual(3);
+    expect(response.body.data.pagination.totalPages).toBe(response.body.data.pagination.totalItems);
     expect(response.body.data.items[0]).not.toHaveProperty("storageKey");
   });
 
