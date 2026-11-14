@@ -190,6 +190,13 @@ function AdminPage() {
   const [editYear, setEditYear] = useState("");
   const [editGenreSlugs, setEditGenreSlugs] = useState<string[]>([]);
   const [editStudioSlugs, setEditStudioSlugs] = useState<string[]>([]);
+  const [genreName, setGenreName] = useState("");
+  const [genreSlug, setGenreSlug] = useState("");
+  const [studioName, setStudioName] = useState("");
+  const [studioSlug, setStudioSlug] = useState("");
+  const [seasonYear, setSeasonYear] = useState("2026");
+  const [seasonName, setSeasonName] = useState<"WINTER" | "SPRING" | "SUMMER" | "FALL">("WINTER");
+  const [seasonLabel, setSeasonLabel] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const loginMutation = useMutation({
     mutationFn: () => apiClient.authLogin(email, password),
@@ -208,6 +215,7 @@ function AdminPage() {
   const isAdmin = sessionQuery.data?.user.role === "ADMIN";
   const adminGenresQuery = useQuery({ queryKey: ["admin", "genres"], queryFn: apiClient.adminCatalogGenres, enabled: isAdmin });
   const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.adminCatalogStudios, enabled: isAdmin });
+  const adminSeasonsQuery = useQuery({ queryKey: ["admin", "seasons"], queryFn: apiClient.adminCatalogSeasons, enabled: isAdmin });
   const catalogQuery = useQuery({
     queryKey: ["admin", "catalog"],
     queryFn: apiClient.adminCatalogAnime,
@@ -244,6 +252,30 @@ function AdminPage() {
       setEditingId(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
     },
+  });
+  const createGenreMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateGenre({ slug: genreSlug.trim(), name: genreName.trim() }),
+    onSuccess: async () => { setGenreName(""); setGenreSlug(""); await queryClient.invalidateQueries({ queryKey: ["admin", "genres"] }); },
+  });
+  const createStudioMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateStudio({ slug: studioSlug.trim(), name: studioName.trim() }),
+    onSuccess: async () => { setStudioName(""); setStudioSlug(""); await queryClient.invalidateQueries({ queryKey: ["admin", "studios"] }); },
+  });
+  const createSeasonMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateSeason({ year: Number(seasonYear), season: seasonName, label: seasonLabel.trim() || null }),
+    onSuccess: async () => { setSeasonLabel(""); await queryClient.invalidateQueries({ queryKey: ["admin", "seasons"] }); },
+  });
+  const deleteGenreMutation = useMutation({
+    mutationFn: apiClient.adminDeleteGenre,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "genres"] }),
+  });
+  const deleteStudioMutation = useMutation({
+    mutationFn: apiClient.adminDeleteStudio,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "studios"] }),
+  });
+  const deleteSeasonMutation = useMutation({
+    mutationFn: apiClient.adminDeleteSeason,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "seasons"] }),
   });
 
   if (sessionQuery.isLoading) {
@@ -322,6 +354,42 @@ function AdminPage() {
           </div>
         </section>
       </div>
+      <section className="admin-taxonomy">
+        <div className="catalog-section-heading"><div><span className="section-kicker">CATALOGUE STRUCTURE</span><h2>Genres, studios and seasons</h2></div><span>Application-owned metadata</span></div>
+        <div className="admin-taxonomy-grid">
+          <Surface className="admin-taxonomy-card">
+            <h3>Genres</h3>
+            <form onSubmit={(event) => { event.preventDefault(); createGenreMutation.mutate(); }}>
+              <TextField id="admin-genre-name" label="Genre name" required maxLength={100} value={genreName} onChange={(event) => { setGenreName(event.target.value); setGenreSlug(event.target.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); }} />
+              <TextField id="admin-genre-slug" label="Slug" required maxLength={100} value={genreSlug} onChange={(event) => setGenreSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+              <button className="ui-button ui-button--secondary" type="submit" disabled={createGenreMutation.isPending || !genreName.trim() || !genreSlug.trim()}>Add genre</button>
+            </form>
+            {createGenreMutation.isError || deleteGenreMutation.isError ? <p className="admin-error" role="alert">{(createGenreMutation.error ?? deleteGenreMutation.error)?.message}</p> : null}
+            <ul className="admin-taxonomy-list">{(adminGenresQuery.data ?? []).map((genre) => <li key={genre.id}><span>{genre.name}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + genre.name} onClick={() => deleteGenreMutation.mutate(genre.id)} disabled={deleteGenreMutation.isPending}>Delete</button></li>)}</ul>
+          </Surface>
+          <Surface className="admin-taxonomy-card">
+            <h3>Studios</h3>
+            <form onSubmit={(event) => { event.preventDefault(); createStudioMutation.mutate(); }}>
+              <TextField id="admin-studio-name" label="Studio name" required maxLength={160} value={studioName} onChange={(event) => { setStudioName(event.target.value); setStudioSlug(event.target.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); }} />
+              <TextField id="admin-studio-slug" label="Slug" required maxLength={140} value={studioSlug} onChange={(event) => setStudioSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+              <button className="ui-button ui-button--secondary" type="submit" disabled={createStudioMutation.isPending || !studioName.trim() || !studioSlug.trim()}>Add studio</button>
+            </form>
+            {createStudioMutation.isError || deleteStudioMutation.isError ? <p className="admin-error" role="alert">{(createStudioMutation.error ?? deleteStudioMutation.error)?.message}</p> : null}
+            <ul className="admin-taxonomy-list">{(adminStudiosQuery.data ?? []).map((studio) => <li key={studio.id}><span>{studio.name}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + studio.name} onClick={() => deleteStudioMutation.mutate(studio.id)} disabled={deleteStudioMutation.isPending}>Delete</button></li>)}</ul>
+          </Surface>
+          <Surface className="admin-taxonomy-card">
+            <h3>Seasons</h3>
+            <form onSubmit={(event) => { event.preventDefault(); createSeasonMutation.mutate(); }}>
+              <TextField id="admin-season-year" label="Year" required inputMode="numeric" value={seasonYear} onChange={(event) => setSeasonYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
+              <label className="ui-field" htmlFor="admin-season-name">Season<select className="ui-input" id="admin-season-name" value={seasonName} onChange={(event) => setSeasonName(event.target.value as typeof seasonName)}><option value="WINTER">Winter</option><option value="SPRING">Spring</option><option value="SUMMER">Summer</option><option value="FALL">Fall</option></select></label>
+              <TextField id="admin-season-label" label="Display label (optional)" maxLength={100} value={seasonLabel} onChange={(event) => setSeasonLabel(event.target.value)} />
+              <button className="ui-button ui-button--secondary" type="submit" disabled={createSeasonMutation.isPending || seasonYear.length !== 4 || Number(seasonYear) < 1900 || Number(seasonYear) > 2200}>Add season</button>
+            </form>
+            {createSeasonMutation.isError || deleteSeasonMutation.isError ? <p className="admin-error" role="alert">{(createSeasonMutation.error ?? deleteSeasonMutation.error)?.message}</p> : null}
+            <ul className="admin-taxonomy-list">{(adminSeasonsQuery.data ?? []).map((season) => <li key={season.id}><span>{season.label || season.season + " " + season.year}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + season.season + " " + season.year} onClick={() => deleteSeasonMutation.mutate(season.id)} disabled={deleteSeasonMutation.isPending}>Delete</button></li>)}</ul>
+          </Surface>
+        </div>
+      </section>
     </main>
   );
 }
