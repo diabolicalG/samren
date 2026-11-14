@@ -83,16 +83,23 @@ function BrowsePage() {
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [genre, setGenre] = useState("");
+  const [studio, setStudio] = useState("");
+  const [year, setYear] = useState("");
+  const [sort, setSort] = useState("title");
+  const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
   const genresQuery = useQuery({ queryKey: ["catalog", "genres"], queryFn: apiClient.catalogGenres });
+  const studiosQuery = useQuery({ queryKey: ["catalog", "studios"], queryFn: apiClient.catalogStudios });
   const params: CatalogListParams = {
     q: deferredSearch.trim() || undefined,
     type: type ? type as CatalogListParams["type"] : undefined,
     status: status ? status as CatalogListParams["status"] : undefined,
     genre: genre || undefined,
-    page: 1,
+    studio: studio || undefined,
+    year: year ? Number(year) : undefined,
+    page,
     pageSize: 24,
-    sort: "title",
+    sort: sort as CatalogListParams["sort"],
   };
   const catalogQuery = useQuery({
     queryKey: ["catalog", "browse", params],
@@ -108,14 +115,17 @@ function BrowsePage() {
           <TextField id="catalog-search" label="Search titles" placeholder="Search anime…" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="ui-field" htmlFor="catalog-type">Format<select className="ui-input" id="catalog-type" value={type} onChange={(event) => setType(event.target.value)}><option value="">All formats</option><option value="TV">TV</option><option value="MOVIE">Movie</option><option value="OVA">OVA</option><option value="ONA">ONA</option><option value="SPECIAL">Special</option></select></label>
           <label className="ui-field" htmlFor="catalog-status">Release status<select className="ui-input" id="catalog-status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option value="AIRING">Airing</option><option value="FINISHED">Finished</option><option value="NOT_YET_AIRED">Upcoming</option><option value="CANCELLED">Cancelled</option></select></label>
-          <label className="ui-field" htmlFor="catalog-genre">Genre<select className="ui-input" id="catalog-genre" value={genre} onChange={(event) => setGenre(event.target.value)}><option value="">All genres</option>{(genresQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
+          <label className="ui-field" htmlFor="catalog-genre">Genre<select className="ui-input" id="catalog-genre" value={genre} onChange={(event) => { setGenre(event.target.value); setPage(1); }}><option value="">All genres</option>{(genresQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
+          <TextField id="catalog-year" label="Release year" inputMode="numeric" placeholder="e.g. 2025" value={year} onChange={(event) => { setYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPage(1); }} />
+          <label className="ui-field" htmlFor="catalog-studio">Studio<select className="ui-input" id="catalog-studio" value={studio} onChange={(event) => { setStudio(event.target.value); setPage(1); }}><option value="">All studios</option>{(studiosQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
+          <label className="ui-field" htmlFor="catalog-sort">Sort by<select className="ui-input" id="catalog-sort" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="title">Title</option><option value="recent">Recently added</option><option value="score">Highest score</option></select></label>
         </div>
       </Surface>
       <div className="browse-results-heading"><h2>Catalogue</h2>{catalogQuery.data ? <span>{catalogQuery.data.pagination.totalItems} titles</span> : null}</div>
       {catalogQuery.isLoading ? <div className="catalog-loading" role="status">Loading catalogue…</div> : null}
       {catalogQuery.isError ? <Surface className="catalog-empty" role="alert"><p>The catalogue could not be loaded. Check the API connection and try again.</p></Surface> : null}
       {catalogQuery.isSuccess && catalogQuery.data.items.length === 0 ? <Surface className="catalog-empty"><p>No titles match those filters. Try a different search.</p></Surface> : null}
-      {catalogQuery.isSuccess && catalogQuery.data.items.length > 0 ? <AnimeGrid items={catalogQuery.data.items} /> : null}
+      {catalogQuery.isSuccess && catalogQuery.data.items.length > 0 ? <><AnimeGrid items={catalogQuery.data.items} /><div className="catalog-pagination"><button type="button" className="ui-button ui-button--secondary" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><span>Page {catalogQuery.data.pagination.page} of {Math.max(1, catalogQuery.data.pagination.totalPages)}</span><button type="button" className="ui-button ui-button--secondary" disabled={page >= catalogQuery.data.pagination.totalPages} onClick={() => setPage((current) => current + 1)}>Next</button></div></> : null}
     </main>
   );
 }
