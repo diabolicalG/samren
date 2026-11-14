@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminMediaAsset, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -55,6 +55,14 @@ export function createApiClient(options: ApiClientOptions = {}) {
     adminCreateEpisode: (input: { animeId: string; episodeNumber: number; title: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminUpdateEpisode: (id: string, input: { episodeNumber?: number; title?: string; synopsis?: string | null; durationSeconds?: number | null; publicationStatus?: CatalogPublicationStatus; isFiller?: boolean; isRecap?: boolean }) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminArchiveEpisode: (id: string) => request<AdminCatalogEpisode>("/admin/catalog/episodes/" + encodeURIComponent(id), { method: "DELETE" }),
+    adminEpisodeMedia: (episodeId: string) => request<AdminEpisodeMedia[]>("/admin/catalog/episodes/" + encodeURIComponent(episodeId) + "/media"),
+    adminCreateEpisodeMedia: (episodeId: string, input: { assetId: string; qualityLabel?: string | null; isDefault?: boolean }) => request<AdminEpisodeMedia>("/admin/catalog/episodes/" + encodeURIComponent(episodeId) + "/media", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminUpdateEpisodeMedia: (id: string, input: { qualityLabel?: string | null; isDefault?: boolean }) => request<AdminEpisodeMedia>("/admin/catalog/episode-media/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminDeleteEpisodeMedia: (id: string) => request<void>("/admin/catalog/episode-media/" + encodeURIComponent(id), { method: "DELETE" }),
+    adminSubtitleTracks: (episodeId: string) => request<AdminSubtitleTrack[]>("/admin/catalog/episodes/" + encodeURIComponent(episodeId) + "/subtitles"),
+    adminCreateSubtitleTrack: (episodeId: string, input: { assetId: string; languageCode: string; label: string; format: "SRT" | "VTT" | "ASS"; isDefault?: boolean }) => request<AdminSubtitleTrack>("/admin/catalog/episodes/" + encodeURIComponent(episodeId) + "/subtitles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminUpdateSubtitleTrack: (id: string, input: { languageCode?: string; label?: string; format?: "SRT" | "VTT" | "ASS"; isDefault?: boolean }) => request<AdminSubtitleTrack>("/admin/catalog/subtitle-tracks/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+    adminDeleteSubtitleTrack: (id: string) => request<void>("/admin/catalog/subtitle-tracks/" + encodeURIComponent(id), { method: "DELETE" }),
     adminCatalogGenres: () => request<CatalogTaxonomyItem[]>("/admin/catalog/genres"),
     adminCatalogStudios: () => request<CatalogTaxonomyItem[]>("/admin/catalog/studios"),
     adminCatalogSeasons: () => request<CatalogSeason[]>("/admin/catalog/seasons"),
