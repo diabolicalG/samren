@@ -8,6 +8,7 @@ import { authenticateSession } from "./auth/session.js";
 import { adminCatalogRouter } from "./catalog/admin.routes.js";
 
 export const app = express();
+app.set("trust proxy", env.TRUST_PROXY_HOPS);
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN.split(",").map((value) => value.trim()), credentials: true }));
