@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
-import type { CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
+import type { AdminAnimeWriteInput, CatalogAnimeCard, CatalogAnimeDetail, CatalogListParams } from "@samren/types";
 import { apiClient } from "@samren/api-client";
 import { ActionLink, StatusBadge, Surface, TextField } from "./components/ui";
 
@@ -183,6 +183,13 @@ function AdminPage() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [synopsis, setSynopsis] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editSynopsis, setEditSynopsis] = useState("");
+  const [editYear, setEditYear] = useState("");
+  const [editGenreSlugs, setEditGenreSlugs] = useState<string[]>([]);
+  const [editStudioSlugs, setEditStudioSlugs] = useState<string[]>([]);
   const [formMessage, setFormMessage] = useState("");
   const loginMutation = useMutation({
     mutationFn: () => apiClient.authLogin(email, password),
@@ -199,6 +206,8 @@ function AdminPage() {
     },
   });
   const isAdmin = sessionQuery.data?.user.role === "ADMIN";
+  const adminGenresQuery = useQuery({ queryKey: ["admin", "genres"], queryFn: apiClient.catalogGenres, enabled: isAdmin });
+  const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.catalogStudios, enabled: isAdmin });
   const catalogQuery = useQuery({
     queryKey: ["admin", "catalog"],
     queryFn: apiClient.adminCatalogAnime,
@@ -228,6 +237,13 @@ function AdminPage() {
   const archiveMutation = useMutation({
     mutationFn: apiClient.adminArchiveAnime,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+  });
+  const editMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: AdminAnimeWriteInput }) => apiClient.adminUpdateAnime(id, input),
+    onSuccess: async () => {
+      setEditingId(null);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
+    },
   });
 
   if (sessionQuery.isLoading) {
@@ -278,13 +294,30 @@ function AdminPage() {
           {catalogQuery.data?.items.length === 0 ? <Surface className="catalog-empty"><p>No catalogue records exist yet. Create the first draft.</p></Surface> : null}
           <div className="admin-record-list">
             {catalogQuery.data?.items.map((item) => (
-              <article className="admin-record" key={item.id}>
-                <div className="admin-record-copy"><div className="admin-record-meta"><span className={"admin-status admin-status--" + item.publicationStatus.toLowerCase()}>{item.publicationStatus}</span><span>{item._count.episodes} episodes</span></div><h3>{item.title}</h3><p>/{item.slug}</p></div>
-                <div className="admin-record-actions">
-                  {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
-                  {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
-                </div>
-              </article>
+              <div className="admin-record-wrap" key={item.id}>
+                <article className="admin-record">
+                  <div className="admin-record-copy"><div className="admin-record-meta"><span className={"admin-status admin-status--" + item.publicationStatus.toLowerCase()}>{item.publicationStatus}</span><span>{item._count.episodes} episodes</span></div><h3>{item.title}</h3><p>/{item.slug}</p></div>
+                  <div className="admin-record-actions">
+                    {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); }} aria-label={"Edit " + item.title}>Edit</button> : null}
+                    {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
+                    {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
+                  </div>
+                </article>
+                {editingId === item.id ? (
+                  <Surface className="admin-edit">
+                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs } }); }}>
+                      <TextField id={"edit-title-" + item.id} label="Title" required maxLength={240} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
+                      <TextField id={"edit-slug-" + item.id} label="Slug" required maxLength={180} value={editSlug} onChange={(event) => setEditSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+                      <TextField id={"edit-year-" + item.id} label="Release year" inputMode="numeric" placeholder="Optional" value={editYear} onChange={(event) => setEditYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
+                      <label className="ui-field" htmlFor={"edit-synopsis-" + item.id}>Synopsis<textarea id={"edit-synopsis-" + item.id} className="ui-input admin-textarea" maxLength={10000} rows={4} value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
+                      <label className="ui-field" htmlFor={"edit-genres-" + item.id}>Genres<select multiple className="ui-input admin-multiselect" id={"edit-genres-" + item.id} value={editGenreSlugs} onChange={(event) => setEditGenreSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminGenresQuery.data ?? []).map((genre) => <option key={genre.id} value={genre.slug}>{genre.name}</option>)}</select></label>
+                      <label className="ui-field" htmlFor={"edit-studios-" + item.id}>Studios<select multiple className="ui-input admin-multiselect" id={"edit-studios-" + item.id} value={editStudioSlugs} onChange={(event) => setEditStudioSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminStudiosQuery.data ?? []).map((studio) => <option key={studio.id} value={studio.slug}>{studio.name}</option>)}</select></label>
+                      {editMutation.isError ? <p className="admin-error" role="alert">{editMutation.error.message}</p> : null}
+                      <div className="admin-record-actions"><button className="ui-button ui-button--primary" type="submit" disabled={editMutation.isPending || !editTitle.trim() || !editSlug.trim() || (editYear !== "" && (Number(editYear) < 1900 || Number(editYear) > 2200))}>{editMutation.isPending ? "Saving…" : "Save changes"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingId(null)}>Cancel</button></div>
+                    </form>
+                  </Surface>
+                ) : null}
+              </div>
             ))}
           </div>
         </section>
