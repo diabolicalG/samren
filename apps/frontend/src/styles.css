@@ -267,3 +267,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-assets .admin-taxonomy-card form > .ui-button { grid-column: 1 / -1; }
 .admin-asset-note { margin: 0 0 16px; color: #9aa5b7; font-size: 11px; line-height: 1.7; }
 @media (max-width: 560px) { .admin-assets .admin-taxonomy-card form { grid-template-columns: 1fr; }.admin-assets .admin-taxonomy-card form > .ui-button { grid-column: auto; } }
+
+.admin-episode-list > li { display: grid; gap: 10px; }
+.admin-episode-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.episode-assets { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8,10,15,.45); }
+.episode-assets-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.episode-assets-grid h4 { margin: 0 0 10px; color: #c4b5fd; font: 650 11px Manrope,sans-serif; }
+.episode-assets-grid form { display: grid; gap: 9px; }
+.episode-assets-grid .ui-button { justify-self: start; padding: 7px 9px; font-size: 9px; }
+.episode-assets-grid .admin-taxonomy-list { margin-top: 10px; }
+@media (max-width: 640px) { .episode-assets-grid { grid-template-columns: 1fr; }.admin-episode-row { align-items: start; flex-direction: column; }.admin-episode-actions { width: 100%; } }
