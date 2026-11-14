@@ -1,4 +1,4 @@
-import type { ApiEnvelope, HealthStatus } from "@samren/types";
+import type { ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
