@@ -138,3 +138,11 @@ export type AdminAnimeWriteInput = {
   genreSlugs?: string[];
   studioSlugs?: string[];
 };
+
+export type AdminCatalogEpisode = CatalogEpisode & {
+  animeId: string;
+  seasonId: string | null;
+  publicationStatus: CatalogPublicationStatus;
+  createdAt: string;
+  updatedAt: string;
+};
