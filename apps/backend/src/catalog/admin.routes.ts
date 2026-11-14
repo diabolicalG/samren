@@ -120,7 +120,7 @@ adminCatalogRouter.post("/anime", requireTrustedOrigin, async (request, response
         ageRating: data.ageRating,
         score: data.score,
         featured: data.featured,
-        seasonGroupId: data.seasonGroupId,
+        seasonGroup: data.seasonGroupId ? { connect: { id: data.seasonGroupId } } : undefined,
         publishedAt: data.publicationStatus === "PUBLISHED" ? new Date() : null,
         genres: { create: data.genreSlugs.map((genreSlug) => ({ genre: { connect: { slug: genreSlug } } })) },
         studios: { create: data.studioSlugs.map((studioSlug) => ({ studio: { connect: { slug: studioSlug } } })) },
