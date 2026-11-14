@@ -21,7 +21,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.user.deleteMany({ where: { id: userId } });
+  if (userId) await prisma.user.deleteMany({ where: { id: userId } });
 });
 
 describe("first-party authentication sessions", () => {
