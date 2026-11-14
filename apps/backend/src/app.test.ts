@@ -88,6 +88,7 @@ describe("first-party authentication boundaries", () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("UNAUTHENTICATED");
+    expect(response.headers["cache-control"]).toBe("no-store");
   });
 
   it("requires an allowed browser origin for login and logout", async () => {
