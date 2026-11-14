@@ -180,6 +180,54 @@ describe("administrator workspace", () => {
     });
   });
 
+
+  it("lets administrators create taxonomy records and register first-party asset metadata", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "authSession").mockResolvedValue({
+      user: { id: "admin-1", email: "admin@samren.test", username: "admin", role: "ADMIN" },
+    });
+    vi.spyOn(apiClient, "adminCatalogAnime").mockResolvedValue({ items: [] });
+    vi.spyOn(apiClient, "adminCatalogGenres").mockResolvedValue([]);
+    vi.spyOn(apiClient, "adminCatalogStudios").mockResolvedValue([]);
+    vi.spyOn(apiClient, "adminCatalogSeasons").mockResolvedValue([]);
+    vi.spyOn(apiClient, "adminCatalogAssets").mockResolvedValue([]);
+    const createGenre = vi.spyOn(apiClient, "adminCreateGenre").mockResolvedValue({ id: "genre-2", slug: "mystery", name: "Mystery" });
+    const createStudio = vi.spyOn(apiClient, "adminCreateStudio").mockResolvedValue({ id: "studio-2", slug: "new-studio", name: "New Studio" });
+    const createSeason = vi.spyOn(apiClient, "adminCreateSeason").mockResolvedValue({ id: "season-2", year: 2026, season: "WINTER", label: "Winter 2026" });
+    const createAsset = vi.spyOn(apiClient, "adminCreateAsset").mockResolvedValue({
+      id: "asset-2", storageKey: "catalogue/posters/sample.webp", originalFilename: "sample.webp",
+      mediaKind: "POSTER", mimeType: "image/webp", sizeBytes: "2048", checksumSha256: null,
+      processingState: "PENDING", width: null, height: null, durationSeconds: null,
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    renderApp("/admin");
+
+    fireEvent.change(await screen.findByLabelText("Genre name"), { target: { value: "Mystery" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add genre" }));
+    fireEvent.change(screen.getByLabelText("Studio name"), { target: { value: "New Studio" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add studio" }));
+    fireEvent.change(screen.getByLabelText("Year"), { target: { value: "2026" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add season" }));
+    fireEvent.change(screen.getByLabelText("Internal storage key"), { target: { value: "catalogue/posters/sample.webp" } });
+    fireEvent.change(screen.getByLabelText("Original filename"), { target: { value: "sample.webp" } });
+    fireEvent.change(screen.getByLabelText("Size (bytes)"), { target: { value: "2048" } });
+    fireEvent.click(screen.getByRole("button", { name: "Register metadata" }));
+
+    await waitFor(() => {
+      expect(createGenre).toHaveBeenCalledWith({ slug: "mystery", name: "Mystery" });
+      expect(createStudio).toHaveBeenCalledWith({ slug: "new-studio", name: "New Studio" });
+      expect(createSeason).toHaveBeenCalledWith({ year: 2026, season: "WINTER", label: null });
+      expect(createAsset).toHaveBeenCalledWith(expect.objectContaining({
+        storageKey: "catalogue/posters/sample.webp",
+        originalFilename: "sample.webp",
+        mediaKind: "POSTER",
+        mimeType: "image/webp",
+        sizeBytes: 2048,
+      }));
+    });
+  });
+
   it("does not render catalogue write controls for a regular user", async () => {
     vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
     vi.spyOn(apiClient, "authSession").mockResolvedValue({
