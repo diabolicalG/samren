@@ -17,6 +17,10 @@ import {
   adminEpisodeUpdateSchema,
   adminAssetCreateSchema,
   adminAssetUpdateSchema,
+  adminEpisodeMediaCreateSchema,
+  adminEpisodeMediaUpdateSchema,
+  adminSubtitleTrackCreateSchema,
+  adminSubtitleTrackUpdateSchema,
 } from "./admin.schemas.js";
 
 export const adminCatalogRouter = Router();
@@ -487,6 +491,179 @@ adminCatalogRouter.delete("/episodes/:id", requireTrustedOrigin, async (request,
       select: { id: true, animeId: true, episodeNumber: true, publicationStatus: true },
     });
     response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+
+const episodeMediaSelect = {
+  id: true, episodeId: true, assetId: true, qualityLabel: true, isDefault: true, createdAt: true,
+  asset: { select: { id: true, originalFilename: true, mimeType: true, width: true, height: true, durationSeconds: true, processingState: true } },
+} satisfies Prisma.EpisodeMediaSelect;
+
+const subtitleTrackSelect = {
+  id: true, episodeId: true, assetId: true, languageCode: true, label: true, format: true, isDefault: true, createdAt: true,
+  asset: { select: { id: true, originalFilename: true, mimeType: true, processingState: true } },
+} satisfies Prisma.SubtitleTrackSelect;
+
+adminCatalogRouter.get("/episodes/:episodeId/media", async (request, response, next) => {
+  const episodeId = adminAnimeIdSchema.safeParse(request.params.episodeId);
+  if (!episodeId.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode identifier is invalid" } });
+    return;
+  }
+  try {
+    const items = await prisma.episodeMedia.findMany({ where: { episodeId: episodeId.data }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }], select: episodeMediaSelect });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.post("/episodes/:episodeId/media", requireTrustedOrigin, async (request, response) => {
+  const episodeId = adminAnimeIdSchema.safeParse(request.params.episodeId);
+  const parsed = adminEpisodeMediaCreateSchema.safeParse(request.body);
+  if (!episodeId.success || !parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode media association is invalid" } });
+    return;
+  }
+  try {
+    const [episode, asset] = await Promise.all([
+      prisma.episode.findUnique({ where: { id: episodeId.data }, select: { id: true } }),
+      prisma.mediaAsset.findUnique({ where: { id: parsed.data.assetId }, select: { id: true, mediaKind: true } }),
+    ]);
+    if (!episode || !asset) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The episode or media asset was not found" } });
+      return;
+    }
+    if (asset.mediaKind !== "VIDEO") {
+      response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_KIND", message: "Episode media must reference a VIDEO asset" } });
+      return;
+    }
+    const item = await prisma.$transaction(async (tx) => {
+      if (parsed.data.isDefault) await tx.episodeMedia.updateMany({ where: { episodeId: episodeId.data, isDefault: true }, data: { isDefault: false } });
+      return tx.episodeMedia.create({ data: { ...parsed.data, episodeId: episodeId.data }, select: episodeMediaSelect });
+    });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/episode-media/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminEpisodeMediaUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode media update is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      const existing = await tx.episodeMedia.findUnique({ where: { id: id.data }, select: { episodeId: true } });
+      if (!existing) throw Object.assign(new Error("Episode media not found"), { code: "P2025" });
+      if (parsed.data.isDefault) await tx.episodeMedia.updateMany({ where: { episodeId: existing.episodeId, isDefault: true, id: { not: id.data } }, data: { isDefault: false } });
+      return tx.episodeMedia.update({ where: { id: id.data }, data: parsed.data, select: episodeMediaSelect });
+    });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/episode-media/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode media identifier is invalid" } });
+    return;
+  }
+  try {
+    await prisma.episodeMedia.delete({ where: { id: id.data } });
+    response.status(204).end();
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.get("/episodes/:episodeId/subtitles", async (request, response, next) => {
+  const episodeId = adminAnimeIdSchema.safeParse(request.params.episodeId);
+  if (!episodeId.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode identifier is invalid" } });
+    return;
+  }
+  try {
+    const items = await prisma.subtitleTrack.findMany({ where: { episodeId: episodeId.data }, orderBy: [{ isDefault: "desc" }, { languageCode: "asc" }], select: subtitleTrackSelect });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.post("/episodes/:episodeId/subtitles", requireTrustedOrigin, async (request, response) => {
+  const episodeId = adminAnimeIdSchema.safeParse(request.params.episodeId);
+  const parsed = adminSubtitleTrackCreateSchema.safeParse(request.body);
+  if (!episodeId.success || !parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The subtitle track is invalid" } });
+    return;
+  }
+  try {
+    const [episode, asset] = await Promise.all([
+      prisma.episode.findUnique({ where: { id: episodeId.data }, select: { id: true } }),
+      prisma.mediaAsset.findUnique({ where: { id: parsed.data.assetId }, select: { id: true, mediaKind: true, mimeType: true } }),
+    ]);
+    if (!episode || !asset) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The episode or subtitle asset was not found" } });
+      return;
+    }
+    const mimeByFormat = { SRT: "application/x-subrip", VTT: "text/vtt", ASS: "application/x-ass" };
+    if (asset.mediaKind !== "SUBTITLE" || asset.mimeType !== mimeByFormat[parsed.data.format]) {
+      response.status(400).json({ data: null, error: { code: "INVALID_SUBTITLE_ASSET", message: "Subtitle format must match a SUBTITLE asset MIME type" } });
+      return;
+    }
+    const item = await prisma.$transaction(async (tx) => {
+      if (parsed.data.isDefault) await tx.subtitleTrack.updateMany({ where: { episodeId: episodeId.data, isDefault: true }, data: { isDefault: false } });
+      return tx.subtitleTrack.create({ data: { ...parsed.data, episodeId: episodeId.data }, select: subtitleTrackSelect });
+    });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/subtitle-tracks/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminSubtitleTrackUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The subtitle track update is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      const existing = await tx.subtitleTrack.findUnique({ where: { id: id.data }, select: { episodeId: true, format: true, asset: { select: { mediaKind: true, mimeType: true } } } });
+      if (!existing) throw Object.assign(new Error("Subtitle track not found"), { code: "P2025" });
+      const nextFormat = parsed.data.format ?? existing.format;
+      const mimeByFormat = { SRT: "application/x-subrip", VTT: "text/vtt", ASS: "application/x-ass" };
+      if (existing.asset.mediaKind !== "SUBTITLE" || existing.asset.mimeType !== mimeByFormat[nextFormat]) {
+        throw Object.assign(new Error("Subtitle format does not match its asset"), { code: "P2003" });
+      }
+      if (parsed.data.isDefault) await tx.subtitleTrack.updateMany({ where: { episodeId: existing.episodeId, isDefault: true, id: { not: id.data } }, data: { isDefault: false } });
+      return tx.subtitleTrack.update({ where: { id: id.data }, data: parsed.data, select: subtitleTrackSelect });
+    });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/subtitle-tracks/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The subtitle track identifier is invalid" } });
+    return;
+  }
+  try {
+    await prisma.subtitleTrack.delete({ where: { id: id.data } });
+    response.status(204).end();
   } catch (error) {
     sendError(response, error);
   }
