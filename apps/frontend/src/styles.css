@@ -262,3 +262,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-episode-actions { display: flex; flex-shrink: 0; gap: 6px; }
 .admin-episode-actions .ui-button { padding: 5px 8px; font-size: 9px; }
 @media (max-width: 560px) { .admin-episodes form { grid-template-columns: 1fr; }.admin-episodes form > .ui-button { grid-column: auto; } }
+
+.admin-assets .admin-taxonomy-card form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: end; gap: 14px; }
+.admin-assets .admin-taxonomy-card form > .ui-button { grid-column: 1 / -1; }
+.admin-asset-note { margin: 0 0 16px; color: #9aa5b7; font-size: 11px; line-height: 1.7; }
+@media (max-width: 560px) { .admin-assets .admin-taxonomy-card form { grid-template-columns: 1fr; }.admin-assets .admin-taxonomy-card form > .ui-button { grid-column: auto; } }
