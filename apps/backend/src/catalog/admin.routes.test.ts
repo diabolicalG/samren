@@ -122,6 +122,56 @@ describe("admin catalogue management", () => {
     expect(archivedPublicLookup.status).toBe(404);
   });
 
+
+  it("creates, updates, and safely deletes unused catalogue taxonomies", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const genre = await agent.post("/api/v1/admin/catalog/genres").set("Origin", origin).send({
+      slug: "phase-two-test-genre",
+      name: "Phase Two Test Genre",
+    });
+    expect(genre.status).toBe(201);
+    const updatedGenre = await agent.patch("/api/v1/admin/catalog/genres/" + genre.body.data.id)
+      .set("Origin", origin).send({ name: "Updated Phase Two Genre" });
+    expect(updatedGenre.status).toBe(200);
+    expect(updatedGenre.body.data.name).toBe("Updated Phase Two Genre");
+    const deletedGenre = await agent.delete("/api/v1/admin/catalog/genres/" + genre.body.data.id).set("Origin", origin);
+    expect(deletedGenre.status).toBe(204);
+
+    const studio = await agent.post("/api/v1/admin/catalog/studios").set("Origin", origin).send({
+      slug: "phase-two-test-studio",
+      name: "Phase Two Test Studio",
+      website: "https://example.invalid/studio",
+    });
+    expect(studio.status).toBe(201);
+    const updatedStudio = await agent.patch("/api/v1/admin/catalog/studios/" + studio.body.data.id)
+      .set("Origin", origin).send({ description: "A local test fixture." });
+    expect(updatedStudio.status).toBe(200);
+    expect(updatedStudio.body.data.description).toBe("A local test fixture.");
+    const deletedStudio = await agent.delete("/api/v1/admin/catalog/studios/" + studio.body.data.id).set("Origin", origin);
+    expect(deletedStudio.status).toBe(204);
+
+    const season = await agent.post("/api/v1/admin/catalog/seasons").set("Origin", origin).send({
+      year: 2028,
+      season: "FALL",
+      label: "Fall 2028 test",
+    });
+    expect(season.status).toBe(201);
+    const updatedSeason = await agent.patch("/api/v1/admin/catalog/seasons/" + season.body.data.id)
+      .set("Origin", origin).send({ label: "Updated Fall 2028" });
+    expect(updatedSeason.status).toBe(200);
+    expect(updatedSeason.body.data.label).toBe("Updated Fall 2028");
+    const deletedSeason = await agent.delete("/api/v1/admin/catalog/seasons/" + season.body.data.id).set("Origin", origin);
+    expect(deletedSeason.status).toBe(204);
+  });
+
+  it("prevents deleting a taxonomy that is in use", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const response = await agent.delete("/api/v1/admin/catalog/genres/" + (await prisma.genre.findUniqueOrThrow({ where: { slug: "adventure" }, select: { id: true } })).id)
+      .set("Origin", origin);
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("IN_USE");
+  });
+
   it("rejects mutations from an untrusted origin", async () => {
     const agent = await login(adminEmail, adminPassword);
     const response = await agent
