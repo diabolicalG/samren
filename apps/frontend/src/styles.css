@@ -60,3 +60,56 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .page-shell { width: min(92vw,600px); }.hero-panel { min-height: 600px; margin-top: 22px; padding: 32px 25px; }.hero-orbit { width: 260px; height: 260px; top: auto; bottom: 26px; right: 50%; transform: translateX(50%); opacity: .65; }.orbit-core { width: 100px; height: 100px; border-radius: 30px; }.hero-index { left: 25px; bottom: 22px; }.welcome-row { display: block; padding-top: 42px; }.welcome-row p { margin-top: 15px; }.empty-library { align-items: flex-start; flex-wrap: wrap; }.status-pill { margin-left: 62px; }.site-footer { width: 92vw; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+/* Shared Obsidian primitives */
+.action-link:focus-visible,
+.main-nav a:focus-visible,
+.brand:focus-visible,
+.text-link:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+  border-radius: 5px;
+}
+.surface {
+  border: 1px solid var(--line);
+  background: rgba(18, 23, 34, .72);
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #aab3c2;
+  background: rgba(18, 23, 34, .72);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+.status-badge-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+.status-badge[data-tone="positive"] {
+  color: #9de7c1;
+  border-color: rgba(74, 222, 128, .22);
+}
+.status-badge[data-tone="positive"] .status-badge-dot {
+  background: #4ade80;
+  box-shadow: 0 0 10px rgba(74, 222, 128, .55);
+}
+.status-badge[data-tone="warning"] {
+  color: #f5c987;
+  border-color: rgba(245, 158, 11, .24);
+}
+.status-badge[data-tone="warning"] .status-badge-dot {
+  background: #f59e0b;
+}
+@media (max-width: 760px) {
+  .status-badge { display: none; }
+}
