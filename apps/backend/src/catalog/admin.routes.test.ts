@@ -4,7 +4,7 @@ import { app } from "../app.js";
 import { prisma } from "../db/prisma.js";
 import { hashPassword } from "../auth/password.js";
 
-const origin = "http://localhost:3000";
+const origin = "http://localhost:5173";
 const adminEmail = "phase2-catalog-admin@samren.test";
 const userEmail = "phase2-catalog-user@samren.test";
 const adminPassword = "phase2-ci-catalog-admin-password";
