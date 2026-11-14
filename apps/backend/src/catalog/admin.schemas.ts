@@ -56,3 +56,19 @@ export const adminSeasonCreateSchema = z.object({
 }).strict();
 
 export const adminSeasonUpdateSchema = adminSeasonCreateSchema.partial().strict();
+
+export const adminEpisodeCreateSchema = z.object({
+  animeId: z.string().cuid(),
+  seasonId: z.string().cuid().nullable().optional(),
+  episodeNumber: z.number().int().positive().max(10000),
+  absoluteNumber: z.number().int().positive().max(100000).nullable().optional(),
+  title: z.string().trim().min(1).max(240),
+  synopsis: optionalText(10000),
+  durationSeconds: z.number().int().positive().max(86400).nullable().optional(),
+  airDate: z.string().datetime().nullable().optional(),
+  publicationStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
+  isFiller: z.boolean().default(false),
+  isRecap: z.boolean().default(false),
+}).strict();
+
+export const adminEpisodeUpdateSchema = adminEpisodeCreateSchema.omit({ animeId: true }).partial().strict();
