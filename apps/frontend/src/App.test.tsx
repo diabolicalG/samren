@@ -95,6 +95,9 @@ describe("administrator workspace", () => {
       user: { id: "admin-1", email: "admin@samren.test", username: "admin", role: "ADMIN" },
     });
     vi.spyOn(apiClient, "adminCatalogAnime").mockResolvedValue({ items: [] });
+    vi.spyOn(apiClient, "adminCatalogGenres").mockResolvedValue([]);
+    vi.spyOn(apiClient, "adminCatalogStudios").mockResolvedValue([]);
+    vi.spyOn(apiClient, "adminCatalogSeasons").mockResolvedValue([]);
 
     renderApp("/admin");
 
@@ -134,6 +137,7 @@ describe("administrator workspace", () => {
     vi.spyOn(apiClient, "adminCatalogAnime").mockResolvedValue({ items: [item] });
     vi.spyOn(apiClient, "adminCatalogGenres").mockResolvedValue([{ id: "genre-1", slug: "adventure", name: "Adventure" }]);
     vi.spyOn(apiClient, "adminCatalogStudios").mockResolvedValue([{ id: "studio-1", slug: "samren-studio", name: "Samren Studio" }]);
+    vi.spyOn(apiClient, "adminCatalogSeasons").mockResolvedValue([]);
     const update = vi.spyOn(apiClient, "adminUpdateAnime").mockResolvedValue({ ...item, title: "Clockwork Orbit Revisited" });
 
     renderApp("/admin");
