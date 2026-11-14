@@ -36,6 +36,8 @@ const adminAnimeSelect = {
   ageRating: true,
   score: true,
   featured: true,
+  posterAssetId: true,
+  bannerAssetId: true,
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -64,7 +66,7 @@ function sendError(response: import("express").Response, error: unknown) {
   response.status(500).json({ data: null, error: { code: "INTERNAL_ERROR", message: "The catalogue operation could not be completed" } });
 }
 
-async function validateRelations(genreSlugs: string[] | undefined, studioSlugs: string[] | undefined, seasonGroupId: string | null | undefined) {
+async function validateRelations(genreSlugs: string[] | undefined, studioSlugs: string[] | undefined, seasonGroupId: string | null | undefined, posterAssetId?: string | null, bannerAssetId?: string | null) {
   if (genreSlugs?.length) {
     const found = await prisma.genre.findMany({ where: { slug: { in: genreSlugs } }, select: { slug: true } });
     if (found.length !== genreSlugs.length) return false;
@@ -76,6 +78,14 @@ async function validateRelations(genreSlugs: string[] | undefined, studioSlugs: 
   if (seasonGroupId) {
     const season = await prisma.season.findUnique({ where: { id: seasonGroupId }, select: { id: true } });
     if (!season) return false;
+  }
+  if (posterAssetId) {
+    const asset = await prisma.mediaAsset.findUnique({ where: { id: posterAssetId }, select: { mediaKind: true } });
+    if (!asset || asset.mediaKind !== "POSTER") return false;
+  }
+  if (bannerAssetId) {
+    const asset = await prisma.mediaAsset.findUnique({ where: { id: bannerAssetId }, select: { mediaKind: true } });
+    if (!asset || asset.mediaKind !== "BANNER") return false;
   }
   return true;
 }
@@ -503,7 +513,7 @@ adminCatalogRouter.post("/anime", requireTrustedOrigin, async (request, response
 
   try {
     const data = parsed.data;
-    if (!(await validateRelations(data.genreSlugs, data.studioSlugs, data.seasonGroupId))) {
+    if (!(await validateRelations(data.genreSlugs, data.studioSlugs, data.seasonGroupId, data.posterAssetId, data.bannerAssetId))) {
       response.status(400).json({ data: null, error: { code: "INVALID_RELATION", message: "One or more selected genres, studios, or seasons do not exist" } });
       return;
     }
@@ -530,6 +540,8 @@ adminCatalogRouter.post("/anime", requireTrustedOrigin, async (request, response
         ageRating: data.ageRating,
         score: data.score,
         featured: data.featured,
+        posterAsset: data.posterAssetId ? { connect: { id: data.posterAssetId } } : undefined,
+        bannerAsset: data.bannerAssetId ? { connect: { id: data.bannerAssetId } } : undefined,
         seasonGroup: data.seasonGroupId ? { connect: { id: data.seasonGroupId } } : undefined,
         publishedAt: data.publicationStatus === "PUBLISHED" ? new Date() : null,
         genres: { create: data.genreSlugs.map((genreSlug) => ({ genre: { connect: { slug: genreSlug } } })) },
@@ -578,6 +590,8 @@ adminCatalogRouter.patch("/anime/:id", requireTrustedOrigin, async (request, res
       ageRating: data.ageRating,
       score: data.score,
       featured: data.featured,
+      posterAsset: data.posterAssetId === undefined ? undefined : data.posterAssetId === null ? { disconnect: true } : { connect: { id: data.posterAssetId } },
+      bannerAsset: data.bannerAssetId === undefined ? undefined : data.bannerAssetId === null ? { disconnect: true } : { connect: { id: data.bannerAssetId } },
       seasonGroup: data.seasonGroupId === undefined ? undefined : data.seasonGroupId === null
         ? { disconnect: true }
         : { connect: { id: data.seasonGroupId } },
