@@ -165,7 +165,7 @@ describe("admin catalogue management", () => {
     expect(subtitleAssociation.body.data.asset.mimeType).toBe("text/vtt");
 
     const wrongMediaKind = await agent.post("/api/v1/admin/catalog/episodes/" + episode.body.data.id + "/media")
-      .set("Origin", origin).send({ assetId, qualityLabel: "poster" });
+      .set("Origin", origin).send({ assetId: posterAssetId, qualityLabel: "poster" });
     expect(wrongMediaKind.status).toBe(400);
     expect(wrongMediaKind.body.error.code).toBe("INVALID_MEDIA_KIND");
 
