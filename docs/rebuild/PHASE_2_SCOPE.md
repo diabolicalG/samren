@@ -64,7 +64,7 @@ Admin write routes:
 - Add catalogue detail route with synopsis, metadata, genre/studio links and episode listing.
 - Add an authenticated admin catalogue workspace for anime, taxonomy, episodes, first-party asset metadata and episode media/subtitle associations.
 - Keep the Obsidian visual language, accessible controls, keyboard navigation and reduced-motion behavior.
-- Artwork is displayed only from safe application-owned asset references. No hotlinked external anime artwork.
+- Artwork metadata references only application-owned assets; no remote artwork is hotlinked. Public storage delivery and player display are Phase 3.
 
 ## 6. Seed and database workflow
 
@@ -83,9 +83,9 @@ Admin write routes:
 4. Add public catalogue endpoints and integration tests.
 5. Add deterministic seed fixtures and verify idempotence.
 6. Add frontend data hooks/client methods and home/browse/detail experiences.
-7. Add admin mutation endpoints/UI behind verified server-side ADMIN sessions. Anime management is implemented; complete taxonomy, episode and asset metadata management.
+7. Add and verify admin mutation endpoints/UI behind server-side ADMIN sessions for anime, taxonomy, episodes, asset metadata and episode media/subtitle associations.
 8. Run lint, typecheck, tests, schema/migration checks and production builds; audit runtime/config/lockfiles for excluded integrations.
-9. Publish Phase 2 progress and final audit; create a commit checkpoint only after acceptance gates pass.
+9. Publish Phase 2 progress and final audit; checkpoint the completed phase after all acceptance gates pass.
 
 ## 8. Acceptance gates
 
