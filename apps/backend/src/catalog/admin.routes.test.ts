@@ -13,6 +13,7 @@ const animeSlug = "phase-two-admin-managed-title";
 let adminId: string;
 let userId: string;
 let assetId: string | undefined;
+const relatedAssetIds: string[] = [];
 
 async function login(email: string, password: string) {
   const agent = request.agent(app);
@@ -42,7 +43,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.anime.deleteMany({ where: { slug: animeSlug } });
-  if (assetId) await prisma.mediaAsset.deleteMany({ where: { id: assetId } });
+  await prisma.mediaAsset.deleteMany({ where: { id: { in: [assetId, ...relatedAssetIds].filter((id): id is string => Boolean(id)) } } });
   const userIds = [adminId, userId].filter((id): id is string => Boolean(id));
   if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 });
@@ -110,6 +111,7 @@ describe("admin catalogue management", () => {
     expect(asset.body.data.sizeBytes).toBe("4096");
     expect(asset.body.data.processingState).toBe("PENDING");
     assetId = asset.body.data.id;
+    relatedAssetIds.push(assetId);
 
     const linked = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
       .set("Origin", origin).send({ posterAssetId: assetId });
@@ -131,6 +133,50 @@ describe("admin catalogue management", () => {
     expect(updatedEpisode.status).toBe(200);
     expect(updatedEpisode.body.data.title).toBe("The Edited Pilot");
     expect(updatedEpisode.body.data.isRecap).toBe(true);
+
+    const videoAsset = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin).send({
+      storageKey: "samren/assets/phase-two-episode.mp4",
+      originalFilename: "phase-two-episode.mp4",
+      mediaKind: "VIDEO",
+      mimeType: "video/mp4",
+      sizeBytes: 8192,
+    });
+    const subtitleAsset = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin).send({
+      storageKey: "samren/assets/phase-two-episode.vtt",
+      originalFilename: "phase-two-episode.vtt",
+      mediaKind: "SUBTITLE",
+      mimeType: "text/vtt",
+      sizeBytes: 1024,
+    });
+    expect(videoAsset.status).toBe(201);
+    expect(subtitleAsset.status).toBe(201);
+    relatedAssetIds.push(videoAsset.body.data.id, subtitleAsset.body.data.id);
+
+    const videoAssociation = await agent.post("/api/v1/admin/catalog/episodes/" + episode.body.data.id + "/media")
+      .set("Origin", origin).send({ assetId: videoAsset.body.data.id, qualityLabel: "1080p", isDefault: true });
+    expect(videoAssociation.status).toBe(201);
+    expect(videoAssociation.body.data.isDefault).toBe(true);
+    expect(videoAssociation.body.data.asset.mimeType).toBe("video/mp4");
+
+    const subtitleAssociation = await agent.post("/api/v1/admin/catalog/episodes/" + episode.body.data.id + "/subtitles")
+      .set("Origin", origin).send({ assetId: subtitleAsset.body.data.id, languageCode: "en", label: "English", format: "VTT", isDefault: true });
+    expect(subtitleAssociation.status).toBe(201);
+    expect(subtitleAssociation.body.data.asset.mimeType).toBe("text/vtt");
+
+    const wrongMediaKind = await agent.post("/api/v1/admin/catalog/episodes/" + episode.body.data.id + "/media")
+      .set("Origin", origin).send({ assetId, qualityLabel: "poster" });
+    expect(wrongMediaKind.status).toBe(400);
+    expect(wrongMediaKind.body.error.code).toBe("INVALID_MEDIA_KIND");
+
+    const updatedVideoAssociation = await agent.patch("/api/v1/admin/catalog/episode-media/" + videoAssociation.body.data.id)
+      .set("Origin", origin).send({ qualityLabel: "720p" });
+    expect(updatedVideoAssociation.status).toBe(200);
+    expect(updatedVideoAssociation.body.data.qualityLabel).toBe("720p");
+
+    const updatedSubtitleAssociation = await agent.patch("/api/v1/admin/catalog/subtitle-tracks/" + subtitleAssociation.body.data.id)
+      .set("Origin", origin).send({ label: "English captions", isDefault: false });
+    expect(updatedSubtitleAssociation.status).toBe(200);
+    expect(updatedSubtitleAssociation.body.data.label).toBe("English captions");
 
     const draftPublicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(draftPublicLookup.status).toBe(404);
@@ -157,6 +203,11 @@ describe("admin catalogue management", () => {
     const protectedAssetDelete = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
     expect(protectedAssetDelete.status).toBe(409);
     expect(protectedAssetDelete.body.error.code).toBe("IN_USE");
+
+    const deletedVideoAssociation = await agent.delete("/api/v1/admin/catalog/episode-media/" + videoAssociation.body.data.id).set("Origin", origin);
+    expect(deletedVideoAssociation.status).toBe(204);
+    const deletedSubtitleAssociation = await agent.delete("/api/v1/admin/catalog/subtitle-tracks/" + subtitleAssociation.body.data.id).set("Origin", origin);
+    expect(deletedSubtitleAssociation.status).toBe(204);
 
     const archivedEpisode = await agent.delete("/api/v1/admin/catalog/episodes/" + episode.body.data.id).set("Origin", origin);
     expect(archivedEpisode.status).toBe(200);
