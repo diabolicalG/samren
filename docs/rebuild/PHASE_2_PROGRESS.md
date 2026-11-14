@@ -24,8 +24,10 @@
 
 ## Verification
 
-- The last fully green implementation run before the final CORS tightening was [CI run 43609617230](https://github.com/diabolicalG/samren/actions/runs/43609617230), which passed schema validation, client generation, migrations, seed twice, lint, typecheck, backend tests, frontend tests and both production builds.
-- A final CI run is checking the tightened CORS default and matching test origins; update this section with its result before treating this progress document as the final release checkpoint.
+- **PASS:** [CI run 43609815225](https://github.com/diabolicalG/samren/actions/runs/43609815225) on implementation checkpoint [`8669c5a`](https://github.com/diabolicalG/samren/commit/8669c5afbfa574c4d3a5ea258f52e9a161278e07).
+- All gates passed: Prisma schema validation/client generation, PostgreSQL migration, seed execution twice, Oxlint, frontend/backend typechecks, backend integration tests, frontend smoke/accessibility tests, and frontend/backend production builds.
+- The run includes the tightened single-origin CORS default and the active Vite origin in auth/admin integration tests.
+- See [PHASE_2_AUDIT.md](./PHASE_2_AUDIT.md) for the final acceptance and boundary review.
 - CI evidence is against an ephemeral PostgreSQL service. No production database deployment, backup/restore exercise or production migration has been performed.
 
 ## Explicit limitations
