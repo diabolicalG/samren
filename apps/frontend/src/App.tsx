@@ -206,8 +206,8 @@ function AdminPage() {
     },
   });
   const isAdmin = sessionQuery.data?.user.role === "ADMIN";
-  const adminGenresQuery = useQuery({ queryKey: ["admin", "genres"], queryFn: apiClient.catalogGenres, enabled: isAdmin });
-  const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.catalogStudios, enabled: isAdmin });
+  const adminGenresQuery = useQuery({ queryKey: ["admin", "genres"], queryFn: apiClient.adminCatalogGenres, enabled: isAdmin });
+  const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.adminCatalogStudios, enabled: isAdmin });
   const catalogQuery = useQuery({
     queryKey: ["admin", "catalog"],
     queryFn: apiClient.adminCatalogAnime,
