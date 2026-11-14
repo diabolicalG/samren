@@ -302,6 +302,10 @@ function AdminPage() {
     mutationFn: apiClient.adminArchiveEpisode,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }),
   });
+  const updateEpisodeMutation = useMutation({
+    mutationFn: ({ id, publicationStatus }: { id: string; publicationStatus: "DRAFT" | "PUBLISHED" }) => apiClient.adminUpdateEpisode(id, { publicationStatus }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }),
+  });
 
   if (sessionQuery.isLoading) {
     return <main className="page-shell admin-page"><div className="catalog-loading" role="status">Checking administrator session…</div></main>;
@@ -370,9 +374,9 @@ function AdminPage() {
                       <TextField id={"episode-duration-" + item.id} label="Duration (minutes)" inputMode="numeric" value={newEpisodeDuration} onChange={(event) => setNewEpisodeDuration(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
                       <button className="ui-button ui-button--secondary" type="submit" disabled={createEpisodeMutation.isPending || !newEpisodeTitle.trim() || Number(newEpisodeNumber) < 1 || (newEpisodeDuration !== "" && Number(newEpisodeDuration) < 1)}>Add episode draft</button>
                     </form>
-                    {createEpisodeMutation.isError || archiveEpisodeMutation.isError ? <p className="admin-error" role="alert">{(createEpisodeMutation.error ?? archiveEpisodeMutation.error)?.message}</p> : null}
+                    {createEpisodeMutation.isError || archiveEpisodeMutation.isError || updateEpisodeMutation.isError ? <p className="admin-error" role="alert">{(createEpisodeMutation.error ?? archiveEpisodeMutation.error ?? updateEpisodeMutation.error)?.message}</p> : null}
                     {adminEpisodesQuery.isLoading ? <div className="catalog-loading">Loading episodes…</div> : null}
-                    <ul className="admin-taxonomy-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending || episode.publicationStatus === "ARCHIVED"}>Archive</button></li>)}</ul>
+                    <ul className="admin-taxonomy-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span>{episode.publicationStatus !== "ARCHIVED" ? <div className="admin-episode-actions"><button className="ui-button ui-button--quiet" type="button" onClick={() => updateEpisodeMutation.mutate({ id: episode.id, publicationStatus: episode.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateEpisodeMutation.isPending}>{episode.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending}>Archive</button></div> : null}</li>)}</ul>
                   </Surface>
                 ) : null}
                 {editingId === item.id ? (
