@@ -110,3 +110,29 @@ export const adminAssetUpdateSchema = z.object({
   height: z.number().int().positive().max(30000).nullable().optional(),
   durationSeconds: z.number().int().positive().max(86400).nullable().optional(),
 }).strict();
+
+export const adminEpisodeMediaCreateSchema = z.object({
+  assetId: z.string().cuid(),
+  qualityLabel: z.string().trim().max(40).nullable().optional(),
+  isDefault: z.boolean().default(false),
+}).strict();
+
+export const adminEpisodeMediaUpdateSchema = z.object({
+  qualityLabel: z.string().trim().max(40).nullable().optional(),
+  isDefault: z.boolean().optional(),
+}).strict();
+
+export const adminSubtitleTrackCreateSchema = z.object({
+  assetId: z.string().cuid(),
+  languageCode: z.string().trim().min(2).max(16).regex(/^[a-zA-Z0-9-]+$/),
+  label: z.string().trim().min(1).max(80),
+  format: z.enum(["SRT", "VTT", "ASS"]),
+  isDefault: z.boolean().default(false),
+}).strict();
+
+export const adminSubtitleTrackUpdateSchema = z.object({
+  languageCode: z.string().trim().min(2).max(16).regex(/^[a-zA-Z0-9-]+$/).optional(),
+  label: z.string().trim().min(1).max(80).optional(),
+  format: z.enum(["SRT", "VTT", "ASS"]).optional(),
+  isDefault: z.boolean().optional(),
+}).strict();
