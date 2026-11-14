@@ -79,7 +79,7 @@ const safeStorageKeySchema = z.string().trim().min(1).max(500)
 
 export const adminAssetCreateSchema = z.object({
   storageKey: safeStorageKeySchema,
-  originalFilename: z.string().trim().min(1).max(255).refine((value) => !value.includes("/") && !value.includes("\\\\") && !value.includes("\\0"), "Filename must not contain a path"),
+  originalFilename: z.string().trim().min(1).max(255).refine((value) => !value.includes("/") && !value.includes(String.fromCharCode(92)) && !value.includes(String.fromCharCode(0)), "Filename must not contain a path"),
   mediaKind: z.enum(["POSTER", "BANNER", "VIDEO", "SUBTITLE"]),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "text/vtt", "application/x-subrip", "application/x-ass"]),
   sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
@@ -100,7 +100,7 @@ export const adminAssetCreateSchema = z.object({
 });
 
 export const adminAssetUpdateSchema = z.object({
-  originalFilename: z.string().trim().min(1).max(255).refine((value) => !/[\\\\/\\0]/.test(value)).optional(),
+  originalFilename: z.string().trim().min(1).max(255).refine((value) => !value.includes("/") && !value.includes(String.fromCharCode(92)) && !value.includes(String.fromCharCode(0)), "Filename must not contain a path"),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "text/vtt", "application/x-subrip", "application/x-ass"]).optional(),
   sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   checksumSha256: z.string().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
