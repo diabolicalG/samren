@@ -60,6 +60,7 @@ describe("frontend foundation", () => {
   it("renders the database-backed browse filters and catalogue empty state", async () => {
     vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
     vi.spyOn(apiClient, "catalogGenres").mockResolvedValue([]);
+    vi.spyOn(apiClient, "catalogStudios").mockResolvedValue([]);
     vi.spyOn(apiClient, "catalogAnime").mockResolvedValue({
       items: [],
       pagination: { page: 1, pageSize: 24, totalItems: 0, totalPages: 0 },
