@@ -1,6 +1,6 @@
 # Samren Phase 2 — Application-Owned Catalogue
 
-**Status:** IN PROGRESS — public catalogue foundation implemented; admin write path remains gated on secure authentication  
+**Status:** IN PROGRESS — public catalogue and authenticated anime admin slice implemented; taxonomy, episode and asset administration remain outstanding  
 **Repository:** `diabolicalG/samren`  
 **Branch:** `main`  
 **Phase 1 baseline:** `fa471ba986bdd462d20d17e0f002218b540567f8`  
@@ -62,7 +62,7 @@ Admin write routes:
 - Home shows published featured and recently added catalogue records, with explicit empty states when no records exist.
 - Browse supports search, genre/status/type/year filters, pagination, loading/error/empty states and responsive layouts.
 - Add catalogue detail route with synopsis, metadata, genre/studio links and episode listing.
-- Add an admin catalogue workspace only when the API can enforce authenticated ADMIN authorization. Do not render fake CRUD controls that cannot persist.
+- Add an admin catalogue workspace; the authenticated anime management screen is implemented. Taxonomy, episode and asset metadata screens remain outstanding.
 - Keep the Obsidian visual language, accessible controls, keyboard navigation and reduced-motion behavior.
 - Artwork is displayed only from safe application-owned asset references. No hotlinked external anime artwork.
 
@@ -83,7 +83,7 @@ Admin write routes:
 4. Add public catalogue endpoints and integration tests.
 5. Add deterministic seed fixtures and verify idempotence.
 6. Add frontend data hooks/client methods and home/browse/detail experiences.
-7. Add admin mutation endpoints/UI only after server-side admin authentication is available; until then retain a fail-closed authorization boundary and document the blocked slice.
+7. Add admin mutation endpoints/UI behind verified server-side ADMIN sessions. Anime management is implemented; complete taxonomy, episode and asset metadata management.
 8. Run lint, typecheck, tests, schema/migration checks and production builds; audit runtime/config/lockfiles for excluded integrations.
 9. Publish Phase 2 progress and final audit; create a commit checkpoint only after acceptance gates pass.
 
@@ -100,4 +100,4 @@ Admin write routes:
 - [ ] Lint, typecheck, tests and production builds pass in CI.
 - [ ] Anime-streaming remains unchanged; legacy source remains untouched.
 
-**Phase boundary:** Phase 2 is catalogue-only. First-party playback and secure media delivery are Phase 3. Full user accounts and personal library are Phase 4. Admin mutation UI may be staged behind the secure authentication prerequisite rather than weakening authorization.
+**Phase boundary:** Phase 2 is catalogue-only. First-party playback and secure media delivery are Phase 3. Full user accounts and personal library are Phase 4.
