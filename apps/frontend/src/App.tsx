@@ -260,6 +260,16 @@ function AdminPage() {
   const [genreSlug, setGenreSlug] = useState("");
   const [studioName, setStudioName] = useState("");
   const [studioSlug, setStudioSlug] = useState("");
+  const [editingGenreId, setEditingGenreId] = useState<string | null>(null);
+  const [editGenreName, setEditGenreName] = useState("");
+  const [editGenreSlug, setEditGenreSlug] = useState("");
+  const [editingStudioId, setEditingStudioId] = useState<string | null>(null);
+  const [editStudioName, setEditStudioName] = useState("");
+  const [editStudioSlug, setEditStudioSlug] = useState("");
+  const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null);
+  const [editSeasonYear, setEditSeasonYear] = useState("");
+  const [editSeasonName, setEditSeasonName] = useState<"WINTER" | "SPRING" | "SUMMER" | "FALL">("WINTER");
+  const [editSeasonLabel, setEditSeasonLabel] = useState("");
   const [seasonYear, setSeasonYear] = useState("2026");
   const [seasonName, setSeasonName] = useState<"WINTER" | "SPRING" | "SUMMER" | "FALL">("WINTER");
   const [seasonLabel, setSeasonLabel] = useState("");
@@ -267,6 +277,11 @@ function AdminPage() {
   const [newEpisodeNumber, setNewEpisodeNumber] = useState("1");
   const [newEpisodeTitle, setNewEpisodeTitle] = useState("");
   const [newEpisodeDuration, setNewEpisodeDuration] = useState("");
+  const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
+  const [editEpisodeNumber, setEditEpisodeNumber] = useState("");
+  const [editEpisodeTitle, setEditEpisodeTitle] = useState("");
+  const [editEpisodeSynopsis, setEditEpisodeSynopsis] = useState("");
+  const [editEpisodeDuration, setEditEpisodeDuration] = useState("");
   const [editPosterAssetId, setEditPosterAssetId] = useState("");
   const [editBannerAssetId, setEditBannerAssetId] = useState("");
   const [assetStorageKey, setAssetStorageKey] = useState("");
@@ -274,6 +289,10 @@ function AdminPage() {
   const [assetKind, setAssetKind] = useState<"POSTER" | "BANNER" | "VIDEO" | "SUBTITLE">("POSTER");
   const [assetMimeType, setAssetMimeType] = useState("image/webp");
   const [assetSizeBytes, setAssetSizeBytes] = useState("");
+  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [editAssetFilename, setEditAssetFilename] = useState("");
+  const [editAssetMimeType, setEditAssetMimeType] = useState("");
+  const [editAssetSizeBytes, setEditAssetSizeBytes] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const loginMutation = useMutation({
     mutationFn: () => apiClient.authLogin(email, password),
@@ -336,13 +355,25 @@ function AdminPage() {
     mutationFn: () => apiClient.adminCreateGenre({ slug: genreSlug.trim(), name: genreName.trim() }),
     onSuccess: async () => { setGenreName(""); setGenreSlug(""); await queryClient.invalidateQueries({ queryKey: ["admin", "genres"] }); },
   });
+  const updateGenreMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { slug?: string; name?: string } }) => apiClient.adminUpdateGenre(id, input),
+    onSuccess: async () => { setEditingGenreId(null); await queryClient.invalidateQueries({ queryKey: ["admin", "genres"] }); },
+  });
   const createStudioMutation = useMutation({
     mutationFn: () => apiClient.adminCreateStudio({ slug: studioSlug.trim(), name: studioName.trim() }),
     onSuccess: async () => { setStudioName(""); setStudioSlug(""); await queryClient.invalidateQueries({ queryKey: ["admin", "studios"] }); },
   });
+  const updateStudioMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { slug?: string; name?: string } }) => apiClient.adminUpdateStudio(id, input),
+    onSuccess: async () => { setEditingStudioId(null); await queryClient.invalidateQueries({ queryKey: ["admin", "studios"] }); },
+  });
   const createSeasonMutation = useMutation({
     mutationFn: () => apiClient.adminCreateSeason({ year: Number(seasonYear), season: seasonName, label: seasonLabel.trim() || null }),
     onSuccess: async () => { setSeasonLabel(""); await queryClient.invalidateQueries({ queryKey: ["admin", "seasons"] }); },
+  });
+  const updateSeasonMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { year?: number; season?: "WINTER" | "SPRING" | "SUMMER" | "FALL"; label?: string | null } }) => apiClient.adminUpdateSeason(id, input),
+    onSuccess: async () => { setEditingSeasonId(null); await queryClient.invalidateQueries({ queryKey: ["admin", "seasons"] }); },
   });
   const deleteGenreMutation = useMutation({
     mutationFn: apiClient.adminDeleteGenre,
@@ -380,6 +411,10 @@ function AdminPage() {
     mutationFn: ({ id, publicationStatus }: { id: string; publicationStatus: "DRAFT" | "PUBLISHED" }) => apiClient.adminUpdateEpisode(id, { publicationStatus }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }),
   });
+  const editEpisodeMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { episodeNumber?: number; title?: string; synopsis?: string | null; durationSeconds?: number | null } }) => apiClient.adminUpdateEpisode(id, input),
+    onSuccess: async () => { setEditingEpisodeId(null); await queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }); await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }); },
+  });
   const createAssetMutation = useMutation({
     mutationFn: () => apiClient.adminCreateAsset({
       storageKey: assetStorageKey.trim(),
@@ -392,6 +427,10 @@ function AdminPage() {
       setAssetStorageKey(""); setAssetFilename(""); setAssetSizeBytes("");
       await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
     },
+  });
+  const updateAssetMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { originalFilename?: string; mimeType?: string; sizeBytes?: number } }) => apiClient.adminUpdateAsset(id, input),
+    onSuccess: async () => { setEditingAssetId(null); await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] }); },
   });
   const deleteAssetMutation = useMutation({
     mutationFn: apiClient.adminDeleteAsset,
@@ -469,7 +508,7 @@ function AdminPage() {
                     </form>
                     {createEpisodeMutation.isError || archiveEpisodeMutation.isError || updateEpisodeMutation.isError ? <p className="admin-error" role="alert">{(createEpisodeMutation.error ?? archiveEpisodeMutation.error ?? updateEpisodeMutation.error)?.message}</p> : null}
                     {adminEpisodesQuery.isLoading ? <div className="catalog-loading">Loading episodes…</div> : null}
-                    <ul className="admin-taxonomy-list admin-episode-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><div className="admin-episode-row"><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span>{episode.publicationStatus !== "ARCHIVED" ? <div className="admin-episode-actions"><button className="ui-button ui-button--quiet" type="button" onClick={() => updateEpisodeMutation.mutate({ id: episode.id, publicationStatus: episode.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateEpisodeMutation.isPending}>{episode.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending}>Archive</button></div> : null}</div><EpisodeAssetManager episodeId={episode.id} assets={adminAssetsQuery.data ?? []} /></li>)}</ul>
+                    <ul className="admin-taxonomy-list admin-episode-list">{(adminEpisodesQuery.data ?? []).map((episode) => <li key={episode.id}><div className="admin-episode-row"><span>EP {episode.episodeNumber} · {episode.title} · {episode.publicationStatus}</span>{episode.publicationStatus !== "ARCHIVED" ? <div className="admin-episode-actions"><button className="ui-button ui-button--quiet" type="button" onClick={() => { setEditingEpisodeId(episode.id); setEditEpisodeNumber(String(episode.episodeNumber)); setEditEpisodeTitle(episode.title); setEditEpisodeSynopsis(episode.synopsis ?? ""); setEditEpisodeDuration(episode.durationSeconds ? String(Math.round(episode.durationSeconds / 60)) : ""); }}>Edit</button><button className="ui-button ui-button--quiet" type="button" onClick={() => updateEpisodeMutation.mutate({ id: episode.id, publicationStatus: episode.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateEpisodeMutation.isPending}>{episode.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => archiveEpisodeMutation.mutate(episode.id)} disabled={archiveEpisodeMutation.isPending}>Archive</button></div> : null}</div>{editingEpisodeId === episode.id ? <form className="admin-inline-edit" onSubmit={(event) => { event.preventDefault(); editEpisodeMutation.mutate({ id: episode.id, input: { episodeNumber: Number(editEpisodeNumber), title: editEpisodeTitle.trim(), synopsis: editEpisodeSynopsis.trim() || null, durationSeconds: editEpisodeDuration ? Number(editEpisodeDuration) * 60 : null } }); }}><TextField id={"edit-episode-number-" + episode.id} label="Episode number" required value={editEpisodeNumber} onChange={(event) => setEditEpisodeNumber(event.target.value.replace(/[^0-9]/g, ""))} /><TextField id={"edit-episode-title-" + episode.id} label="Episode title" required value={editEpisodeTitle} onChange={(event) => setEditEpisodeTitle(event.target.value)} /><TextField id={"edit-episode-duration-" + episode.id} label="Duration (minutes)" value={editEpisodeDuration} onChange={(event) => setEditEpisodeDuration(event.target.value.replace(/[^0-9]/g, ""))} /><label className="ui-field" htmlFor={"edit-episode-synopsis-" + episode.id}>Synopsis<textarea id={"edit-episode-synopsis-" + episode.id} className="ui-input admin-textarea" rows={3} value={editEpisodeSynopsis} onChange={(event) => setEditEpisodeSynopsis(event.target.value)} /></label><button className="ui-button ui-button--quiet" type="submit" disabled={editEpisodeMutation.isPending || !editEpisodeTitle.trim() || Number(editEpisodeNumber) < 1}>Save episode</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingEpisodeId(null)}>Cancel</button></form> : null}<EpisodeAssetManager episodeId={episode.id} assets={adminAssetsQuery.data ?? []} /></li>)}</ul>
                   </Surface>
                 ) : null}
                 {editingId === item.id ? (
@@ -504,7 +543,7 @@ function AdminPage() {
               <button className="ui-button ui-button--secondary" type="submit" disabled={createGenreMutation.isPending || !genreName.trim() || !genreSlug.trim()}>Add genre</button>
             </form>
             {createGenreMutation.isError || deleteGenreMutation.isError ? <p className="admin-error" role="alert">{(createGenreMutation.error ?? deleteGenreMutation.error)?.message}</p> : null}
-            <ul className="admin-taxonomy-list">{(adminGenresQuery.data ?? []).map((genre) => <li key={genre.id}><span>{genre.name}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + genre.name} onClick={() => deleteGenreMutation.mutate(genre.id)} disabled={deleteGenreMutation.isPending}>Delete</button></li>)}</ul>
+            <ul className="admin-taxonomy-list">{(adminGenresQuery.data ?? []).map((genre) => <li key={genre.id}>{editingGenreId === genre.id ? <form className="admin-inline-edit" onSubmit={(event) => { event.preventDefault(); updateGenreMutation.mutate({ id: genre.id, input: { name: editGenreName.trim(), slug: editGenreSlug.trim() } }); }}><TextField id={"edit-genre-name-" + genre.id} label="Genre name" required value={editGenreName} onChange={(event) => setEditGenreName(event.target.value)} /><TextField id={"edit-genre-slug-" + genre.id} label="Slug" required value={editGenreSlug} onChange={(event) => setEditGenreSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} /><button className="ui-button ui-button--quiet" type="submit" disabled={updateGenreMutation.isPending}>Save</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingGenreId(null)}>Cancel</button></form> : <><span>{genre.name}</span><div className="admin-record-actions"><button type="button" className="ui-button ui-button--quiet" onClick={() => { setEditingGenreId(genre.id); setEditGenreName(genre.name); setEditGenreSlug(genre.slug); }}>Edit</button><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + genre.name} onClick={() => deleteGenreMutation.mutate(genre.id)} disabled={deleteGenreMutation.isPending}>Delete</button></div></>}</li>)}</ul>
           </Surface>
           <Surface className="admin-taxonomy-card">
             <h3>Studios</h3>
@@ -514,7 +553,7 @@ function AdminPage() {
               <button className="ui-button ui-button--secondary" type="submit" disabled={createStudioMutation.isPending || !studioName.trim() || !studioSlug.trim()}>Add studio</button>
             </form>
             {createStudioMutation.isError || deleteStudioMutation.isError ? <p className="admin-error" role="alert">{(createStudioMutation.error ?? deleteStudioMutation.error)?.message}</p> : null}
-            <ul className="admin-taxonomy-list">{(adminStudiosQuery.data ?? []).map((studio) => <li key={studio.id}><span>{studio.name}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + studio.name} onClick={() => deleteStudioMutation.mutate(studio.id)} disabled={deleteStudioMutation.isPending}>Delete</button></li>)}</ul>
+            <ul className="admin-taxonomy-list">{(adminStudiosQuery.data ?? []).map((studio) => <li key={studio.id}>{editingStudioId === studio.id ? <form className="admin-inline-edit" onSubmit={(event) => { event.preventDefault(); updateStudioMutation.mutate({ id: studio.id, input: { name: editStudioName.trim(), slug: editStudioSlug.trim() } }); }}><TextField id={"edit-studio-name-" + studio.id} label="Studio name" required value={editStudioName} onChange={(event) => setEditStudioName(event.target.value)} /><TextField id={"edit-studio-slug-" + studio.id} label="Slug" required value={editStudioSlug} onChange={(event) => setEditStudioSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} /><button className="ui-button ui-button--quiet" type="submit" disabled={updateStudioMutation.isPending}>Save</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingStudioId(null)}>Cancel</button></form> : <><span>{studio.name}</span><div className="admin-record-actions"><button type="button" className="ui-button ui-button--quiet" onClick={() => { setEditingStudioId(studio.id); setEditStudioName(studio.name); setEditStudioSlug(studio.slug); }}>Edit</button><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + studio.name} onClick={() => deleteStudioMutation.mutate(studio.id)} disabled={deleteStudioMutation.isPending}>Delete</button></div></>}</li>)}</ul>
           </Surface>
           <Surface className="admin-taxonomy-card">
             <h3>Seasons</h3>
@@ -525,7 +564,7 @@ function AdminPage() {
               <button className="ui-button ui-button--secondary" type="submit" disabled={createSeasonMutation.isPending || seasonYear.length !== 4 || Number(seasonYear) < 1900 || Number(seasonYear) > 2200}>Add season</button>
             </form>
             {createSeasonMutation.isError || deleteSeasonMutation.isError ? <p className="admin-error" role="alert">{(createSeasonMutation.error ?? deleteSeasonMutation.error)?.message}</p> : null}
-            <ul className="admin-taxonomy-list">{(adminSeasonsQuery.data ?? []).map((season) => <li key={season.id}><span>{season.label || season.season + " " + season.year}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + season.season + " " + season.year} onClick={() => deleteSeasonMutation.mutate(season.id)} disabled={deleteSeasonMutation.isPending}>Delete</button></li>)}</ul>
+            <ul className="admin-taxonomy-list">{(adminSeasonsQuery.data ?? []).map((season) => <li key={season.id}>{editingSeasonId === season.id ? <form className="admin-inline-edit" onSubmit={(event) => { event.preventDefault(); updateSeasonMutation.mutate({ id: season.id, input: { year: Number(editSeasonYear), season: editSeasonName, label: editSeasonLabel.trim() || null } }); }}><TextField id={"edit-season-year-" + season.id} label="Year" required value={editSeasonYear} onChange={(event) => setEditSeasonYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} /><label className="ui-field" htmlFor={"edit-season-name-" + season.id}>Season<select className="ui-input" id={"edit-season-name-" + season.id} value={editSeasonName} onChange={(event) => setEditSeasonName(event.target.value as typeof editSeasonName)}><option value="WINTER">Winter</option><option value="SPRING">Spring</option><option value="SUMMER">Summer</option><option value="FALL">Fall</option></select></label><TextField id={"edit-season-label-" + season.id} label="Label" value={editSeasonLabel} onChange={(event) => setEditSeasonLabel(event.target.value)} /><button className="ui-button ui-button--quiet" type="submit" disabled={updateSeasonMutation.isPending || editSeasonYear.length !== 4}>Save</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingSeasonId(null)}>Cancel</button></form> : <><span>{season.label || season.season + " " + season.year}</span><div className="admin-record-actions"><button type="button" className="ui-button ui-button--quiet" onClick={() => { setEditingSeasonId(season.id); setEditSeasonYear(String(season.year)); setEditSeasonName(season.season); setEditSeasonLabel(season.label ?? ""); }}>Edit</button><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + season.season + " " + season.year} onClick={() => deleteSeasonMutation.mutate(season.id)} disabled={deleteSeasonMutation.isPending}>Delete</button></div></>}</li>)}</ul>
           </Surface>
         </div>
       </section>
@@ -542,7 +581,7 @@ function AdminPage() {
             <button className="ui-button ui-button--secondary" type="submit" disabled={createAssetMutation.isPending || !assetStorageKey.trim() || !assetFilename.trim() || !assetMimeType.trim() || Number(assetSizeBytes) <= 0}>Register metadata</button>
           </form>
           {createAssetMutation.isError || deleteAssetMutation.isError ? <p className="admin-error" role="alert">{(createAssetMutation.error ?? deleteAssetMutation.error)?.message}</p> : null}
-          <ul className="admin-taxonomy-list">{(adminAssetsQuery.data ?? []).map((asset) => <li key={asset.id}><span>{asset.mediaKind} · {asset.originalFilename} · {asset.sizeBytes} bytes · {asset.processingState}</span><button type="button" className="ui-button ui-button--quiet" onClick={() => deleteAssetMutation.mutate(asset.id)} disabled={deleteAssetMutation.isPending}>Delete</button></li>)}</ul>
+          <ul className="admin-taxonomy-list">{(adminAssetsQuery.data ?? []).map((asset) => <li key={asset.id}>{editingAssetId === asset.id ? <form className="admin-inline-edit" onSubmit={(event) => { event.preventDefault(); updateAssetMutation.mutate({ id: asset.id, input: { originalFilename: editAssetFilename.trim(), mimeType: editAssetMimeType.trim(), sizeBytes: Number(editAssetSizeBytes) } }); }}><TextField id={"edit-asset-filename-" + asset.id} label="Filename" required value={editAssetFilename} onChange={(event) => setEditAssetFilename(event.target.value)} /><TextField id={"edit-asset-mime-" + asset.id} label="MIME type" required value={editAssetMimeType} onChange={(event) => setEditAssetMimeType(event.target.value)} /><TextField id={"edit-asset-size-" + asset.id} label="Size (bytes)" required value={editAssetSizeBytes} onChange={(event) => setEditAssetSizeBytes(event.target.value.replace(/[^0-9]/g, ""))} /><button className="ui-button ui-button--quiet" type="submit" disabled={updateAssetMutation.isPending || !editAssetFilename.trim() || !editAssetMimeType.trim() || Number(editAssetSizeBytes) <= 0}>Save</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingAssetId(null)}>Cancel</button></form> : <><span>{asset.mediaKind} · {asset.originalFilename} · {asset.sizeBytes} bytes · {asset.processingState}</span><div className="admin-record-actions"><button type="button" className="ui-button ui-button--quiet" onClick={() => { setEditingAssetId(asset.id); setEditAssetFilename(asset.originalFilename); setEditAssetMimeType(asset.mimeType); setEditAssetSizeBytes(asset.sizeBytes); }}>Edit</button><button type="button" className="ui-button ui-button--quiet" onClick={() => deleteAssetMutation.mutate(asset.id)} disabled={deleteAssetMutation.isPending}>Delete</button></div></>}</li>)}</ul>
         </Surface>
       </section>
     </main>
