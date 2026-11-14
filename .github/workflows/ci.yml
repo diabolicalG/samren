@@ -12,6 +12,23 @@ permissions:
 jobs:
   foundation:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: samren
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: samren
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U samren -d samren"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://samren:ci-only@localhost:5432/samren
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,14 +55,16 @@ jobs:
           fi
       - name: Validate Prisma schema
         working-directory: apps/backend
-        env:
-          DATABASE_URL: "postgresql://samren:ci-only@localhost:5432/samren"
         run: pnpm db:validate
       - name: Generate Prisma client
         working-directory: apps/backend
-        env:
-          DATABASE_URL: "postgresql://samren:ci-only@localhost:5432/samren"
         run: pnpm db:generate
+      - name: Apply catalogue migrations
+        working-directory: apps/backend
+        run: pnpm db:migrate:deploy
+      - name: Seed deterministic catalogue fixtures
+        working-directory: apps/backend
+        run: pnpm db:seed
       - name: Lint active foundation code
         run: pnpm lint
       - name: Typecheck
