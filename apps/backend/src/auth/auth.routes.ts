@@ -10,6 +10,7 @@ export const authRouter = Router();
 const failedLogins = new Map<string, { count: number; resetAt: number }>();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_FAILURES = 10;
+const MAX_TRACKED_LOGIN_IPS = 10_000;
 
 function loginRateLimit(request: import("express").Request, response: import("express").Response, next: import("express").NextFunction) {
   const key = request.ip || request.socket.remoteAddress || "unknown";
@@ -51,9 +52,15 @@ authRouter.post("/login", requireTrustedOrigin, loginRateLimit, async (request, 
       const key = request.ip || request.socket.remoteAddress || "unknown";
       const current = failedLogins.get(key);
       const now = Date.now();
-      failedLogins.set(key, current && current.resetAt > now
-        ? { count: current.count + 1, resetAt: current.resetAt }
-        : { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+      if (!current || current.resetAt <= now) {
+        if (failedLogins.size >= MAX_TRACKED_LOGIN_IPS) {
+          const oldestKey = failedLogins.keys().next().value;
+          if (oldestKey) failedLogins.delete(oldestKey);
+        }
+        failedLogins.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+      } else {
+        failedLogins.set(key, { count: current.count + 1, resetAt: current.resetAt });
+      }
       response.status(401).json({ data: null, error: { code: "INVALID_CREDENTIALS", message: "Email or password is incorrect" } });
       return;
     }
