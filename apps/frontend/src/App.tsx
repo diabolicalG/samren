@@ -201,6 +201,13 @@ function AdminPage() {
   const [newEpisodeNumber, setNewEpisodeNumber] = useState("1");
   const [newEpisodeTitle, setNewEpisodeTitle] = useState("");
   const [newEpisodeDuration, setNewEpisodeDuration] = useState("");
+  const [editPosterAssetId, setEditPosterAssetId] = useState("");
+  const [editBannerAssetId, setEditBannerAssetId] = useState("");
+  const [assetStorageKey, setAssetStorageKey] = useState("");
+  const [assetFilename, setAssetFilename] = useState("");
+  const [assetKind, setAssetKind] = useState<"POSTER" | "BANNER" | "VIDEO" | "SUBTITLE">("POSTER");
+  const [assetMimeType, setAssetMimeType] = useState("image/webp");
+  const [assetSizeBytes, setAssetSizeBytes] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const loginMutation = useMutation({
     mutationFn: () => apiClient.authLogin(email, password),
@@ -221,6 +228,7 @@ function AdminPage() {
   const adminStudiosQuery = useQuery({ queryKey: ["admin", "studios"], queryFn: apiClient.adminCatalogStudios, enabled: isAdmin });
   const adminSeasonsQuery = useQuery({ queryKey: ["admin", "seasons"], queryFn: apiClient.adminCatalogSeasons, enabled: isAdmin });
   const adminEpisodesQuery = useQuery({ queryKey: ["admin", "episodes", activeEpisodeAnimeId], queryFn: () => apiClient.adminCatalogEpisodes(activeEpisodeAnimeId ?? ""), enabled: isAdmin && Boolean(activeEpisodeAnimeId) });
+  const adminAssetsQuery = useQuery({ queryKey: ["admin", "assets"], queryFn: apiClient.adminCatalogAssets, enabled: isAdmin });
   const catalogQuery = useQuery({
     queryKey: ["admin", "catalog"],
     queryFn: apiClient.adminCatalogAnime,
@@ -306,6 +314,23 @@ function AdminPage() {
     mutationFn: ({ id, publicationStatus }: { id: string; publicationStatus: "DRAFT" | "PUBLISHED" }) => apiClient.adminUpdateEpisode(id, { publicationStatus }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "episodes", activeEpisodeAnimeId] }),
   });
+  const createAssetMutation = useMutation({
+    mutationFn: () => apiClient.adminCreateAsset({
+      storageKey: assetStorageKey.trim(),
+      originalFilename: assetFilename.trim(),
+      mediaKind: assetKind,
+      mimeType: assetMimeType.trim(),
+      sizeBytes: Number(assetSizeBytes),
+    }),
+    onSuccess: async () => {
+      setAssetStorageKey(""); setAssetFilename(""); setAssetSizeBytes("");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
+    },
+  });
+  const deleteAssetMutation = useMutation({
+    mutationFn: apiClient.adminDeleteAsset,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "assets"] }),
+  });
 
   if (sessionQuery.isLoading) {
     return <main className="page-shell admin-page"><div className="catalog-loading" role="status">Checking administrator session…</div></main>;
@@ -360,7 +385,7 @@ function AdminPage() {
                   <div className="admin-record-copy"><div className="admin-record-meta"><span className={"admin-status admin-status--" + item.publicationStatus.toLowerCase()}>{item.publicationStatus}</span><span>{item._count.episodes} episodes</span></div><h3>{item.title}</h3><p>/{item.slug}</p></div>
                   <div className="admin-record-actions">
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => setActiveEpisodeAnimeId((current) => current === item.id ? null : item.id)} aria-expanded={activeEpisodeAnimeId === item.id}>{activeEpisodeAnimeId === item.id ? "Hide episodes" : "Episodes"}</button>
-                    <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); }} aria-label={"Edit " + item.title}>Edit</button> : null}
+                    <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); setEditPosterAssetId(item.posterAssetId ?? ""); setEditBannerAssetId(item.bannerAssetId ?? ""); }} aria-label={"Edit " + item.title}>Edit</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
                   </div>
@@ -381,12 +406,14 @@ function AdminPage() {
                 ) : null}
                 {editingId === item.id ? (
                   <Surface className="admin-edit">
-                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs } }); }}>
+                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs, posterAssetId: editPosterAssetId || null, bannerAssetId: editBannerAssetId || null } }); }}>
                       <TextField id={"edit-title-" + item.id} label="Title" required maxLength={240} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
                       <TextField id={"edit-slug-" + item.id} label="Slug" required maxLength={180} value={editSlug} onChange={(event) => setEditSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
                       <TextField id={"edit-year-" + item.id} label="Release year" inputMode="numeric" placeholder="Optional" value={editYear} onChange={(event) => setEditYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
                       <label className="ui-field" htmlFor={"edit-synopsis-" + item.id}>Synopsis<textarea id={"edit-synopsis-" + item.id} className="ui-input admin-textarea" maxLength={10000} rows={4} value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
                       <label className="ui-field" htmlFor={"edit-genres-" + item.id}>Genres<select multiple className="ui-input admin-multiselect" id={"edit-genres-" + item.id} value={editGenreSlugs} onChange={(event) => setEditGenreSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminGenresQuery.data ?? []).map((genre) => <option key={genre.id} value={genre.slug}>{genre.name}</option>)}</select></label>
+                      <label className="ui-field" htmlFor={"edit-poster-" + item.id}>Poster asset<select className="ui-input" id={"edit-poster-" + item.id} value={editPosterAssetId} onChange={(event) => setEditPosterAssetId(event.target.value)}><option value="">No poster</option>{(adminAssetsQuery.data ?? []).filter((asset) => asset.mediaKind === "POSTER").map((asset) => <option key={asset.id} value={asset.id}>{asset.originalFilename} · {asset.processingState}</option>)}</select></label>
+                      <label className="ui-field" htmlFor={"edit-banner-" + item.id}>Banner asset<select className="ui-input" id={"edit-banner-" + item.id} value={editBannerAssetId} onChange={(event) => setEditBannerAssetId(event.target.value)}><option value="">No banner</option>{(adminAssetsQuery.data ?? []).filter((asset) => asset.mediaKind === "BANNER").map((asset) => <option key={asset.id} value={asset.id}>{asset.originalFilename} · {asset.processingState}</option>)}</select></label>
                       <label className="ui-field" htmlFor={"edit-studios-" + item.id}>Studios<select multiple className="ui-input admin-multiselect" id={"edit-studios-" + item.id} value={editStudioSlugs} onChange={(event) => setEditStudioSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminStudiosQuery.data ?? []).map((studio) => <option key={studio.id} value={studio.slug}>{studio.name}</option>)}</select></label>
                       {editMutation.isError ? <p className="admin-error" role="alert">{editMutation.error.message}</p> : null}
                       <div className="admin-record-actions"><button className="ui-button ui-button--primary" type="submit" disabled={editMutation.isPending || !editTitle.trim() || !editSlug.trim() || (editYear !== "" && (Number(editYear) < 1900 || Number(editYear) > 2200))}>{editMutation.isPending ? "Saving…" : "Save changes"}</button><button className="ui-button ui-button--quiet" type="button" onClick={() => setEditingId(null)}>Cancel</button></div>
@@ -433,6 +460,22 @@ function AdminPage() {
             <ul className="admin-taxonomy-list">{(adminSeasonsQuery.data ?? []).map((season) => <li key={season.id}><span>{season.label || season.season + " " + season.year}</span><button type="button" className="ui-button ui-button--quiet" aria-label={"Delete " + season.season + " " + season.year} onClick={() => deleteSeasonMutation.mutate(season.id)} disabled={deleteSeasonMutation.isPending}>Delete</button></li>)}</ul>
           </Surface>
         </div>
+      </section>
+      <section className="admin-taxonomy admin-assets">
+        <div className="catalog-section-heading"><div><span className="section-kicker">FIRST-PARTY MEDIA</span><h2>Asset metadata</h2></div><span>Metadata only · no upload or playback</span></div>
+        <Surface className="admin-taxonomy-card">
+          <p className="admin-asset-note">Register internal storage metadata for a future first-party asset workflow. This does not upload a file, make it available publicly, or accept a remote URL.</p>
+          <form onSubmit={(event) => { event.preventDefault(); createAssetMutation.mutate(); }}>
+            <TextField id="asset-storage-key" label="Internal storage key" required maxLength={500} placeholder="catalogue/posters/example.webp" value={assetStorageKey} onChange={(event) => setAssetStorageKey(event.target.value)} />
+            <TextField id="asset-filename" label="Original filename" required maxLength={255} value={assetFilename} onChange={(event) => setAssetFilename(event.target.value)} />
+            <label className="ui-field" htmlFor="asset-kind">Media kind<select className="ui-input" id="asset-kind" value={assetKind} onChange={(event) => { const kind = event.target.value as typeof assetKind; setAssetKind(kind); setAssetMimeType(kind === "POSTER" || kind === "BANNER" ? "image/webp" : kind === "VIDEO" ? "video/mp4" : "text/vtt"); }}><option value="POSTER">Poster</option><option value="BANNER">Banner</option><option value="VIDEO">Video</option><option value="SUBTITLE">Subtitle</option></select></label>
+            <TextField id="asset-mime" label="MIME type" required value={assetMimeType} onChange={(event) => setAssetMimeType(event.target.value)} />
+            <TextField id="asset-size" label="Size (bytes)" required inputMode="numeric" value={assetSizeBytes} onChange={(event) => setAssetSizeBytes(event.target.value.replace(/[^0-9]/g, ""))} />
+            <button className="ui-button ui-button--secondary" type="submit" disabled={createAssetMutation.isPending || !assetStorageKey.trim() || !assetFilename.trim() || !assetMimeType.trim() || Number(assetSizeBytes) <= 0}>Register metadata</button>
+          </form>
+          {createAssetMutation.isError || deleteAssetMutation.isError ? <p className="admin-error" role="alert">{(createAssetMutation.error ?? deleteAssetMutation.error)?.message}</p> : null}
+          <ul className="admin-taxonomy-list">{(adminAssetsQuery.data ?? []).map((asset) => <li key={asset.id}><span>{asset.mediaKind} · {asset.originalFilename} · {asset.sizeBytes} bytes · {asset.processingState}</span><button type="button" className="ui-button ui-button--quiet" onClick={() => deleteAssetMutation.mutate(asset.id)} disabled={deleteAssetMutation.isPending}>Delete</button></li>)}</ul>
+        </Surface>
       </section>
     </main>
   );
