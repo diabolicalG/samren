@@ -86,3 +86,46 @@ export type CatalogPage<T> = {
     totalPages: number;
   };
 };
+
+export type CatalogPublicationStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+export type AdminAuthUser = {
+  id: string;
+  email: string;
+  username: string;
+  role: "USER" | "MODERATOR" | "ADMIN";
+};
+
+export type AdminCatalogAnime = {
+  id: string;
+  slug: string;
+  title: string;
+  englishTitle: string | null;
+  nativeTitle: string | null;
+  synopsis: string | null;
+  type: CatalogAnimeType;
+  releaseStatus: CatalogReleaseStatus;
+  publicationStatus: CatalogPublicationStatus;
+  releaseYear: number | null;
+  releaseSeason: CatalogSeasonName | null;
+  ageRating: CatalogAgeRating | null;
+  score: number | null;
+  featured: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  genres: Array<{ genre: CatalogTaxonomyItem }>;
+  studios: Array<{ studio: CatalogTaxonomyItem }>;
+  _count: { episodes: number };
+};
+
+export type AdminAnimeWriteInput = {
+  slug?: string;
+  title?: string;
+  synopsis?: string | null;
+  publicationStatus?: CatalogPublicationStatus;
+  featured?: boolean;
+  releaseYear?: number | null;
+  genreSlugs?: string[];
+  studioSlugs?: string[];
+};
