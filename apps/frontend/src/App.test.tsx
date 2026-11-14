@@ -31,6 +31,8 @@ describe("frontend foundation", () => {
       timestamp: new Date().toISOString(),
     });
 
+    vi.spyOn(apiClient, "catalogAnime").mockResolvedValue({ items: [], pagination: { page: 1, pageSize: 6, totalItems: 0, totalPages: 0 } });
+
     renderApp();
 
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
@@ -45,6 +47,8 @@ describe("frontend foundation", () => {
       service: "samren-api",
       timestamp: new Date().toISOString(),
     });
+
+    vi.spyOn(apiClient, "catalogAnime").mockResolvedValue({ items: [], pagination: { page: 1, pageSize: 6, totalItems: 0, totalPages: 0 } });
 
     renderApp();
 
