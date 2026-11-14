@@ -222,6 +222,28 @@ describe("admin catalogue management", () => {
     expect(response.body.error.code).toBe("IN_USE");
   });
 
+
+  it("rejects remote URLs, traversal paths and mismatched asset MIME types", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const base = {
+      originalFilename: "unsafe.webp",
+      mediaKind: "POSTER",
+      mimeType: "image/webp",
+      sizeBytes: 100,
+    };
+    const remote = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin)
+      .send({ ...base, storageKey: "https://remote.invalid/poster.webp" });
+    expect(remote.status).toBe(400);
+
+    const traversal = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin)
+      .send({ ...base, storageKey: "samren/../../outside.webp" });
+    expect(traversal.status).toBe(400);
+
+    const mismatched = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin)
+      .send({ ...base, storageKey: "samren/assets/video-file.mp4", mediaKind: "VIDEO" });
+    expect(mismatched.status).toBe(400);
+  });
+
   it("rejects mutations from an untrusted origin", async () => {
     const agent = await login(adminEmail, adminPassword);
     const response = await agent
