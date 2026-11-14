@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
@@ -101,6 +101,55 @@ describe("administrator workspace", () => {
     expect(await screen.findByRole("heading", { name: /catalogue management/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /create a catalogue draft/i })).toBeTruthy();
     expect(await screen.findByText(/no catalogue records exist yet/i)).toBeTruthy();
+  });
+
+
+  it("lets an administrator edit first-party catalogue metadata", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "authSession").mockResolvedValue({
+      user: { id: "admin-1", email: "admin@samren.test", username: "admin", role: "ADMIN" },
+    });
+    const item = {
+      id: "anime-1",
+      slug: "clockwork-orbit",
+      title: "The Clockwork Orbit",
+      englishTitle: null,
+      nativeTitle: null,
+      synopsis: "A story about maps.",
+      type: "TV" as const,
+      releaseStatus: "FINISHED" as const,
+      publicationStatus: "DRAFT" as const,
+      releaseYear: 2025,
+      releaseSeason: "FALL" as const,
+      ageRating: "PG_13" as const,
+      score: 82,
+      featured: false,
+      publishedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      genres: [{ genre: { id: "genre-1", slug: "adventure", name: "Adventure" } }],
+      studios: [{ studio: { id: "studio-1", slug: "samren-studio", name: "Samren Studio" } }],
+      _count: { episodes: 0 },
+    };
+    vi.spyOn(apiClient, "adminCatalogAnime").mockResolvedValue({ items: [item] });
+    vi.spyOn(apiClient, "catalogGenres").mockResolvedValue([{ id: "genre-1", slug: "adventure", name: "Adventure" }]);
+    vi.spyOn(apiClient, "catalogStudios").mockResolvedValue([{ id: "studio-1", slug: "samren-studio", name: "Samren Studio" }]);
+    const update = vi.spyOn(apiClient, "adminUpdateAnime").mockResolvedValue({ ...item, title: "Clockwork Orbit Revisited" });
+
+    renderApp("/admin");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit The Clockwork Orbit" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Clockwork Orbit Revisited" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith("anime-1", expect.objectContaining({
+        title: "Clockwork Orbit Revisited",
+        slug: "clockwork-orbit",
+        genreSlugs: ["adventure"],
+        studioSlugs: ["samren-studio"],
+      }));
+    });
   });
 
   it("does not render catalogue write controls for a regular user", async () => {
