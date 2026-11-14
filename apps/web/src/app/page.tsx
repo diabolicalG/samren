@@ -10,6 +10,9 @@ export default function HomePage() {
 
   const animes = data?.data?.items ?? [];
 
+  // Keep the home route intentionally simple: the API gateway now owns the
+  // provider fallback, so the browser has one stable contract.
+
   return (
     <AnimeGrid
       animes={animes}

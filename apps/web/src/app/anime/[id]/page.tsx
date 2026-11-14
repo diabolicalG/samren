@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAnime, useEpisodes, useStreamUrl } from '@samren/hooks';
 import {
   EpisodeList,
@@ -31,6 +31,7 @@ const TYPE_ICONS: { [key: string]: React.ReactNode } = {
 
 export default function AnimeDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const animeId = rawId as string | undefined;
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
@@ -216,7 +217,7 @@ export default function AnimeDetailPage() {
           ) : (
             <EpisodeList
               episodes={episodes}
-              onEpisodeClick={(ep) => setSelectedEpisode(ep.number)}
+              onEpisodeClick={(ep) => router.push(`/watch/${encodeURIComponent(animeId ?? '')}/${ep.number}`)}
             />
           )}
         </div>
