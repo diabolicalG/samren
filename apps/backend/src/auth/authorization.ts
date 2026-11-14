@@ -15,8 +15,9 @@ declare global {
 }
 
 /**
- * Role checks fail closed. A future authentication middleware must populate
- * request.principal from a verified server-side session before this guard is used.
+ * Role checks fail closed. The active session middleware populates request.principal
+ * only after looking up a non-revoked, unexpired session token hash in PostgreSQL.
+ * Never derive the principal or role from request input.
  */
 export function requireRole(...allowedRoles: UserRole[]) {
   return (request: Request, response: Response, next: NextFunction) => {
