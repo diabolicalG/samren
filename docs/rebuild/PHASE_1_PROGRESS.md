@@ -39,7 +39,8 @@
 
 - CI run `43603989248` for commit `c6028e57ff0004d150c3e62d42f1d90ac34800c0` completed successfully. It passed dependency installation, lockfile reconciliation, Prisma validation/generation, typechecking, backend API tests and frontend/backend production builds.
 - That successful run predates the current frontend API integration and frontend smoke tests. The current revision must pass a fresh CI run before these additions are considered verified.
-- No local install, test run or build is claimed here. Phase 1 is not complete until the new CI run passes.
+- The CI lockfile reconciliation step generated and committed the updated workspace lockfile as `bfc40894a8eaba1a9c5c99d77462eb04a8993502`. A concurrent contents commit caused an earlier workflow run's lockfile push to be rejected; the workflow now rebases before pushing a generated lockfile to avoid that race.
+- No local install, test run or build is claimed here. Phase 1 is not complete until the current CI run passes.
 
 ## Exclusion gate
 
