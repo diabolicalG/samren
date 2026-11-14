@@ -13,6 +13,8 @@ import {
   adminStudioUpdateSchema,
   adminSeasonCreateSchema,
   adminSeasonUpdateSchema,
+  adminEpisodeCreateSchema,
+  adminEpisodeUpdateSchema,
 } from "./admin.schemas.js";
 
 export const adminCatalogRouter = Router();
@@ -258,6 +260,120 @@ adminCatalogRouter.get("/seasons", async (_request, response, next) => {
     response.json({ data: items, error: null });
   } catch (error) {
     next(error);
+  }
+});
+
+
+adminCatalogRouter.get("/anime/:animeId/episodes", async (request, response, next) => {
+  const animeId = adminAnimeIdSchema.safeParse(request.params.animeId);
+  if (!animeId.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The anime identifier is invalid" } });
+    return;
+  }
+  try {
+    const items = await prisma.episode.findMany({
+      where: { animeId: animeId.data },
+      orderBy: [{ episodeNumber: "asc" }, { id: "asc" }],
+      select: {
+        id: true, animeId: true, seasonId: true, episodeNumber: true, absoluteNumber: true,
+        title: true, synopsis: true, durationSeconds: true, airDate: true,
+        publicationStatus: true, isFiller: true, isRecap: true, createdAt: true, updatedAt: true,
+      },
+    });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.post("/episodes", requireTrustedOrigin, async (request, response) => {
+  const parsed = adminEpisodeCreateSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode record is invalid" } });
+    return;
+  }
+  try {
+    const data = parsed.data;
+    const anime = await prisma.anime.findUnique({ where: { id: data.animeId }, select: { id: true } });
+    if (!anime) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The anime record was not found" } });
+      return;
+    }
+    if (data.seasonId && !(await prisma.season.findUnique({ where: { id: data.seasonId }, select: { id: true } }))) {
+      response.status(400).json({ data: null, error: { code: "INVALID_RELATION", message: "The selected season does not exist" } });
+      return;
+    }
+    const { animeId, seasonId, airDate, ...fields } = data;
+    const item = await prisma.episode.create({
+      data: {
+        ...fields,
+        anime: { connect: { id: animeId } },
+        season: seasonId ? { connect: { id: seasonId } } : undefined,
+        airDate: airDate ? new Date(airDate) : null,
+      },
+      select: {
+        id: true, animeId: true, seasonId: true, episodeNumber: true, absoluteNumber: true,
+        title: true, synopsis: true, durationSeconds: true, airDate: true,
+        publicationStatus: true, isFiller: true, isRecap: true, createdAt: true, updatedAt: true,
+      },
+    });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/episodes/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminEpisodeUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode update is invalid" } });
+    return;
+  }
+  try {
+    const data = parsed.data;
+    if (data.seasonId) {
+      const season = await prisma.season.findUnique({ where: { id: data.seasonId }, select: { id: true } });
+      if (!season) {
+        response.status(400).json({ data: null, error: { code: "INVALID_RELATION", message: "The selected season does not exist" } });
+        return;
+      }
+    }
+    const { seasonId, airDate, ...fields } = data;
+    const item = await prisma.episode.update({
+      where: { id: id.data },
+      data: {
+        ...fields,
+        season: seasonId === undefined ? undefined : seasonId === null ? { disconnect: true } : { connect: { id: seasonId } },
+        airDate: airDate === undefined ? undefined : airDate === null ? null : new Date(airDate),
+      },
+      select: {
+        id: true, animeId: true, seasonId: true, episodeNumber: true, absoluteNumber: true,
+        title: true, synopsis: true, durationSeconds: true, airDate: true,
+        publicationStatus: true, isFiller: true, isRecap: true, createdAt: true, updatedAt: true,
+      },
+    });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/episodes/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The episode identifier is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.episode.update({
+      where: { id: id.data },
+      data: { publicationStatus: "ARCHIVED" },
+      select: { id: true, animeId: true, episodeNumber: true, publicationStatus: true },
+    });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
   }
 });
 
