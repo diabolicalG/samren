@@ -66,6 +66,10 @@ function sendError(response: import("express").Response, error: unknown) {
       response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The requested catalogue record was not found" } });
       return;
     }
+    if (code === "P2003") {
+      response.status(409).json({ data: null, error: { code: "RELATION_CONFLICT", message: "The selected catalogue relation is not valid for this record" } });
+      return;
+    }
   }
   response.status(500).json({ data: null, error: { code: "INTERNAL_ERROR", message: "The catalogue operation could not be completed" } });
 }
