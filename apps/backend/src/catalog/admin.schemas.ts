@@ -72,3 +72,39 @@ export const adminEpisodeCreateSchema = z.object({
 }).strict();
 
 export const adminEpisodeUpdateSchema = adminEpisodeCreateSchema.omit({ animeId: true }).partial().strict();
+
+const safeStorageKeySchema = z.string().trim().min(1).max(500)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9/_\\-.]*$/)
+  .refine((value) => !value.split("/").some((segment) => segment === "." || segment === ".."), "Storage key path traversal is not allowed");
+
+export const adminAssetCreateSchema = z.object({
+  storageKey: safeStorageKeySchema,
+  originalFilename: z.string().trim().min(1).max(255).refine((value) => !/[\\\\/\\0]/.test(value), "Filename must not contain a path"),
+  mediaKind: z.enum(["POSTER", "BANNER", "VIDEO", "SUBTITLE"]),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "text/vtt", "application/x-subrip", "application/x-ass"]),
+  sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  checksumSha256: z.string().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
+  width: z.number().int().positive().max(30000).nullable().optional(),
+  height: z.number().int().positive().max(30000).nullable().optional(),
+  durationSeconds: z.number().int().positive().max(86400).nullable().optional(),
+}).strict().superRefine((value, context) => {
+  const allowedMime: Record<typeof value.mediaKind, string[]> = {
+    POSTER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
+    BANNER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
+    VIDEO: ["video/mp4", "video/webm"],
+    SUBTITLE: ["text/vtt", "application/x-subrip", "application/x-ass"],
+  };
+  if (!allowedMime[value.mediaKind].includes(value.mimeType)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["mimeType"], message: "MIME type does not match the selected media kind" });
+  }
+});
+
+export const adminAssetUpdateSchema = z.object({
+  originalFilename: z.string().trim().min(1).max(255).refine((value) => !/[\\\\/\\0]/.test(value)).optional(),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "text/vtt", "application/x-subrip", "application/x-ass"]).optional(),
+  sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  checksumSha256: z.string().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
+  width: z.number().int().positive().max(30000).nullable().optional(),
+  height: z.number().int().positive().max(30000).nullable().optional(),
+  durationSeconds: z.number().int().positive().max(86400).nullable().optional(),
+}).strict();
