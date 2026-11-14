@@ -123,6 +123,7 @@ model Season {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   anime     Anime[]
+  episodes  Episode[]
 
   @@unique([year, season])
   @@index([year, season])
