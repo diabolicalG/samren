@@ -16,8 +16,12 @@
     "clean": "turbo run clean"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/frontend",
+    "apps/backend",
+    "packages/api-client",
+    "packages/types",
+    "packages/prettier-config",
+    "packages/typescript-config"
   ],
   "engines": {
     "node": ">=20",
