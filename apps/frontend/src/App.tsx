@@ -359,8 +359,8 @@ function AdminPage() {
   return (
     <main className="page-shell admin-page">
       <section className="admin-heading">
-        <div><span className="section-kicker">SAMREN CONTROL ROOM</span><h1>Catalogue <span>management.</span></h1><p>Signed in as {sessionQuery.data.user.email}. Changes are written to the first-party catalogue.</p></div>
-        <button className="ui-button ui-button--secondary" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>Sign out</button>
+        <div className="admin-heading-content"><span className="section-kicker">SAMREN CONTROL ROOM</span><h1>Catalogue <span>management.</span></h1><p>Signed in as {sessionQuery.data.user.email}. Changes are written to the first-party catalogue.</p></div>
+        <div className="admin-heading-actions"><button className="ui-button ui-button--secondary" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>Sign out</button></div>
       </section>
       <div className="admin-workspace">
         <Surface className="admin-create">
