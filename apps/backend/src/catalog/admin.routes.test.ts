@@ -242,6 +242,21 @@ describe("admin catalogue management", () => {
     const mismatched = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin)
       .send({ ...base, storageKey: "samren/assets/video-file.mp4", mediaKind: "VIDEO" });
     expect(mismatched.status).toBe(400);
+
+    const valid = await agent.post("/api/v1/admin/catalog/assets").set("Origin", origin).send({
+      storageKey: "samren/assets/test-video.mp4",
+      originalFilename: "test-video.mp4",
+      mediaKind: "VIDEO",
+      mimeType: "video/mp4",
+      sizeBytes: 2048,
+    });
+    expect(valid.status).toBe(201);
+    const updated = await agent.patch("/api/v1/admin/catalog/assets/" + valid.body.data.id)
+      .set("Origin", origin).send({ originalFilename: "renamed-test-video.mp4", sizeBytes: 4096 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.sizeBytes).toBe("4096");
+    const deleted = await agent.delete("/api/v1/admin/catalog/assets/" + valid.body.data.id).set("Origin", origin);
+    expect(deleted.status).toBe(204);
   });
 
   it("rejects mutations from an untrusted origin", async () => {
