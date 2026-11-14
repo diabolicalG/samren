@@ -1,6 +1,6 @@
 # Samren Phase 2 — Progress
 
-**Status:** IN PROGRESS  
+**Status:** IN PROGRESS — public catalogue slice implemented and CI-verified  
 **Branch:** `main`  
 **Scope checkpoint:** [`910bc5f`](https://github.com/diabolicalG/samren/commit/910bc5fdce840bf9fb67d6afd7b1e4403a9578d6)  
 **Phase 1 final checkpoint:** [`fa471ba`](https://github.com/diabolicalG/samren/commit/fa471ba986bdd462d20d17e0f002218b540567f8)
@@ -26,10 +26,11 @@
 
 ## Verification status
 
-- Prisma schema validation and client generation have passed in an earlier Phase 2 CI run.
-- Full PostgreSQL migration + seed + API integration + frontend tests + production builds are being verified in CI. Do not mark Phase 2 complete until the final run is green.
-- The first frontend CI failures were stale Phase 1 browse assertions and an unused import; the test expectations/import were updated.
-- Latest CI run: [43605998822](https://github.com/diabolicalG/samren/actions/runs/43605998822) — pending at the time this progress note was written.
+- **PASS:** [CI run 43606065978](https://github.com/diabolicalG/samren/actions/runs/43606065978) on commit [`ed750d0`](https://github.com/diabolicalG/samren/commit/ed750d0230dbb87b79fb7de5331fc4f9b29f1265).
+- PostgreSQL 16 service started in CI; Prisma schema validation and client generation passed; the catalogue migration deployed successfully; deterministic fixtures seeded successfully.
+- Oxlint, frontend/backend TypeScript checks, backend API and role-guard tests, frontend smoke/accessibility tests, and frontend/backend production builds all passed.
+- The first frontend CI failures were stale Phase 1 browse assertions and an unused import; these were corrected before the successful run.
+- This is CI integration evidence against a disposable PostgreSQL service, not a claim that a production database has been deployed or migrated.
 
 ## Boundary check
 
