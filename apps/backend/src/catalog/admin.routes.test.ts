@@ -41,7 +41,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.anime.deleteMany({ where: { slug: animeSlug } });
-  await prisma.user.deleteMany({ where: { id: { in: [adminId, userId] } } });
+  const userIds = [adminId, userId].filter((id): id is string => Boolean(id));
+  if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 });
 
 describe("admin catalogue management", () => {
