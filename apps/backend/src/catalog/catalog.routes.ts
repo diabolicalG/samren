@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { catalogListQuerySchema, catalogSlugSchema } from "./catalog.schemas.js";
 import {
   findPublishedAnimeBySlug,
@@ -11,7 +11,7 @@ import {
 
 export const catalogRouter = Router();
 
-function sendFailure(response: Parameters<Parameters<typeof catalogRouter.get>[1]>[1], error: unknown) {
+function sendFailure(response: Response, error: unknown) {
   if (error && typeof error === "object" && "issues" in error) {
     response.status(400).json({
       data: null,
