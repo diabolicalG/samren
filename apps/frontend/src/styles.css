@@ -277,3 +277,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .episode-assets-grid .ui-button { justify-self: start; padding: 7px 9px; font-size: 9px; }
 .episode-assets-grid .admin-taxonomy-list { margin-top: 10px; }
 @media (max-width: 640px) { .episode-assets-grid { grid-template-columns: 1fr; }.admin-episode-row { align-items: start; flex-direction: column; }.admin-episode-actions { width: 100%; } }
+
+.admin-inline-edit { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; width: 100%; padding: 10px 0; }
+.admin-inline-edit .ui-field { min-width: 0; }
+.admin-inline-edit .ui-input { min-width: 0; }
+.admin-inline-edit > button { align-self: end; }
+.admin-taxonomy-list > li:has(.admin-inline-edit) { display: block; }
+@media (max-width: 560px) { .admin-inline-edit { grid-template-columns: 1fr; } }
