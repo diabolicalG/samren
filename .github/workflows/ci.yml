@@ -47,5 +47,7 @@ jobs:
         run: pnpm db:generate
       - name: Typecheck
         run: pnpm typecheck
+      - name: Backend API tests
+        run: pnpm --filter @samren/backend test
       - name: Build frontend and backend
         run: pnpm build
