@@ -30,8 +30,8 @@ export async function listPublishedAnime(query: CatalogListQuery) {
     query.sort === "title"
       ? [{ title: "asc" }, { id: "asc" }]
       : query.sort === "score"
-        ? [{ score: "desc" }, { title: "asc" }]
-        : [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }];
+        ? [{ score: { sort: "desc", nulls: "last" } }, { title: "asc" }]
+        : [{ publishedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }];
 
   const skip = (query.page - 1) * query.pageSize;
   const [items, totalItems] = await Promise.all([
