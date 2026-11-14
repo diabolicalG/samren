@@ -96,7 +96,7 @@ function BrowsePage() {
     status: status ? status as CatalogListParams["status"] : undefined,
     genre: genre || undefined,
     studio: studio || undefined,
-    year: year ? Number(year) : undefined,
+    year: year.length === 4 ? Number(year) : undefined,
     page,
     pageSize: 24,
     sort: sort as CatalogListParams["sort"],
@@ -104,6 +104,7 @@ function BrowsePage() {
   const catalogQuery = useQuery({
     queryKey: ["catalog", "browse", params],
     queryFn: () => apiClient.catalogAnime(params),
+    placeholderData: (previousData) => previousData,
   });
 
   return (
@@ -112,9 +113,9 @@ function BrowsePage() {
       <Surface className="catalog-filters">
         <div className="filter-title"><SlidersHorizontal size={16} /><span>Refine your search</span></div>
         <div className="filter-grid">
-          <TextField id="catalog-search" label="Search titles" placeholder="Search anime…" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <label className="ui-field" htmlFor="catalog-type">Format<select className="ui-input" id="catalog-type" value={type} onChange={(event) => setType(event.target.value)}><option value="">All formats</option><option value="TV">TV</option><option value="MOVIE">Movie</option><option value="OVA">OVA</option><option value="ONA">ONA</option><option value="SPECIAL">Special</option></select></label>
-          <label className="ui-field" htmlFor="catalog-status">Release status<select className="ui-input" id="catalog-status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option value="AIRING">Airing</option><option value="FINISHED">Finished</option><option value="NOT_YET_AIRED">Upcoming</option><option value="CANCELLED">Cancelled</option></select></label>
+          <TextField id="catalog-search" label="Search titles" placeholder="Search anime…" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+          <label className="ui-field" htmlFor="catalog-type">Format<select className="ui-input" id="catalog-type" value={type} onChange={(event) => { setType(event.target.value); setPage(1); }}><option value="">All formats</option><option value="TV">TV</option><option value="MOVIE">Movie</option><option value="OVA">OVA</option><option value="ONA">ONA</option><option value="SPECIAL">Special</option></select></label>
+          <label className="ui-field" htmlFor="catalog-status">Release status<select className="ui-input" id="catalog-status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">All statuses</option><option value="AIRING">Airing</option><option value="FINISHED">Finished</option><option value="NOT_YET_AIRED">Upcoming</option><option value="CANCELLED">Cancelled</option></select></label>
           <label className="ui-field" htmlFor="catalog-genre">Genre<select className="ui-input" id="catalog-genre" value={genre} onChange={(event) => { setGenre(event.target.value); setPage(1); }}><option value="">All genres</option>{(genresQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
           <TextField id="catalog-year" label="Release year" inputMode="numeric" placeholder="e.g. 2025" value={year} onChange={(event) => { setYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4)); setPage(1); }} />
           <label className="ui-field" htmlFor="catalog-studio">Studio<select className="ui-input" id="catalog-studio" value={studio} onChange={(event) => { setStudio(event.target.value); setPage(1); }}><option value="">All studios</option>{(studiosQuery.data ?? []).map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
