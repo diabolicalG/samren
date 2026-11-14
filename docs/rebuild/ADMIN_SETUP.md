@@ -6,7 +6,7 @@ This guide provisions the first administrator for a self-hosted Samren installat
 
 1. Configure PostgreSQL and set `DATABASE_URL` for the backend.
 2. Set `NODE_ENV=production` for a production deployment. Production session cookies are marked `Secure`.
-3. Set `CORS_ORIGIN` to the exact browser origin(s) that host the frontend, comma-separated. Do not use a wildcard. The development default allows Vite at `http://localhost:5173` and the legacy local origin `http://localhost:3000`.
+3. Set `CORS_ORIGIN` to the exact browser origin(s) that host the frontend, comma-separated. Do not use a wildcard. The development default allows only the active Vite frontend at `http://localhost:5173`. Add another exact origin only when a separately deployed trusted frontend requires it.
 4. If Samren is behind a reverse proxy, set `TRUST_PROXY_HOPS` to the exact number of trusted proxy hops (commonly `1` behind one controlled proxy). Leave it at `0` when the API is directly exposed. Do not set a larger value than the actual trusted proxy chain.
 
 ## Apply database migrations
