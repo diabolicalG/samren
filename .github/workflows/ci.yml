@@ -65,6 +65,9 @@ jobs:
       - name: Seed deterministic catalogue fixtures
         working-directory: apps/backend
         run: pnpm db:seed
+      - name: Verify seed idempotence
+        working-directory: apps/backend
+        run: pnpm db:seed
       - name: Lint active foundation code
         run: pnpm lint
       - name: Typecheck
