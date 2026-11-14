@@ -72,6 +72,43 @@ async function validateRelations(genreSlugs: string[] | undefined, studioSlugs: 
 
 adminCatalogRouter.use(requireRole("ADMIN"));
 
+
+adminCatalogRouter.get("/genres", async (_request, response, next) => {
+  try {
+    const items = await prisma.genre.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, slug: true, name: true },
+    });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.get("/studios", async (_request, response, next) => {
+  try {
+    const items = await prisma.studio.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, slug: true, name: true },
+    });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminCatalogRouter.get("/seasons", async (_request, response, next) => {
+  try {
+    const items = await prisma.season.findMany({
+      orderBy: [{ year: "desc" }, { season: "desc" }],
+      select: { id: true, year: true, season: true, label: true },
+    });
+    response.json({ data: items, error: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminCatalogRouter.get("/anime", async (_request, response, next) => {
   try {
     const items = await prisma.anime.findMany({
