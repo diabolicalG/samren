@@ -49,5 +49,7 @@ jobs:
         run: pnpm typecheck
       - name: Backend API tests
         run: pnpm --filter @samren/backend test
+      - name: Frontend smoke and accessibility tests
+        run: pnpm --filter @samren/frontend test
       - name: Build frontend and backend
         run: pnpm build
