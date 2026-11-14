@@ -7,6 +7,12 @@ import {
   adminAnimeCreateSchema,
   adminAnimeIdSchema,
   adminAnimeUpdateSchema,
+  adminGenreCreateSchema,
+  adminGenreUpdateSchema,
+  adminStudioCreateSchema,
+  adminStudioUpdateSchema,
+  adminSeasonCreateSchema,
+  adminSeasonUpdateSchema,
 } from "./admin.schemas.js";
 
 export const adminCatalogRouter = Router();
@@ -72,6 +78,152 @@ async function validateRelations(genreSlugs: string[] | undefined, studioSlugs: 
 
 adminCatalogRouter.use(requireRole("ADMIN"));
 
+
+
+adminCatalogRouter.post("/genres", requireTrustedOrigin, async (request, response) => {
+  const parsed = adminGenreCreateSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The genre record is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.genre.create({ data: parsed.data, select: { id: true, slug: true, name: true } });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/genres/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminGenreUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The genre update is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.genre.update({ where: { id: id.data }, data: parsed.data, select: { id: true, slug: true, name: true } });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/genres/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The genre identifier is invalid" } });
+    return;
+  }
+  try {
+    if (await prisma.animeGenre.count({ where: { genreId: id.data } })) {
+      response.status(409).json({ data: null, error: { code: "IN_USE", message: "Remove this genre from catalogue entries before deleting it" } });
+      return;
+    }
+    await prisma.genre.delete({ where: { id: id.data } });
+    response.status(204).end();
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.post("/studios", requireTrustedOrigin, async (request, response) => {
+  const parsed = adminStudioCreateSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The studio record is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.studio.create({ data: parsed.data, select: { id: true, slug: true, name: true, description: true, website: true } });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/studios/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminStudioUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The studio update is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.studio.update({ where: { id: id.data }, data: parsed.data, select: { id: true, slug: true, name: true, description: true, website: true } });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/studios/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The studio identifier is invalid" } });
+    return;
+  }
+  try {
+    if (await prisma.animeStudio.count({ where: { studioId: id.data } })) {
+      response.status(409).json({ data: null, error: { code: "IN_USE", message: "Remove this studio from catalogue entries before deleting it" } });
+      return;
+    }
+    await prisma.studio.delete({ where: { id: id.data } });
+    response.status(204).end();
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.post("/seasons", requireTrustedOrigin, async (request, response) => {
+  const parsed = adminSeasonCreateSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The season record is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.season.create({ data: parsed.data, select: { id: true, year: true, season: true, label: true } });
+    response.status(201).json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.patch("/seasons/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  const parsed = adminSeasonUpdateSchema.safeParse(request.body);
+  if (!id.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The season update is invalid" } });
+    return;
+  }
+  try {
+    const item = await prisma.season.update({ where: { id: id.data }, data: parsed.data, select: { id: true, year: true, season: true, label: true } });
+    response.json({ data: item, error: null });
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+adminCatalogRouter.delete("/seasons/:id", requireTrustedOrigin, async (request, response) => {
+  const id = adminAnimeIdSchema.safeParse(request.params.id);
+  if (!id.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The season identifier is invalid" } });
+    return;
+  }
+  try {
+    const [animeCount, episodeCount] = await Promise.all([
+      prisma.anime.count({ where: { seasonGroupId: id.data } }),
+      prisma.episode.count({ where: { seasonId: id.data } }),
+    ]);
+    if (animeCount || episodeCount) {
+      response.status(409).json({ data: null, error: { code: "IN_USE", message: "This season is assigned to catalogue entries or episodes" } });
+      return;
+    }
+    await prisma.season.delete({ where: { id: id.data } });
+    response.status(204).end();
+  } catch (error) {
+    sendError(response, error);
+  }
+});
 
 adminCatalogRouter.get("/genres", async (_request, response, next) => {
   try {
