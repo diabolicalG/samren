@@ -1,8 +1,6 @@
 import { app } from "./app.js";
+import { env } from "./config/env.js";
 
-const port = Number(process.env.PORT ?? 4000);
-const host = process.env.HOST ?? "0.0.0.0";
-
-app.listen(port, host, () => {
-  process.stdout.write(`Samren API listening on http://${host}:${port}\n`);
+app.listen(env.PORT, env.HOST, () => {
+  process.stdout.write(`Samren API listening on http://${env.HOST}:${env.PORT}\n`);
 });
