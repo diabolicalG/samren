@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 export function createApiClient(options: ApiClientOptions = {}) {
-  const baseUrl = (options.baseUrl ?? "/api/v1").replace(/\\/$/, "");
+  const baseUrl = (options.baseUrl ?? "/api/v1").replace(/\/$/, "");
   const credentials = options.credentials ?? "include";
 
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
