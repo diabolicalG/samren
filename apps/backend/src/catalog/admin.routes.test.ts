@@ -59,7 +59,22 @@ describe("admin catalogue management", () => {
     expect(response.body.error.code).toBe("FORBIDDEN");
   });
 
-  it("creates, publishes, and archives a first-party catalogue record", async () => {
+  it("exposes full catalogue taxonomies only to administrators", async () => {
+    const unauthenticated = await request(app).get("/api/v1/admin/catalog/genres");
+    expect(unauthenticated.status).toBe(401);
+
+    const agent = await login(adminEmail, adminPassword);
+    const genres = await agent.get("/api/v1/admin/catalog/genres");
+    const studios = await agent.get("/api/v1/admin/catalog/studios");
+    const seasons = await agent.get("/api/v1/admin/catalog/seasons");
+    expect(genres.status).toBe(200);
+    expect(genres.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ slug: "adventure" })]));
+    expect(studios.status).toBe(200);
+    expect(studios.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ slug: "samren-studio-sample" })]));
+    expect(seasons.status).toBe(200);
+  });
+
+  it("creates, publishes, edits, and archives a first-party catalogue record", async () => {
     const agent = await login(adminEmail, adminPassword);
     const created = await agent
       .post("/api/v1/admin/catalog/anime")
@@ -86,14 +101,16 @@ describe("admin catalogue management", () => {
     const published = await agent
       .patch(`/api/v1/admin/catalog/anime/${created.body.data.id}`)
       .set("Origin", origin)
-      .send({ publicationStatus: "PUBLISHED", featured: true });
+      .send({ publicationStatus: "PUBLISHED", featured: true, title: "Phase Two Admin Edited Title", releaseYear: 2026 });
     expect(published.status).toBe(200);
     expect(published.body.data.publicationStatus).toBe("PUBLISHED");
     expect(published.body.data.featured).toBe(true);
+    expect(published.body.data.title).toBe("Phase Two Admin Edited Title");
+    expect(published.body.data.releaseYear).toBe(2026);
 
     const publicLookup = await request(app).get(`/api/v1/catalog/anime/${animeSlug}`);
     expect(publicLookup.status).toBe(200);
-    expect(publicLookup.body.data.title).toBe("Phase Two Admin Managed Title");
+    expect(publicLookup.body.data.title).toBe("Phase Two Admin Edited Title");
 
     const archived = await agent
       .delete(`/api/v1/admin/catalog/anime/${created.body.data.id}`)
