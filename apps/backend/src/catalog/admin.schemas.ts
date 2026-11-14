@@ -30,3 +30,29 @@ export const adminAnimeUpdateSchema = adminAnimeCreateSchema.partial().extend({
 }).strict();
 
 export const adminAnimeIdSchema = z.string().cuid();
+
+const taxonomySlugSchema = z.string().trim().min(1).max(140).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
+export const adminGenreCreateSchema = z.object({
+  slug: taxonomySlugSchema.max(100),
+  name: z.string().trim().min(1).max(100),
+}).strict();
+
+export const adminGenreUpdateSchema = adminGenreCreateSchema.partial().strict();
+
+export const adminStudioCreateSchema = z.object({
+  slug: taxonomySlugSchema,
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(5000).nullable().optional(),
+  website: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
+export const adminStudioUpdateSchema = adminStudioCreateSchema.partial().strict();
+
+export const adminSeasonCreateSchema = z.object({
+  year: z.number().int().min(1900).max(2200),
+  season: z.enum(["WINTER", "SPRING", "SUMMER", "FALL"]),
+  label: z.string().trim().max(100).nullable().optional(),
+}).strict();
+
+export const adminSeasonUpdateSchema = adminSeasonCreateSchema.partial().strict();
