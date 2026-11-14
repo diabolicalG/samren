@@ -1,6 +1,6 @@
 # Samren Phase 2 — Application-Owned Catalogue
 
-**Status:** IN PROGRESS — scope defined; implementation begins after this checkpoint  
+**Status:** IN PROGRESS — public catalogue foundation implemented; admin write path remains gated on secure authentication  
 **Repository:** `diabolicalG/samren`  
 **Branch:** `main`  
 **Phase 1 baseline:** `fa471ba986bdd462d20d17e0f002218b540567f8`  
