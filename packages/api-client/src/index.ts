@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminMediaAsset, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminMediaAsset, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
