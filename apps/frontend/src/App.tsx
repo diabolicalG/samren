@@ -58,7 +58,7 @@ function HomePage() {
         <div className="hero-copy">
           <span className="eyebrow"><Sparkles size={14} /> YOUR ANIME SPACE</span>
           <h1 id="hero-title">A quieter way<br />to <span>find your next</span><br />favorite story.</h1>
-          <p>Build your own collection, keep track of every episode, and make your watchlist feel like home.</p>
+          <p>Explore an application-owned catalogue, discover new stories, and find your next favorite.</p>
           <ActionLink className="primary-action" to="/browse">Explore the catalogue <span aria-hidden="true">↗</span></ActionLink>
         </div>
         <div className="hero-orbit" aria-hidden="true">
