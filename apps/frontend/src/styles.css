@@ -297,3 +297,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-upload-card form > p, .admin-upload-card form > button { grid-column: 1 / -1; }
 .admin-success { color: #9de7c1 !important; }
 @media (max-width: 640px) { .admin-upload-card form { grid-template-columns: 1fr; } }
+
+
+/* Phase 3 — first-party episode playback */
+.watch-page { padding-top: 32px; padding-bottom: 64px; }
+.watch-heading { padding: 32px 0 22px; }
+.watch-heading h1 { margin: 10px 0; font: 800 clamp(28px,4vw,44px)/1.12 Manrope,sans-serif; letter-spacing: -.045em; }
+.watch-heading p { max-width: 760px; color: var(--muted); line-height: 1.7; font-size: 13px; }
+.video-frame { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #000; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.video-frame video { display: block; width: 100%; max-height: min(72vh,760px); aspect-ratio: 16/9; background: #000; }
+.playback-quality { color: var(--muted); font-size: 11px; }
+.episode-row { color: inherit; }
+.episode-row:hover { border-color: rgba(167,139,250,.48); }
