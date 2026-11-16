@@ -1,192 +1,122 @@
 # Samren Phase 3 — Implementation Progress
 
-**Status:** IN PROGRESS — implementation not yet accepted
-**Branch:** `phase-3-media-providers`
-**Scope authorization:** Product-owner revision dated 2026-11-15
-**Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`
-**Latest checkpoint:** `6b32d293e4a57904d9f45f857ee245adef8de799` (upload sanitization fix; later CI validation pending)
+**Status:** IN PROGRESS — not accepted or frozen  
+**Branch:** `phase-3-media-providers`  
+**Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
+**Latest code checkpoint:** `5d5fc40627c55bc7eb3a27ae103ac939f40c27e1`  
+**Pull request:** https://github.com/diabolicalG/samren/pull/5 (draft; not merged)
 
-## 1. Repository verification
+## 1. Repository boundaries
 
-- Active repository confirmed: `diabolicalG/samren`.
-- Work is isolated on `phase-3-media-providers`; `main` was not changed.
-- Reference repository: `diabolicalG/Anime-streaming`; inspected read-only.
-- Phase 1 and Phase 2 documentation and baseline Prisma models were inspected.
-- No Phase 3 implementation files were present in the Samren baseline tree. The backend contains the Phase 2 catalogue/admin metadata layer, but no local upload/storage/delivery/playback modules.
-- Existing Prisma models already provide `MediaAsset`, `EpisodeMedia`, and `SubtitleTrack`; Phase 3 should extend their lifecycle without duplicating these models.
+- Active implementation repository: `diabolicalG/samren`.
+- Reference repository: `diabolicalG/Anime-streaming`, inspected read-only.
+- All Phase 3 commits are on this Samren feature branch. `main` has not been changed.
+- Phase 1 and Phase 2 are treated as frozen; changes so far extend media behavior without changing their catalogue contracts.
+- No changes have been made to Anime-streaming.
 
-## 2. Scope revision committed
+## 2. Approved scope revision
 
-The product owner's option-B instruction is recorded in `PHASE_3_SCOPE.md` Section 13. It authorizes Kuhi and native Anivexa integration in addition to first-party local media. This amendment supersedes only the former provider exclusions; it does not authorize arbitrary URL proxying or modifications to Anime-streaming.
+The product owner selected option B on 2026-11-15. The approved Phase 3 scope therefore includes:
 
-## 3. Source audit findings
+- First-party local media storage, upload, delivery, artwork and episode playback.
+- Kuhi provider integration.
+- Native Anivexa provider/extractor integration in Samren rather than requiring a separately managed Anivexa service.
+
+This revision does not authorize unrestricted URL proxying, exposing provider secrets, or changing the reference repository.
+
+## 3. Source audit and provider blockers
 
 ### Kuhi
 
-- Anime-streaming contains a TypeScript `KuhiProvider` client and provider contracts.
-- The Kuhi service itself is represented in the reference repository tree as a Git submodule at `services/kuhi`, gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`.
-- The reference repository tree does not contain a root `.gitmodules` file, so the submodule's canonical repository URL cannot be established from the inspected source.
-- The client code alone does not provide the Kuhi service implementation. Integrating a URL without confirming its canonical source and endpoint ownership would be unsafe and would invent provenance.
-- **BLOCKED:** obtain the Kuhi submodule URL/source or an authorized local clone before copying the service itself. Do not fabricate the source.
+- Anime-streaming contains a TypeScript `KuhiProvider` client and provider contracts under `apps/backend/src/services/streaming`.
+- The Kuhi service itself is a Git submodule at `services/kuhi`, gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`.
+- The reference repository has no root `.gitmodules` file, and GitHub's submodule entry does not expose a canonical source URL.
+- The client can be adapted, but the service cannot be faithfully copied without its source repository URL or an authorized local clone.
+- **BLOCKED:** obtain the canonical submodule source. Do not invent a URL or replace it with an unrelated service.
 
 ### Anivexa
 
-- The reference contains a standalone Node.js API aggregator, twelve provider modules, AniList mapping/cache/episode-strategy modules, and six extractor modules plus FlixCloud support.
-- Its runtime dependencies include `playwright-core` and `wreq-js`; it is not a small TypeScript provider client.
-- The current provider modules perform remote-site scraping and some provider handlers include browser/request-impersonation behavior. Several responses contain remote URLs, headers, cookies, diagnostics, or raw upstream errors.
-- The reference README documents routes for AniList mapping, episode discovery, and provider watch resolution. It also documents provider-specific playback constraints.
-- The Anivexa source includes wildcard CORS and returns raw error details in some paths. These behaviors must not be copied into Samren.
-- **NOT SAFE TO PORT BLINDLY:** each provider/extractor needs an endpoint, dependency, redirect, SSRF, response-size, timeout, credential/logging, and license audit before adoption. Preserve only required functionality and attribution.
+- The reference contains a Node.js API aggregator, twelve provider modules, AniList mapping/cache/episode strategy modules, six extractor modules, and FlixCloud support.
+- Its runtime dependencies include `playwright-core` and `wreq-js`; some providers use browser/request impersonation.
+- The source also contains unsafe or unsuitable patterns that must not be copied unchanged:
+  - `animedunya.js` constructs a shell command with a URL and executes it through `execSync`.
+  - `mkissa.js` contains a hard-coded TMDB bearer token.
+  - Some handlers expose raw upstream error details, cookies, request headers or diagnostic data.
+  - The aggregator uses wildcard CORS.
+- No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
+- **NOT STARTED:** no Anivexa provider/extractor source has been copied into Samren. A provider-by-provider dependency, license and security review remains required.
 
-## 4. Initial completion matrix
+## 4. Implemented first-party media work
 
-| Area | Initial status | Evidence / next work |
-|---|---|---|
-| Local storage adapter | MISSING | No storage module or configured storage root found |
-| Upload route | MISSING | Admin currently registers metadata, not file bytes |
-| Signature verification/checksum | MISSING | Existing schema has checksum/state fields only |
-| Media delivery / byte ranges | MISSING | No first-party media route found |
-| Playback metadata endpoint | MISSING | No episode playback endpoint found |
-| Frontend watch player | MISSING | Existing frontend watch route is not part of the active Phase 2 app |
-| Artwork delivery | MISSING | Existing catalogue returns metadata, no generated media URL |
-| Kuhi client adaptation | BLOCKED / PARTIAL SOURCE | Reference client exists; source service submodule URL unavailable |
-| Anivexa provider/extractor port | NOT STARTED | Large source/dependency/security audit required |
-| Automated Phase 3 tests | MISSING | Add alongside each implementation unit |
-| Final security audit | NOT STARTED | Required before Phase 3 completion |
+### Storage and upload
 
-## 5. Implementation guardrails
-
-- Local assets and remote provider streams remain separate paths.
-- Only local uploads become `MediaAsset` records.
-- Do not persist remote stream URLs as local storage keys.
-- Do not proxy arbitrary client-supplied URLs.
-- Do not expose provider headers, cookies, secrets, raw errors, stack traces, or upstream diagnostics.
-- Do not import browser automation or request-impersonation packages without a provider-specific justification and CI test plan.
-- Preserve existing ADMIN and trusted-Origin middleware.
-- Keep all changes in Samren and do not modify Anime-streaming.
-
-## 6. Verification status
-
-This checkpoint is documentation and source-audit work only. No application code, schema migration, or runtime behavior has been changed. No tests are claimed as run by this checkpoint.
-
-## 7. Next implementation checkpoints
-
-1. Resolve the Kuhi submodule source URL and audit its license/runtime.
-2. Define Samren-native provider contracts and security boundary tests.
-3. Implement local filesystem storage and upload validation.
-4. Implement publication-aware media delivery and byte ranges.
-5. Implement playback metadata and frontend player.
-6. Port the approved Anivexa provider/extractor subset with per-provider tests.
-7. Run full CI, security audit, and Phase 2 regression suite.
-8. Freeze Phase 3 only after all acceptance gates pass.
-
-## 8. Implementation checkpoint — local storage primitives
-
-Implemented on `phase-3-media-providers`:
-
-- Added `MEDIA_STORAGE_ROOT` configuration, defaulting to the private `.data/media` directory.
-- Added generated opaque storage keys with strict format validation.
-- Added canonical-root and canonical-parent containment checks to reject path escapes and symlink escapes.
-- Added atomic temporary-file writes, restrictive file/directory permissions, SHA-256 calculation, and cleanup on write failure.
-- Added local delete and file-stat helpers.
-- Added unit tests for storage-key validation, traversal rejection, file contents, checksum calculation, and empty/oversized buffer rejection.
-- Documented the storage-root setting in `apps/backend/.env.example`.
-
-**Limitations of this checkpoint:**
-
-- This is the storage primitive only; no HTTP upload endpoint, streaming multipart parser, signature sniffing, Prisma asset lifecycle transaction, media delivery route, or player integration is claimed complete.
-- The current storage write helper accepts a bounded Buffer (50 MiB maximum); the approved upload path still needs a streaming implementation to avoid buffering large media in memory.
-- The tests have been authored but have not been executed in a local runtime in this session. No passing test result is claimed.
-- The existing admin metadata-only asset endpoints remain unchanged.
-
-## 9. Next checkpoint
-
-Implement streaming writes with byte limits and file-signature validation, then add the authenticated admin upload route and a database-backed asset lifecycle with rollback/cleanup. Follow with safe media delivery and byte-range handling.
-
-
-## 10. Implementation checkpoint — upload, signatures, delivery
-
-Additional implementation now present on this branch:
-
-- Added streaming storage using a Node readable pipeline, incremental SHA-256, first-64-byte signature capture, byte-limit enforcement (up to a 2 GiB configured ceiling), temporary-file cleanup, and atomic rename.
-- Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT, and ASS.
-- Added an ADMIN-protected, trusted-Origin upload endpoint at `POST /api/v1/admin/catalog/assets/upload`. It accepts raw request bodies with `x-media-kind` and `x-original-filename` headers; it does not accept multipart form data.
-- Upload limits are 15 MiB for images, 2 MiB for subtitles, and 2 GiB for video.
-- The upload endpoint stores validated files, computes checksums, and creates READY MediaAsset records; failed database writes trigger file cleanup.
-- Added publication-aware public GET/HEAD delivery at `/api/v1/media/:id`, including single byte-range responses and 416 handling for invalid ranges.
-- Public media delivery only resolves READY assets associated with published anime/episodes.
-- Public catalogue responses now include first-party poster/banner delivery URLs.
+- Added `MEDIA_STORAGE_ROOT`, defaulting to `.data/media`, and documented it in `apps/backend/.env.example`.
 - Added `.data/` to `.gitignore`.
+- Added generated opaque storage keys with strict format validation.
+- Added root/parent canonicalization and path containment checks.
+- Added atomic temporary-file writes, restrictive file permissions, SHA-256 checksums and cleanup on failure.
+- Added bounded streaming writes with incremental hashing and size enforcement.
+- Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT and ASS.
+- Added an ADMIN- and trusted-Origin-protected raw-binary upload endpoint:
+  - `POST /api/v1/admin/catalog/assets/upload`
+  - Headers: `x-media-kind`, `x-original-filename`, and the actual detected `Content-Type`.
+  - Limits: 15 MiB for images, 2 MiB for subtitles, 2 GiB for video.
+- The upload endpoint creates READY `MediaAsset` records and removes stored files when the database write fails.
+- Added an admin upload control and API client method.
+- Legacy metadata-only assets remain supported. Deletion only unlinks files with Samren-generated managed storage keys.
 
-**Current limitations:**
+**Limitations:** upload requests are raw binary bodies, not multipart/form-data. The upload operation creates the asset but does not automatically attach it to an anime or episode; the existing admin association endpoints remain responsible for that.
 
-- The upload endpoint accepts raw binary request bodies, not multipart/form-data.
-- The upload route currently creates the asset record but does not attach it to an anime or episode; existing admin association endpoints must be used separately.
-- No frontend upload UI, player/watch route, subtitle selection UI, or playback progress integration has been completed.
-- No runtime tests have yet been confirmed green for the latest code. Earlier CI runs failed at lint because of a missing closing brace in the new publication filter and an oxlint control-regex warning; both were corrected in later commits. A newer CI run is pending.
-- This checkpoint does not complete the provider work. Kuhi remains blocked on locating the submodule origin; Anivexa porting has not started.
+### Public media delivery and playback
 
-## 11. Current CI observations
+- Added publication-aware `GET` and `HEAD` delivery at `/api/v1/media/:id`.
+- Added single HTTP byte-range support and 416 responses for invalid ranges.
+- Delivery only exposes READY assets attached to published anime/episodes.
+- Public catalogue responses now include first-party poster URLs; the frontend renders poster and detail artwork when present.
+- Added published episode playback metadata at `/api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`.
+- Added a first-party watch page at `/watch/:slug/:episodeNumber` with native video controls and WebVTT subtitle tracks.
 
-- CI on the earlier upload-only checkpoint `a9fa1b2` completed successfully.
-- Subsequent delivery changes exposed lint errors in an intermediate checkpoint. These were fixed in later commits.
-- CI is being re-run against the latest branch head. Treat the result as pending until GitHub Actions reports completion.
+**Remaining frontend work:** previous/next episode navigation, local playback progress, quality selection, and an end-to-end browser playback test are not yet complete. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
 
+## 5. Verification
 
-## 12. Updated implementation status — 2026-11-16
+- CI run `43832779866` passed all workflow steps for checkpoint `843582214b5cd32d1c4d4d9a7d5d0a223e686a05`: Prisma validation/generation/migration, seed/idempotence, lint, typecheck, backend tests, frontend tests and production build.
+- A later CI run `43832904848` failed one existing admin asset deletion test because newly added file cleanup rejected a legacy metadata-only storage key. The cleanup now checks `isManagedStorageKey` and only unlinks generated keys.
+- A follow-up CI run is required to verify that correction at the current branch head. Do not treat the earlier green run as verification of later commits.
+- No local runtime is available in this session; GitHub Actions is the executable validation environment.
 
-The earlier Sections 4, 6, 7, 8, and 9 describe the baseline and first checkpoint only. They are historical notes, not the current implementation status. The following supersedes their "missing" entries where noted.
+## 6. Current completion matrix
 
-### Implemented on this branch
+| Area | Status | Remaining work |
+|---|---|---|
+| Local storage primitives | PARTIAL | Streaming path exists; add broader failure/race tests and operational cleanup |
+| Admin raw-binary upload | PARTIAL | Multipart support not implemented; attach associations remains separate |
+| Signature validation/checksum | PARTIAL | Unit tests exist; broaden malformed/large-input cases |
+| Public media delivery | PARTIAL | Add integration tests for access rules, HEAD and byte ranges |
+| Artwork URLs/rendering | PARTIAL | Verify on real uploaded assets and responsive layouts |
+| Episode playback metadata | PARTIAL | Add playback integration tests and episode navigation/progress |
+| Frontend player | PARTIAL | Add previous/next, quality selection and browser playback verification |
+| Kuhi client/service | BLOCKED / PARTIAL SOURCE | Obtain canonical submodule source; adapt and test client securely |
+| Anivexa providers/extractors | NOT STARTED | Resolve reuse rights, then port safe provider subset and required extractors |
+| Provider security tests | NOT STARTED | URL validation, SSRF, timeouts, response limits, secrets and error redaction |
+| Final Phase 3 audit | NOT STARTED | Complete only after all acceptance gates pass |
 
-- Private filesystem storage rooted at `MEDIA_STORAGE_ROOT`, default `.data/media`, with `.data/` ignored by Git.
-- Opaque generated storage keys, path containment checks, atomic temporary writes, restrictive file permissions, streaming write support, SHA-256 checksums, byte limits, and partial-file cleanup.
-- Signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT, and ASS.
-- Admin-protected raw-binary upload endpoint at `POST /api/v1/admin/catalog/assets/upload`, using `x-media-kind` and `x-original-filename` headers, trusted-Origin validation, per-kind limits, signature/MIME comparison, and database-write cleanup.
-- Publication-aware first-party media delivery at `GET/HEAD /api/v1/media/:id`, with single byte-range handling and 416 responses for invalid ranges.
-- Public catalogue artwork URLs for uploaded poster/banner assets.
-- API client upload support and admin artwork preview integration.
-- A first-party episode playback metadata route at `GET /api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`, with READY local video sources and VTT subtitle tracks.
-- Shared playback response types and API-client method.
-- A first-party watch-page/player UI in the Next.js web application.
+## 7. Security requirements retained
 
-### Remaining local-media work
+- Local files and remote provider streams remain separate asset paths.
+- Never store a remote provider URL as a local storage key.
+- Never proxy arbitrary user-supplied URLs.
+- Never expose cookies, credentials, private headers, stack traces or raw provider diagnostics.
+- Any provider-returned URL must be validated against an explicit provider policy before use.
+- No browser-automation or request-impersonation dependency is to be introduced without a provider-specific justification, license review and CI plan.
+- Preserve admin authentication and trusted-Origin checks.
 
-- The upload route accepts raw binary request bodies, not multipart form data.
-- Uploading creates a READY asset but does not automatically attach it to an anime/episode; existing admin association endpoints remain a separate operation.
-- The watch-page UI still uses the existing streaming hook for provider playback; end-to-end use of the new first-party playback metadata endpoint and local source fallback needs integration and tests.
-- Verify all upload and delivery edge cases through automated tests and current CI.
-- Complete frontend subtitle track selection and any required playback progress integration.
+## 8. Next checkpoints
 
-### Provider integration status
-
-- **Kuhi service source remains BLOCKED.** The reference tree identifies `services/kuhi` as gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`, but the reference checkout has no `.gitmodules` file and the canonical submodule URL is not exposed. The source TypeScript client is inspectable, but the actual Kuhi service cannot be faithfully copied until its origin/source is available.
-- **Anivexa port remains NOT STARTED.** Its reference tree contains twelve provider modules and six extractors plus shared mapping/cache utilities. Its runtime dependencies include browser automation and request-impersonation packages. Porting requires a deliberate dependency/security review; no Anivexa provider is claimed integrated in Samren yet.
-- Anime-streaming remains read-only and unchanged.
-
-### CI evidence
-
-- Workflow run `43832443914` passed at checkpoint `f502cd555d`.
-- Later playback/upload commits exposed lint/typecheck failures in intermediate commits. The failures were corrected in subsequent commits (including removal of an unused duplicate signature matcher and repair of escaped newline insertion).
-- Workflows for the corrected playback commits were still running at the time of this update. Do not treat them as green until their final GitHub Actions conclusions are available.
-- No local test execution is claimed in this environment.
-
-### Current status
-
-**Phase 3 remains IN PROGRESS and is not frozen.** The local upload/storage/delivery foundation and initial playback UI are present. Provider integration, complete first-party watch wiring, remaining UI behavior, full test verification, and final security audit remain open.
-
-
-## 13. Kuhi submodule origin resolved
-
-The previously unknown Kuhi submodule origin has now been identified by matching the exact gitlink commit SHA `d9a785ad030d6fc6a8ad709291be9612c864449e` against public Git commit objects.
-
-- Upstream repository: `aryaniiil/anime-api`
-- Exact source commit: `d9a785ad030d6fc6a8ad709291be9612c864449e`
-- License at that commit: MIT (`LICENSE` must be retained with copied portions)
-- Runtime dependencies declared upstream: FastAPI, Uvicorn, and HTTPX.
-- The source tree includes the provider race layer, provider adapters, AniList extraction, parsing, and endpoint router.
-- Samren already has a FastAPI application under `apps/api/src/main.py` and its existing unified media API package, with FastAPI and HTTPX dependencies available. The preferred integration path is to extend this existing application rather than add a second service.
-
-The upstream service also exposes generic HLS manifest and segment proxy routes that accept arbitrary URL parameters. Those routes are **not approved for direct copying**. Any proxy capability retained in Samren must enforce fixed trusted provider hosts, redirect validation, bounded response sizes, timeouts, and safe referer handling. The copied endpoint router and provider implementations still require review before being mounted.
-
-**Status update:** Kuhi source is no longer blocked by an unknown submodule URL. Integration has not yet been completed or tested.
+1. Verify current CI after the legacy asset deletion compatibility fix.
+2. Add tests for upload endpoint, publication-aware delivery, byte ranges and playback metadata.
+3. Complete frontend previous/next navigation and local progress.
+4. Resolve Kuhi submodule source and adapt the client/service.
+5. Confirm Anivexa reuse rights and port safe provider/extractor functionality into Samren without shell execution or embedded credentials.
+6. Run provider failure/security tests, Phase 2 regressions and full CI.
+7. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
