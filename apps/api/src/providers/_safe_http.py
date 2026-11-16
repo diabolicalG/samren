@@ -1,5 +1,7 @@
+import asyncio
 import ipaddress
 import os
+import socket
 from urllib.parse import urlsplit
 
 import httpx
@@ -34,6 +36,23 @@ def validate_provider_url(value: str) -> None:
         raise ValueError("Kuhi provider request URL is invalid") from error
 
 
+async def validate_resolved_host(host: str) -> None:
+    try:
+        records = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError as error:
+        raise ValueError("Kuhi provider host DNS resolution failed") from error
+    addresses = {record[4][0] for record in records}
+    if not addresses:
+        raise ValueError("Kuhi provider host did not resolve")
+    for value in addresses:
+        try:
+            address = ipaddress.ip_address(value.split("%", 1)[0])
+        except ValueError as error:
+            raise ValueError("Kuhi provider host returned an invalid IP address") from error
+        if not address.is_global:
+            raise ValueError("Kuhi provider host resolved to a non-public IP address")
+
+
 class _LimitedStream(httpx.AsyncByteStream):
     def __init__(self, inner: httpx.AsyncByteStream, limit: int):
         self.inner = inner
@@ -57,6 +76,7 @@ class _GuardedTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         validate_provider_url(str(request.url))
+        await validate_resolved_host(request.url.host)
         response = await self.inner.handle_async_request(request)
         content_length = response.headers.get("content-length")
         if content_length:
