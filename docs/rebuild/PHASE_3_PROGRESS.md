@@ -131,3 +131,46 @@ Additional implementation now present on this branch:
 - CI on the earlier upload-only checkpoint `a9fa1b2` completed successfully.
 - Subsequent delivery changes exposed lint errors in an intermediate checkpoint. These were fixed in later commits.
 - CI is being re-run against the latest branch head. Treat the result as pending until GitHub Actions reports completion.
+
+
+## 12. Updated implementation status — 2026-11-16
+
+The earlier Sections 4, 6, 7, 8, and 9 describe the baseline and first checkpoint only. They are historical notes, not the current implementation status. The following supersedes their "missing" entries where noted.
+
+### Implemented on this branch
+
+- Private filesystem storage rooted at `MEDIA_STORAGE_ROOT`, default `.data/media`, with `.data/` ignored by Git.
+- Opaque generated storage keys, path containment checks, atomic temporary writes, restrictive file permissions, streaming write support, SHA-256 checksums, byte limits, and partial-file cleanup.
+- Signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT, and ASS.
+- Admin-protected raw-binary upload endpoint at `POST /api/v1/admin/catalog/assets/upload`, using `x-media-kind` and `x-original-filename` headers, trusted-Origin validation, per-kind limits, signature/MIME comparison, and database-write cleanup.
+- Publication-aware first-party media delivery at `GET/HEAD /api/v1/media/:id`, with single byte-range handling and 416 responses for invalid ranges.
+- Public catalogue artwork URLs for uploaded poster/banner assets.
+- API client upload support and admin artwork preview integration.
+- A first-party episode playback metadata route at `GET /api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`, with READY local video sources and VTT subtitle tracks.
+- Shared playback response types and API-client method.
+- A first-party watch-page/player UI in the Next.js web application.
+
+### Remaining local-media work
+
+- The upload route accepts raw binary request bodies, not multipart form data.
+- Uploading creates a READY asset but does not automatically attach it to an anime/episode; existing admin association endpoints remain a separate operation.
+- The watch-page UI still uses the existing streaming hook for provider playback; end-to-end use of the new first-party playback metadata endpoint and local source fallback needs integration and tests.
+- Verify all upload and delivery edge cases through automated tests and current CI.
+- Complete frontend subtitle track selection and any required playback progress integration.
+
+### Provider integration status
+
+- **Kuhi service source remains BLOCKED.** The reference tree identifies `services/kuhi` as gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`, but the reference checkout has no `.gitmodules` file and the canonical submodule URL is not exposed. The source TypeScript client is inspectable, but the actual Kuhi service cannot be faithfully copied until its origin/source is available.
+- **Anivexa port remains NOT STARTED.** Its reference tree contains twelve provider modules and six extractors plus shared mapping/cache utilities. Its runtime dependencies include browser automation and request-impersonation packages. Porting requires a deliberate dependency/security review; no Anivexa provider is claimed integrated in Samren yet.
+- Anime-streaming remains read-only and unchanged.
+
+### CI evidence
+
+- Workflow run `43832443914` passed at checkpoint `f502cd555d`.
+- Later playback/upload commits exposed lint/typecheck failures in intermediate commits. The failures were corrected in subsequent commits (including removal of an unused duplicate signature matcher and repair of escaped newline insertion).
+- Workflows for the corrected playback commits were still running at the time of this update. Do not treat them as green until their final GitHub Actions conclusions are available.
+- No local test execution is claimed in this environment.
+
+### Current status
+
+**Phase 3 remains IN PROGRESS and is not frozen.** The local upload/storage/delivery foundation and initial playback UI are present. Provider integration, complete first-party watch wiring, remaining UI behavior, full test verification, and final security audit remain open.
