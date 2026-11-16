@@ -19,7 +19,7 @@ export type AggregatedStream = {
   subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }>;
 };
 
-type ProviderAdapter = {
+export type ProviderAdapter = {
   id: ProviderId;
   label: string;
   extract: (anilistId: number, episode: number, audio: AudioType) => Promise<unknown>;
@@ -88,16 +88,21 @@ export class ProviderAggregator {
   private readonly sessions = new Map<string, Session>();
   private readonly pool: BoundedWorkerPool;
   private readonly circuits: ProviderCircuitBreaker;
+  private readonly adapters: ProviderAdapter[];
 
-  constructor(options: { concurrency?: number; maxQueue?: number; failureThreshold?: number; cooldownMs?: number } = {}) {
+  constructor(
+    options: { concurrency?: number; maxQueue?: number; failureThreshold?: number; cooldownMs?: number } = {},
+    providers: ProviderAdapter[] = adapters,
+  ) {
     this.pool = new BoundedWorkerPool(options.concurrency ?? 4, options.maxQueue ?? 64);
     this.circuits = new ProviderCircuitBreaker(options.failureThreshold ?? 3, options.cooldownMs ?? 30_000);
+    this.adapters = providers;
   }
 
   get status() {
     return {
       workers: this.pool.stats,
-      providers: adapters.map((adapter) => ({ id: adapter.id, name: adapter.label, ...this.circuits.status(adapter.id) })),
+      providers: this.adapters.map((adapter) => ({ id: adapter.id, name: adapter.label, ...this.circuits.status(adapter.id) })),
     };
   }
 
@@ -159,13 +164,13 @@ export class ProviderAggregator {
       tried: new Set(),
       tasks: new Map(),
     };
-    for (const adapter of adapters) {
+    for (const adapter of this.adapters) {
       session.tasks.set(adapter.id, this.task(adapter, anilistId, episode, audio));
     }
     this.sessions.set(id, session);
     try {
       const stream = await this.firstAvailable(session);
-      return { sessionId: id, stream, providers: adapters.length, expiresAt: new Date(session.expiresAt).toISOString() };
+      return { sessionId: id, stream, providers: this.adapters.length, expiresAt: new Date(session.expiresAt).toISOString() };
     } catch {
       this.sessions.delete(id);
       throw new Error("All configured providers failed to return a playable stream");
@@ -182,7 +187,7 @@ export class ProviderAggregator {
     return {
       stream,
       tried: [...session.tried],
-      remaining: adapters.length - session.tried.size,
+      remaining: this.adapters.length - session.tried.size,
     };
   }
 
