@@ -36,6 +36,22 @@ describe("local media storage", () => {
     expect((await stat(stored.absolutePath)).mode & 0o777).toBe(0o600);
   });
 
+  it("lists only stale regular files with generated managed storage keys", async () => {
+    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-orphans-"));
+    process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
+    const { listStaleManagedMediaKeys, storeMediaBuffer } = await import("./storage.js");
+    const stale = await storeMediaBuffer(Buffer.from("stale media"));
+    const fresh = await storeMediaBuffer(Buffer.from("fresh media"));
+    const now = Date.now();
+    await utimes(stale.absolutePath, new Date(now - 120_000), new Date(now - 120_000));
+
+    const candidates = await listStaleManagedMediaKeys(60_000, now);
+
+    expect(candidates).toEqual([stale.storageKey]);
+    expect(candidates).not.toContain(fresh.storageKey);
+  });
+
   it("rejects traversal and malformed storage keys", async () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
