@@ -91,8 +91,8 @@ async function createSession() {
   if (!cookie || !apiOrigin || !searchOrigin || !searchToken) throw new Error("AnimeOnsen session bootstrap data missing");
   return {
     token: decodeToken(cookie),
-    apiOrigin: new URL(apiOrigin).origin,
-    searchOrigin: new URL(searchOrigin).origin,
+    apiOrigin: validateAnimeOnsenOrigin(apiOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_API_HOSTS")),
+    searchOrigin: validateAnimeOnsenOrigin(searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS")),
     searchToken,
   };
 }
@@ -150,7 +150,8 @@ async function apiJson(path, retry = true) {
 
 async function search(query, retry = true) {
   const current = await getSession();
-  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));\n  const response = await fetch(`${current.searchOrigin}/multi-search`, {
+  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));\n  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));
+  const response = await fetch(`${current.searchOrigin}/multi-search`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${current.searchToken}`,
