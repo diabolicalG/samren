@@ -8,7 +8,11 @@ export function anivexaAllowedHosts(): Set<string> {
   return new Set(env.ANIVEXA_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\.+|\.+$/g, "")).filter(Boolean));
 }
 
-export function anivexaStreamAllowedHosts(): Set<string> {\n  return new Set(env.ANIVEXA_STREAM_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\\.+|\\.+$/g, "")).filter(Boolean));\n}\n\nexport function isAnivexaUrlAllowed(value: string, allowed = anivexaAllowedHosts()): boolean {
+export function anivexaStreamAllowedHosts(): Set<string> {
+  return new Set(env.ANIVEXA_STREAM_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\.+|\.+$/g, "")).filter(Boolean));
+}
+
+export function isAnivexaUrlAllowed(value: string, allowed = anivexaAllowedHosts()): boolean {
   try {
     const url = new URL(value);
     const host = url.hostname.toLowerCase().replace(/\.$/, "");
