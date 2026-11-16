@@ -20,7 +20,7 @@ function configuredHosts(name) {
 export function validateAnimeOnsenOrigin(value, allowedHosts) {
   try {
     const url = new URL(value);
-    const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
     if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")
       || url.pathname !== "/" || url.search || url.hash || !allowedHosts.has(host)) {
       throw new Error("AnimeOnsen supplied an unapproved service origin");
@@ -34,7 +34,7 @@ export function validateAnimeOnsenOrigin(value, allowedHosts) {
 export function isAnimeOnsenMediaUrlAllowed(value, allowedHosts) {
   try {
     const url = new URL(value);
-    const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
     return url.protocol === "https:" && !url.username && !url.password
       && (!url.port || url.port === "443")
       && [...allowedHosts].some((suffix) => host === suffix || host.endsWith("." + suffix));
@@ -133,6 +133,7 @@ async function responseJson(response, label) {
 async function apiJson(path, retry = true) {
   const current = await getSession();
   validateAnimeOnsenOrigin(current.apiOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_API_HOSTS"));
+  const response = await fetch(`${current.apiOrigin}${path}`, {
     headers: {
       Authorization: `Bearer ${current.token}`,
       Accept: "application/json, text/plain, */*",
@@ -394,7 +395,6 @@ export function videoSubtitles(video) {
     default: language === "en-US",
   }));
 }
-}
 
 async function handleWatch(anilistId, audio, epNum, ctx = {}) {
   if (audio !== "sub") throw new Error("AnimeOnsen only provides subtitled streams");
@@ -407,8 +407,8 @@ async function handleWatch(anilistId, audio, epNum, ctx = {}) {
   const video = await apiJson(`/v4/content/${encodeURIComponent(series.contentId)}/video/${encodeURIComponent(episode.sourceNumber)}`);
   const stream = video?.uri?.stream;
   if (!stream) throw new Error(`AnimeOnsen has no stream for episode ${epNum}`);
-  const current = await getSession();
-  const headers = { Authorization: `Bearer ${current.token}` };
+  const allowedHosts = configuredHosts("ANIVEXA_STREAM_ALLOWED_HOSTS");
+  if (!isAnimeOnsenMediaUrlAllowed(stream, allowedHosts)) throw new Error("AnimeOnsen stream URL is not allowlisted");
   const skip = Array.isArray(video?.metadata?.episode)
     ? video.metadata.episode.find((item) => item && typeof item === "object" && ("skipIntro_s" in item || "skipIntro_e" in item))
     : null;
