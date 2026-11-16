@@ -79,7 +79,7 @@ export function parseAniKotoSearchResults(html: string): Candidate[] {
 }
 
 async function search(query: string): Promise<Candidate[]> {
-  const html = await anivexaText(\`\${BASE}/filter?keyword=\${encodeURIComponent(query)}\`, { "User-Agent": UA, Accept: "text/html", Referer: \`\${BASE}/\` });
+  const html = await anivexaText(`${BASE}/filter?keyword=${encodeURIComponent(query)}`, { "User-Agent": UA, Accept: "text/html", Referer: `${BASE}/` });
   return parseAniKotoSearchResults(html);
 }
 function parseEpisodes(html: string): Episode[] {
