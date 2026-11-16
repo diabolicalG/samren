@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
-import { parseAniZoneEpisodes } from "./anizone.js";
+import { parseAniZoneEpisodes, parseAniZonePlayerData } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
 import { createCipheriv } from "node:crypto";
@@ -35,6 +35,30 @@ describe("AniZone episode payload parsing", () => {
       duration: 1425,
       hasSub: true,
     }]);
+  });
+});
+
+
+
+describe("AniZone player payload parsing", () => {
+  it("extracts the static Vidstack HLS source and subtitle metadata", () => {
+    const html = String.raw\`<script>vidstackPlayer(JSON.parse('{"src":"https://cdn.example-stream.net/episode.m3u8","subtitles":[{"file":"https://cdn.example-stream.net/en.vtt","title":"English","language":"en","format":"vtt","default":true}]}'));</script>\`;
+    expect(parseAniZonePlayerData(html)).toEqual({
+      src: "https://cdn.example-stream.net/episode.m3u8",
+      subtitles: [{
+        file: "https://cdn.example-stream.net/en.vtt",
+        title: "English",
+        language: "en",
+        format: "vtt",
+        default: true,
+      }],
+    });
+  });
+
+  it("rejects missing, malformed and non-string player sources", () => {
+    expect(parseAniZonePlayerData("<html>no player</html>")).toBeNull();
+    expect(parseAniZonePlayerData("vidstackPlayer(JSON.parse('not-json'))")).toBeNull();
+    expect(parseAniZonePlayerData(String.raw\`vidstackPlayer(JSON.parse('{"src":42}'))\`)).toBeNull();
   });
 });
 
