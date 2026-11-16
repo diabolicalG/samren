@@ -23,11 +23,11 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   const filename = String(request.get("x-original-filename") ?? "upload").trim();
   const declaredLength = Number(request.get("content-length") ?? 0);
 
-  if (!(kind in allowedMime) || !allowedMime[kind].includes(mime)) {
+  if (!Object.hasOwn(allowedMime, kind) || !allowedMime[kind].includes(mime)) {
     response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The media kind and content type are not supported" } });
     return;
   }
-  if (!filename || filename.length > 255 || basename(filename) !== filename || /[\\\\/\\0]/.test(filename)) {
+  if (!filename || filename.length > 255 || basename(filename) !== filename || filename.includes("/") || filename.includes("\\\\") || filename.split("").some((character) => { const code = character.charCodeAt(0); return code < 32 || code === 127; })) {
     response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
     return;
   }
