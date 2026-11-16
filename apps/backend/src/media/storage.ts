@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants, createWriteStream } from "node:fs";
-import { mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import { Transform } from "node:stream";
@@ -37,6 +37,7 @@ async function canonicalRoot() {
   const canonical = await realpath(root);
   const details = await stat(canonical);
   if (!details.isDirectory()) throw new Error("Media storage root is not a directory");
+  await chmod(canonical, 0o700);
   return canonical;
 }
 
@@ -52,6 +53,7 @@ export async function resolveStoredMediaPath(storageKey: string) {
   if (canonicalParent !== root && !canonicalParent.startsWith(root + path.sep)) {
     throw new Error("Storage path escapes root");
   }
+  await chmod(canonicalParent, 0o700);
   return path.join(canonicalParent, path.basename(candidate));
 }
 
