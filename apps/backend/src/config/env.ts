@@ -10,6 +10,7 @@ const schema = z.object({
   MEDIA_STORAGE_ROOT: z.string().min(1).default(".data/media"),
   ANIVEXA_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   ANIVEXA_ALLOWED_HOSTS: z.string().default(""),
+  ANIVEXA_STREAM_ALLOWED_HOSTS: z.string().default(""),
 });
 
 const parsed = schema.safeParse(process.env);
