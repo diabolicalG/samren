@@ -21,8 +21,8 @@ function configuredRoot() {
   return path.resolve(env.MEDIA_STORAGE_ROOT);
 }
 
-function assertStorageKey(storageKey: string) {
-  if (!STORAGE_KEY_PATTERN.test(storageKey)) {
+export function isManagedStorageKey(storageKey: string) {\n  return STORAGE_KEY_PATTERN.test(storageKey);\n}\n\nfunction assertStorageKey(storageKey: string) {
+  if (!isManagedStorageKey(storageKey)) {
     throw new Error("Invalid storage key");
   }
 }
