@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, createWriteStream } from "node:fs";
 import { mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
+import type { Readable } from "node:stream";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { env } from "../config/env.js";
 
 const STORAGE_KEY_PATTERN = /^[a-f0-9]{2}[/][a-f0-9]{32}$/;
@@ -73,6 +76,58 @@ export async function storeMediaBuffer(input: Buffer): Promise<StoredMedia> {
     return { storageKey, absolutePath: destination, sizeBytes: input.length, checksumSha256 };
   } catch (error) {
     if (handle) await handle.close().catch(() => undefined);
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+
+export async function storeMediaStream(source: Readable, maxBytes: number) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 2 * 1024 * 1024 * 1024) {
+    throw new Error("Invalid media stream size limit");
+  }
+
+  const id = randomUUID().replace(/-/g, "");
+  const storageKey = `${id.slice(0, 2)}/${id}`;
+  const destination = await resolveStoredMediaPath(storageKey);
+  const temporary = `${destination}.${randomUUID()}.tmp`;
+  const hash = createHash("sha256");
+  let sizeBytes = 0;
+  let prefix = Buffer.alloc(0);
+
+  const meter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      sizeBytes += chunk.length;
+      if (sizeBytes > maxBytes) {
+        callback(new Error("Media upload exceeds the configured size limit"));
+        return;
+      }
+      hash.update(chunk);
+      if (prefix.length < 64) {
+        prefix = Buffer.concat([prefix, chunk.subarray(0, 64 - prefix.length)]);
+      }
+      callback(null, chunk);
+    },
+  });
+
+  try {
+    await pipeline(source, meter, createWriteStream(temporary, { flags: "wx", mode: 0o600 }));
+    const handle = await open(temporary, constants.O_RDONLY);
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    if (sizeBytes === 0) throw new Error("Media content must not be empty");
+    await rename(temporary, destination);
+    return {
+      storageKey,
+      absolutePath: destination,
+      sizeBytes,
+      checksumSha256: hash.digest("hex"),
+      signature: prefix,
+    };
+  } catch (error) {
     await rm(temporary, { force: true }).catch(() => undefined);
     throw error;
   }
