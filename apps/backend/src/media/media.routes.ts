@@ -25,7 +25,7 @@ async function deliverMedia(request: import("express").Request, response: import
           { posterFor: { some: { publicationStatus: "PUBLISHED" } } },
           { bannerFor: { some: { publicationStatus: "PUBLISHED" } } },
           { episodeMedia: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
-          { subtitleTracks: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } },
+          { subtitleTracks: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
         ],
       },
       select: { storageKey: true, mimeType: true, checksumSha256: true },
