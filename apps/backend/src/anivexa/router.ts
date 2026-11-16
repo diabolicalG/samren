@@ -6,19 +6,19 @@ import { getAniZoneEpisodes, getAniZoneStreams } from "./anizone.js";
 import { getAniKotoEpisodes, getAniKotoStreams } from "./anikoto.js";
 import { getKaaEpisodes, getKaaStreams } from "./kaa.js";
 import { providerAggregator } from "./aggregator.js";
-import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnimeNoSubEpisodes, getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams } from "./legacy-adapters.js";
+import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnimeNoSubEpisodes, getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams, getAniPmEpisodes, getSenshiEpisodes, getAniPmStreams, getSenshiStreams } from "./legacy-adapters.js";
 
 export const anivexaRouter = Router();
 
 const paramsSchema = z.object({ anilistId: z.coerce.number().int().positive().max(2_147_483_647) });
-const providerSchema = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub"]);
+const providerSchema = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi"]);
 
 anivexaRouter.get("/providers", (_request, response) => {
   if (!env.ANIVEXA_ENABLED) {
     response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
     return;
   }
-  response.status(200).json({ data: { providers: ["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub"], status: "enabled" }, error: null });
+  response.status(200).json({ data: { providers: ["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi"], status: "enabled" }, error: null });
 });
 
 anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
@@ -51,7 +51,11 @@ anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
                 ? await getReAnimeEpisodes(params.data.anilistId)
                 : provider.data === "animeonsen"
                   ? await getAnimeOnsenEpisodes(params.data.anilistId)
-                  : await getAnimeNoSubEpisodes(params.data.anilistId);
+                  : provider.data === "animenosub"
+                  ? await getAnimeNoSubEpisodes(params.data.anilistId)
+                  : provider.data === "anipm"
+                    ? await getAniPmEpisodes(params.data.anilistId)
+                    : await getSenshiEpisodes(params.data.anilistId);
     response.setHeader("Cache-Control", "public, max-age=300");
     response.status(200).json({ data: { anilistId: params.data.anilistId, provider: provider.data, ...result }, error: null });
   } catch {
@@ -72,7 +76,7 @@ anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
   }
   const params = extractParamsSchema.safeParse(request.params);
   const audio = audioSchema.safeParse(request.query.audio ?? "sub");
-  const extractor = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub"]).safeParse(request.query.provider ?? "animegg");
+  const extractor = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi"]).safeParse(request.query.provider ?? "animegg");
   if (!params.success || !audio.success || !extractor.success) {
     response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number, provider and audio type are required" } });
     return;
@@ -96,7 +100,11 @@ anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
                 ? await getReAnimeStreams(params.data.anilistId, params.data.episode, audio.data)
                 : extractor.data === "animeonsen"
                   ? await getAnimeOnsenStreams(params.data.anilistId, params.data.episode, audio.data)
-                  : await getAnimeNoSubStreams(params.data.anilistId, params.data.episode, audio.data);
+                  : extractor.data === "animenosub"
+                  ? await getAnimeNoSubStreams(params.data.anilistId, params.data.episode, audio.data)
+                  : extractor.data === "anipm"
+                    ? await getAniPmStreams(params.data.anilistId, params.data.episode, audio.data)
+                    : await getSenshiStreams(params.data.anilistId, params.data.episode, audio.data);
     response.setHeader("Cache-Control", "private, no-store");
     response.status(200).json({ data: result, error: null });
   } catch {
