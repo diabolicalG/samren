@@ -1,4 +1,4 @@
-import httpx
+from src.providers import _safe_http as httpx
 from fastapi import HTTPException
 from src.config import ANILIST_URL, iter_miruro_pipe_targets
 from src.parser import encode_pipe_request, decode_pipe_response, deep_translate
