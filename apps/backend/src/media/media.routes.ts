@@ -7,7 +7,7 @@ import { readStoredMediaStat } from "./storage.js";
 export const mediaRouter = Router();
 
 const idSchema = z.string().min(1).max(64);
-const rangeSchema = /^bytes=(\\d*)-(\\d*)$/;
+const rangeSchema = /^bytes=([0-9]*)-([0-9]*)$/;
 
 async function deliverMedia(request: import("express").Request, response: import("express").Response) {
   const parsedId = idSchema.safeParse(request.params.id);
