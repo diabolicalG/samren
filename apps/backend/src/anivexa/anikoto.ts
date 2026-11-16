@@ -1,4 +1,5 @@
 import { anivexaJson, anivexaText, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
+import { extractAniKotoEmbed, parseAniKotoDirectSource } from "./anikoto-embed.js";
 
 type Media = {
   id: number;
@@ -167,28 +168,6 @@ export function parseAniKotoServerItems(html: string, audio: "sub" | "dub"): Ser
   return [...found.values()].slice(0, 12);
 }
 
-function directMediaType(value: string): "hls" | "mp4" | null {
-  try {
-    const url = new URL(value);
-    if (/\.m3u8$/i.test(url.pathname)) return "hls";
-    if (/\.(mp4|m4v|webm)$/i.test(url.pathname)) return "mp4";
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function decodeDirectFragment(value: string): string | null {
-  const fragment = value.split("#")[1] ?? "";
-  if (!/^aHR0c/i.test(fragment)) return null;
-  try {
-    const decoded = Buffer.from(fragment, "base64").toString("utf8");
-    return /^https:\/\//i.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function getAniKotoStreams(anilistId: number, episodeNumber: number, audio: "sub" | "dub") {
   const catalogue = await getAniKotoEpisodes(anilistId);
   const candidate: Candidate = { slug: catalogue.meta.id, name: catalogue.meta.title, japanese: "" };
@@ -209,23 +188,25 @@ export async function getAniKotoStreams(anilistId: number, episodeNumber: number
   const streams: Array<{ url: string; type: "hls" | "mp4"; quality: string; server: string; audio: "sub" | "dub" }> = [];
   const seen = new Set<string>();
   for (const server of servers) {
-    let resolvedUrl = "";
+    let embedUrl = "";
     if (/^https:\/\//i.test(server.linkId)) {
-      resolvedUrl = server.linkId;
+      embedUrl = server.linkId;
     } else {
-      const resolved = await anivexaJson<{ result?: { url?: string } }>(
+      const resolved = await anivexaJson<{ result?: string | { url?: string } }>(
         BASE + "/ajax/server?get=" + encodeURIComponent(server.linkId),
         { headers: { "User-Agent": UA, Accept: "application/json", "X-Requested-With": "XMLHttpRequest", Referer: BASE + "/" } },
       ).catch(() => null);
-      resolvedUrl = resolved?.result?.url ?? "";
+      const result = resolved?.result;
+      embedUrl = typeof result === "string" ? result : result?.url ?? "";
     }
+    if (!embedUrl || !/^https:\/\//i.test(embedUrl)) continue;
 
-    const candidates = [resolvedUrl, decodeDirectFragment(resolvedUrl)].filter((value): value is string => Boolean(value));
-    for (const value of candidates) {
-      const type = directMediaType(value);
-      if (!type || !isAnivexaUrlAllowed(value, allowedStreams) || seen.has(value)) continue;
-      seen.add(value);
-      streams.push({ url: value, type, quality: "auto", server: server.name, audio });
+    const direct = parseAniKotoDirectSource(embedUrl);
+    const extracted = direct ? [direct] : await extractAniKotoEmbed(embedUrl, allowedStreams).catch(() => []);
+    for (const source of extracted) {
+      if (!isAnivexaUrlAllowed(source.url, allowedStreams) || seen.has(source.url)) continue;
+      seen.add(source.url);
+      streams.push({ url: source.url, type: source.type, quality: "auto", server: server.name, audio });
     }
   }
   if (!streams.length) {
