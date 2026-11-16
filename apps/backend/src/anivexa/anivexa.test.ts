@@ -42,7 +42,8 @@ describe("AniZone episode payload parsing", () => {
 
 describe("AniZone player payload parsing", () => {
   it("extracts the static Vidstack HLS source and subtitle metadata", () => {
-    const html = String.raw`<script>vidstackPlayer(JSON.parse('{"src":"https://cdn.example-stream.net/episode.m3u8","subtitles":[{"file":"https://cdn.example-stream.net/en.vtt","title":"English","language":"en","format":"vtt","default":true}]}'));</script>`;
+    const payload = { src: "https://cdn.example-stream.net/episode.m3u8", subtitles: [{ file: "https://cdn.example-stream.net/en.vtt", title: "English", language: "en", format: "vtt", default: true }] };
+    const html = "<script>vidstackPlayer(JSON.parse('" + JSON.stringify(payload) + "'));</script>";
     expect(parseAniZonePlayerData(html)).toEqual({
       src: "https://cdn.example-stream.net/episode.m3u8",
       subtitles: [{
