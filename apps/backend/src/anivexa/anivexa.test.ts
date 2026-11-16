@@ -4,6 +4,7 @@ import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
 import { parseAniZoneEpisodes } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
+import { parseAniKotoDirectSource, extractAniKotoEmbed } from "./anikoto-embed.js";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -74,6 +75,27 @@ describe("AniKoto server-list parsing", () => {
     expect(parseAniKotoServerItems(html, "dub")).toEqual([
       { linkId: "dub-1", name: "Dub Server", serverType: "dub" },
     ]);
+  });
+});
+
+
+
+describe("AniKoto direct and embed source policy", () => {
+  it("accepts HTTPS direct media and safely decodes base64 URL fragments", () => {
+    const direct = "https://cdn.example-stream.net/video.m3u8";
+    expect(parseAniKotoDirectSource(direct)).toEqual({ url: direct, type: "hls" });
+    const encoded = Buffer.from(direct).toString("base64url");
+    expect(parseAniKotoDirectSource("https://player.invalid/embed#"+encoded)).toEqual({ url: direct, type: "hls" });
+  });
+
+  it("rejects insecure, unsupported and non-media direct sources", () => {
+    expect(parseAniKotoDirectSource("http://cdn.example-stream.net/video.m3u8")).toBeNull();
+    expect(parseAniKotoDirectSource("https://cdn.example-stream.net/watch/123")).toBeNull();
+    expect(parseAniKotoDirectSource("https://user:pass@cdn.example-stream.net/video.mp4")).toBeNull();
+  });
+
+  it("does not fetch embed pages outside the upstream host allowlist", async () => {
+    await expect(extractAniKotoEmbed("https://player.attacker.invalid/embed-1/abc", new Set(["example-stream.net"]))).resolves.toEqual([]);
   });
 });
 
