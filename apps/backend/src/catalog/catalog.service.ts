@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import type { CatalogListQuery } from "./catalog.schemas.js";
 
+function withMediaUrl<T extends { id: string }>(asset: T | null) {
+  return asset ? { ...asset, url: `/api/v1/media/${asset.id}` } : null;
+}
+
 const animeCardInclude = {
   posterAsset: { select: { id: true, mimeType: true, width: true, height: true } },
   genres: { include: { genre: { select: { id: true, slug: true, name: true } } } },
@@ -46,7 +50,7 @@ export async function listPublishedAnime(query: CatalogListQuery) {
   ]);
 
   return {
-    items,
+    items: items.map((item) => ({ ...item, posterAsset: withMediaUrl(item.posterAsset) })),
     pagination: {
       page: query.page,
       pageSize: query.pageSize,
@@ -57,7 +61,7 @@ export async function listPublishedAnime(query: CatalogListQuery) {
 }
 
 export async function findPublishedAnimeBySlug(slug: string) {
-  return prisma.anime.findFirst({
+  const anime = await prisma.anime.findFirst({
     where: { slug, publicationStatus: "PUBLISHED" },
     include: {
       ...animeCardInclude,
@@ -81,6 +85,12 @@ export async function findPublishedAnimeBySlug(slug: string) {
       },
     },
   });
+  if (!anime) return null;
+  return {
+    ...anime,
+    posterAsset: withMediaUrl(anime.posterAsset),
+    bannerAsset: withMediaUrl(anime.bannerAsset),
+  };
 }
 
 export async function listPublishedEpisodes(slug: string) {
