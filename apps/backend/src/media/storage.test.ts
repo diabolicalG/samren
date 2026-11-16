@@ -34,7 +34,9 @@ afterEach(async () => {
     const { storeMediaStream } = await import("./storage.js");
     await expect(storeMediaStream(Readable.from([Buffer.from("too large")]), 3)).rejects.toThrow("size limit");
     const { readdir } = await import("node:fs/promises");
-    const files = await readdir(path.join(temporaryRoot, "??")).catch(() => []);
+    const directories = await readdir(temporaryRoot);
+    expect(directories).toHaveLength(1);
+    const files = await readdir(path.join(temporaryRoot, directories[0]));
     expect(files).toHaveLength(0);
   });
 
