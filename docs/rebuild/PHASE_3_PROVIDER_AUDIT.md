@@ -49,7 +49,7 @@ The native Anivexa aggregator registers the 11 integrated providers above (exclu
 
 ### Worker configuration
 
-- `ANIVEXA_WORKER_CONCURRENCY`: concurrent extraction tasks (default 4, max 16).
+- `ANIVEXA_WORKER_CONCURRENCY`: concurrent extraction tasks (default 11, one per integrated provider; max 16).
 - `ANIVEXA_WORKER_QUEUE_MAX`: waiting queue capacity (default 64, max 512).
 - `ANIVEXA_PROVIDER_FAILURE_THRESHOLD`: failures before circuit-open (default 3).
 - `ANIVEXA_PROVIDER_COOLDOWN_MS`: circuit cooldown (default 30000 ms).
