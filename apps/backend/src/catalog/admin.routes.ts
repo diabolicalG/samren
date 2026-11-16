@@ -271,67 +271,6 @@ adminCatalogRouter.get("/assets", async (_request, response, next) => {
   }
 });
 
-adminCatalogRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
-  const kind = request.get("x-media-kind");
-  if (kind !== "POSTER" && kind !== "BANNER" && kind !== "VIDEO" && kind !== "SUBTITLE") {
-    response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_KIND", message: "A supported media kind is required" } });
-    return;
-  }
-
-  const filenameHeader = request.get("x-original-filename") ?? "upload";
-  const normalizedFilename = filenameHeader.replace(/\\/g, "/").split("/").pop()?.split("").filter((character) => { const code = character.charCodeAt(0); return code >= 32 && code !== 127; }).join("").trim().slice(0, 255);
-  if (!normalizedFilename) {
-    response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "A valid original filename is required" } });
-    return;
-  }
-
-  const maxBytes = kind === "VIDEO" ? 2 * 1024 * 1024 * 1024 : kind === "SUBTITLE" ? 2 * 1024 * 1024 : 15 * 1024 * 1024;
-  const declaredLength = Number(request.get("content-length") ?? 0);
-  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-    response.status(413).json({ data: null, error: { code: "UPLOAD_TOO_LARGE", message: "The upload exceeds the permitted size" } });
-    return;
-  }
-
-  const { storeMediaStream, deleteStoredMedia } = await import("../media/storage.js");
-  const { detectMediaSignature } = await import("../media/signature.js");
-  let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
-  try {
-    stored = await storeMediaStream(request, maxBytes);
-    const detected = detectMediaSignature(kind, stored.signature);
-    if (!detected) {
-      await deleteStoredMedia(stored.storageKey);
-      response.status(415).json({ data: null, error: { code: "INVALID_MEDIA_SIGNATURE", message: "The uploaded content does not match a supported media format" } });
-      return;
-    }
-
-    const asset = await prisma.mediaAsset.create({
-      data: {
-        storageKey: stored.storageKey,
-        originalFilename: normalizedFilename,
-        mediaKind: kind,
-        mimeType: detected.mimeType,
-        sizeBytes: BigInt(stored.sizeBytes),
-        checksumSha256: stored.checksumSha256,
-        processingState: "READY",
-      },
-      select: adminAssetSelect,
-    });
-    response.status(201).json({ data: serializeAdminAsset(asset), error: null });
-  } catch (error) {
-    if (stored) await deleteStoredMedia(stored.storageKey).catch(() => undefined);
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("size limit")) {
-      response.status(413).json({ data: null, error: { code: "UPLOAD_TOO_LARGE", message: "The upload exceeds the permitted size" } });
-      return;
-    }
-    if (message.includes("empty")) {
-      response.status(400).json({ data: null, error: { code: "EMPTY_UPLOAD", message: "The uploaded file is empty" } });
-      return;
-    }
-    response.status(400).json({ data: null, error: { code: "UPLOAD_FAILED", message: "The media upload could not be completed" } });
-  }
-});
-
 adminCatalogRouter.post("/assets", requireTrustedOrigin, async (request, response) => {
   const parsed = adminAssetCreateSchema.safeParse(request.body);
   if (!parsed.success) {
