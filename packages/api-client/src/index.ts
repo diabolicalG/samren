@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogPlayback, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -82,6 +82,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
     catalogAnime: (params: CatalogListParams = {}) => request<CatalogPage<CatalogAnimeCard>>(`/catalog/anime${queryString(params)}`),
     catalogAnimeBySlug: (slug: string) => request<CatalogAnimeDetail>(`/catalog/anime/${encodeURIComponent(slug)}`),
     catalogEpisodes: (slug: string) => request<CatalogEpisode[]>(`/catalog/anime/${encodeURIComponent(slug)}/episodes`),
+    catalogPlayback: (slug: string, episodeNumber: number) => request<CatalogPlayback>(`/catalog/anime/${encodeURIComponent(slug)}/episodes/${episodeNumber}/playback`),
     catalogGenres: () => request<CatalogTaxonomyItem[]>("/catalog/genres"),
     catalogStudios: () => request<CatalogTaxonomyItem[]>("/catalog/studios"),
     catalogSeasons: () => request<CatalogSeason[]>("/catalog/seasons"),
