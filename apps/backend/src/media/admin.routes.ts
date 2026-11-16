@@ -92,7 +92,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
 
   try {
-    let source: NodeJS.ReadableStream = request;
+    let source: import("node:stream").Readable = request;
     if (isMultipart) {
       const parsedMultipart = await parseMultipartUpload(request, maxBytes);
       multipartFile = parsedMultipart.file;
@@ -126,7 +126,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
     });
     pendingAssetId = pendingAsset.id;
 
-    stored = await storeMediaStream(source as import("node:stream").Readable, maxBytes, storageKey);
+    stored = await storeMediaStream(source, maxBytes, storageKey);
     const detected = detectMediaSignature(kind, stored.signature);
     if (!detected || detected.mimeType !== mime) {
       await deleteStoredMedia(storageKey);
