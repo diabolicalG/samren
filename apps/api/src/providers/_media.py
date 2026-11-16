@@ -1,4 +1,4 @@
-import httpx
+from src.providers import _safe_http as httpx
 
 from src.extractor import anilist_query
 from src.providers import _cache
