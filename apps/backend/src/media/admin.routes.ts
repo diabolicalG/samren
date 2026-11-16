@@ -8,7 +8,7 @@ import { deleteStoredMedia, storeMediaStream } from "./storage.js";
 export const adminMediaRouter = Router();
 adminMediaRouter.use(requireRole("ADMIN"));
 
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+const MAX_UPLOAD_BYTES: Record<string, number> = { POSTER: 15 * 1024 * 1024, BANNER: 15 * 1024 * 1024, VIDEO: 2 * 1024 * 1024 * 1024, SUBTITLE: 2 * 1024 * 1024 };
 const allowedMime: Record<string, string[]> = {
   POSTER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
   BANNER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
@@ -28,18 +28,18 @@ function signatureMatches(kind: string, mime: string, bytes: Buffer) {
     if (mime === "video/webm") return bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3]));
   }
   if (kind === "SUBTITLE") {
-    const text = bytes.toString("utf8").replace(/^\\uFEFF/, "").trimStart();
+    const text = bytes.toString("utf8").replace(/^\uFEFF/, "").trimStart();
     if (mime === "text/vtt") return text.startsWith("WEBVTT");
-    if (mime === "application/x-subrip") return /^\\d+\\s*\\r?\\n\\d{2}:\\d{2}:\\d{2},\\d{3}/.test(text);
+    if (mime === "application/x-subrip") return /^\d+\s*\r?\n\d{2}:\d{2}:\d{2},\d{3}/.test(text);
     if (mime === "application/x-ass") return text.startsWith("[Script Info]");
   }
   return false;
 }
 
 adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
-  const kind = String(request.query.kind ?? "");
+  const kind = String(request.get("x-media-kind") ?? "").toUpperCase();
   const mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  const filename = String(request.get("x-file-name") ?? "upload").trim();
+  const filename = String(request.get("x-original-filename") ?? "upload").trim();
   const declaredLength = Number(request.get("content-length") ?? 0);
 
   if (!(kind in allowedMime) || !allowedMime[kind].includes(mime)) {
@@ -50,14 +50,14 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
     response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
     return;
   }
-  if (request.get("transfer-encoding") === undefined && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > MAX_UPLOAD_BYTES)) {
+  const maxBytes = MAX_UPLOAD_BYTES[kind];\n  if (request.get("transfer-encoding") === undefined && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
     response.status(413).json({ data: null, error: { code: "UPLOAD_SIZE_INVALID", message: "The upload size is missing or exceeds the limit" } });
     return;
   }
 
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
   try {
-    stored = await storeMediaStream(request, MAX_UPLOAD_BYTES);
+    stored = await storeMediaStream(request, maxBytes);
     if (!signatureMatches(kind, mime, stored.signature)) {
       await deleteStoredMedia(stored.storageKey);
       response.status(415).json({ data: null, error: { code: "FILE_SIGNATURE_MISMATCH", message: "The uploaded file content does not match its declared media type" } });
