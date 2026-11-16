@@ -82,7 +82,7 @@ describe("admin catalogue management", () => {
     const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
     const uploaded = await agent
-      .post("/api/v1/admin/media/assets/upload")
+      .post("/api/v1/admin/catalog/assets/upload")
       .set("Origin", origin)
       .set("x-media-kind", "POSTER")
       .set("x-original-filename", "phase3-upload.png")
@@ -100,7 +100,7 @@ describe("admin catalogue management", () => {
     assetId = uploaded.body.data.id as string;
 
     const mismatch = await agent
-      .post("/api/v1/admin/media/assets/upload")
+      .post("/api/v1/admin/catalog/assets/upload")
       .set("Origin", origin)
       .set("x-media-kind", "POSTER")
       .set("x-original-filename", "not-a-png.png")
