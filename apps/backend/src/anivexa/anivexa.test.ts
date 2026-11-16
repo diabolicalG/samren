@@ -63,7 +63,7 @@ describe("AniKoto episode parsing", () => {
 
 
 describe("AniKoto server-list parsing", () => {
-  const html = String.raw\`<div class="type" data-type="sub"><ul><li data-link-id="sub-1"><a>Sub Server</a></li><li data-link-id="sub-2">Backup</li></ul></div><div class="type" data-type="dub"><ul><li data-link-id="dub-1">Dub Server</li></ul></div><div class="type" data-type="dl"><ul><li data-link-id="download-1">Download</li></ul></div>\`;
+  const html = String.raw`<div class="type" data-type="sub"><ul><li data-link-id="sub-1"><a>Sub Server</a></li><li data-link-id="sub-2">Backup</li></ul></div><div class="type" data-type="dub"><ul><li data-link-id="dub-1">Dub Server</li></ul></div><div class="type" data-type="dl"><ul><li data-link-id="download-1">Download</li></ul></div>`;
 
   it("selects only the requested audio servers and supports hardsub for sub", () => {
     expect(parseAniKotoServerItems(html, "sub")).toEqual([
