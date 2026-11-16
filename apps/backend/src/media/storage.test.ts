@@ -58,9 +58,11 @@ describe("local media storage", () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
     vi.resetModules();
-    const { storeMediaStream } = await import("./storage.js");
+    const { createMediaStorageKey, storeMediaStream } = await import("./storage.js");
     const bytes = Buffer.from("streamed-media-content");
-    const stored = await storeMediaStream(Readable.from([bytes.subarray(0, 5), bytes.subarray(5)]), 1024);
+    const reservedKey = createMediaStorageKey();
+    const stored = await storeMediaStream(Readable.from([bytes.subarray(0, 5), bytes.subarray(5)]), 1024, reservedKey);
+    expect(stored.storageKey).toBe(reservedKey);
     expect(await readFile(stored.absolutePath)).toEqual(bytes);
     expect(stored.sizeBytes).toBe(bytes.length);
     expect(stored.signature).toEqual(bytes.subarray(0, 64));
