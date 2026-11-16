@@ -286,7 +286,7 @@ function MediaUploadForm() {
       return apiClient.adminUploadAsset(file, kind);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "catalog", "assets"] });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
       setFile(null);
     },
   });
