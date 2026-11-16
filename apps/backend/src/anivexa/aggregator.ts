@@ -4,12 +4,12 @@ import { getAnimeGGStreams } from "./animegg.js";
 import { getAniZoneStreams } from "./anizone.js";
 import { getAniKotoStreams } from "./anikoto.js";
 import { getKaaStreams } from "./kaa.js";
-import { getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams } from "./legacy-adapters.js";
+import { getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams, getAniPmStreams, getSenshiStreams } from "./legacy-adapters.js";
 import { anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 import { BoundedWorkerPool, ProviderCircuitBreaker } from "./worker-pool.js";
 
 export type AudioType = "sub" | "dub";
-export type ProviderId = "animegg" | "anizone" | "anikoto" | "kaa" | "aniwaves" | "reanime" | "animeonsen" | "animenosub";
+export type ProviderId = "animegg" | "anizone" | "anikoto" | "kaa" | "aniwaves" | "reanime" | "animeonsen" | "animenosub" | "anipm" | "senshi";
 export type AggregatedStream = {
   provider: ProviderId;
   url: string;
@@ -53,6 +53,8 @@ const adapters: ProviderAdapter[] = [
   { id: "reanime", label: "ReAnime", extract: async (id, episode, audio) => getReAnimeStreams(id, episode, audio) },
   { id: "animeonsen", label: "AnimeOnsen", extract: async (id, episode, audio) => getAnimeOnsenStreams(id, episode, audio) },
   { id: "animenosub", label: "AnimeNoSub", extract: async (id, episode, audio) => getAnimeNoSubStreams(id, episode, audio) },
+  { id: "anipm", label: "Ani.pm", extract: async (id, episode, audio) => getAniPmStreams(id, episode, audio) },
+  { id: "senshi", label: "Senshi", extract: async (id, episode, audio) => getSenshiStreams(id, episode, audio) },
 ];
 
 function safeText(value: unknown, fallback: string, max = 100): string {
