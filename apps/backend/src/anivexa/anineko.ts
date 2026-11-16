@@ -15,7 +15,8 @@ function decode(value: string): string {
 }
 function text(value: string): string { return decode(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()); }
 function attr(tag: string, name: string): string {
-  return decode(tag.match(new RegExp("\\b" + name + "\\s*=\\s*[\\"']([^\\"']*)[\\"']", "i"))?.[1] ?? "");
+  const pattern = new RegExp("\\b" + name + "\\s*=\\s*[\\x22']([^\\x22']*)[\\x22']", "i");
+  return decode(tag.match(pattern)?.[1] ?? "");
 }
 function norm(value: string): string { return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, ""); }
 function score(a0: string, b0: string): number {
