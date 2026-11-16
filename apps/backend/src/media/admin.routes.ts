@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { createReadStream } from "node:fs";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
-import { unlink } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import formidable, { type File as FormidableFile } from "formidable";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../auth/authorization.js";
@@ -30,12 +30,12 @@ function isSafeFilename(filename: string) {
     });
 }
 
-async function parseMultipartUpload(request: import("express").Request, maxBytes: number): Promise<FormidableFile> {
-  const temporaryPaths = new Set<string>();
+async function parseMultipartUpload(request: import("express").Request, maxBytes: number): Promise<{ file: FormidableFile; directory: string }> {
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "samren-upload-"));
   const form = formidable({
-    uploadDir: tmpdir(),
-    maxFiles: 1,
-    maxFields: 0,
+    uploadDir: temporaryDirectory,
+    maxFiles: 2,
+    maxFields: 1,
     maxFieldsSize: 1024,
     maxFileSize: maxBytes,
     maxTotalFileSize: maxBytes,
@@ -44,16 +44,14 @@ async function parseMultipartUpload(request: import("express").Request, maxBytes
     multiples: false,
     keepExtensions: false,
   });
-  form.on("fileBegin", (_fieldName, file) => temporaryPaths.add(file.filepath));
-
   try {
     const [fields, files] = await form.parse(request);
     if (Object.keys(fields).length !== 0 || Object.keys(files).length !== 1 || !files.file || files.file.length !== 1) {
       throw new Error("Multipart upload must contain exactly one file field named file");
     }
-    return files.file[0];
+    return { file: files.file[0], directory: temporaryDirectory };
   } catch (error) {
-    await Promise.all([...temporaryPaths].map((filepath) => unlink(filepath).catch(() => undefined)));
+    await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined);
     throw error;
   }
 }
@@ -88,11 +86,14 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let filename = String(request.get("x-original-filename") ?? "upload").trim();
   let mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   let multipartFile: FormidableFile | undefined;
+  let multipartTempDirectory: string | undefined;
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
 
   try {
     if (isMultipart) {
-      multipartFile = await parseMultipartUpload(request, maxBytes);
+      const parsedMultipart = await parseMultipartUpload(request, maxBytes);
+      multipartFile = parsedMultipart.file;
+      multipartTempDirectory = parsedMultipart.directory;
       filename = String(multipartFile.originalFilename ?? "").trim();
       mime = String(multipartFile.mimetype ?? "").split(";")[0].trim().toLowerCase();
       if (!isSafeFilename(filename)) {
@@ -153,6 +154,6 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
       });
     }
   } finally {
-    if (multipartFile) await unlink(multipartFile.filepath).catch(() => undefined);
+    if (multipartTempDirectory) await rm(multipartTempDirectory, { recursive: true, force: true }).catch(() => undefined);
   }
 });
