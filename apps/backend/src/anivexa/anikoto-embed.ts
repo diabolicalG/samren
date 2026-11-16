@@ -64,7 +64,7 @@ function scriptStrings(script: string): string[] {
       }
       continue;
     }
-    if (char === "\'" || char === '"\') {
+    if (char === "'" || char === '\"') {
       const quote = char;
       let value = "";
       index += 1;
