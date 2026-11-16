@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `39ff0da4d5e4c35c08b43a131b0410c75e8bbad3`  
+**Latest code checkpoint:** `ec81860fca48535ca8062d7d79cd8efe969a4da7`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -49,7 +49,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - The aggregator uses wildcard CORS.
 - No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
 - The product owner explicitly approved adapting/copying Anivexa into Samren, with the hard boundary that `Anime-streaming` remains read-only. The integration is being ported natively into Samren rather than running the standalone Anivexa service.
-- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery and watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery with AniList title matching and sub/dub classification. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
+- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery and watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery with AniList title matching and sub/dub classification. AniKoto now also has a fail-closed direct-stream extraction path: it resolves the selected sub/dub server and returns only allowlisted direct HLS/MP4 URLs. Embed-only sources requiring dynamic JavaScript decryption/signing are deliberately unsupported until a safe static/cryptographic implementation is available; no VM or eval-based execution is used. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
 - The upstream source contains unsafe or unsuitable patterns that remain excluded: shell-command execution, embedded bearer credentials, unsafe dynamic-code evaluation, raw upstream diagnostics/cookies, and wildcard CORS. Any additional provider/extractor must use Samren's HTTPS allowlist, redirect revalidation, response limits and stream-host policy. Do not copy secrets or execute provider-supplied code.
 
 ## 4. Implemented first-party media work
@@ -126,7 +126,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery with AniList title matching and sub/dub classification are ported; remaining provider watch extraction, mapping/cache parity and live playback tests remain |
+| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery plus allowlisted direct HLS/MP4 extraction are ported; AniKoto embed-only MegaPlay extraction, AniZone watch extraction, remaining providers, mapping/cache parity and live playback tests remain |
 | Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist and disabled-route tests pass; add AniKoto live fixture tests, DNS pinning review and broader provider tests |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
@@ -142,7 +142,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Continue the user-authorized Anivexa copy/port into Samren only. Add the remaining approved providers and extractors in controlled increments; do not modify Anime-streaming. Do not carry embedded credentials, shell-command execution, or unsafe dynamic-code evaluation into Samren.
+1. Continue the user-authorized Anivexa copy/port into Samren only. Add AniZone watch extraction, safe AniKoto embed extraction (without executing provider JavaScript), and remaining approved providers in controlled increments; do not modify Anime-streaming. Do not carry embedded credentials, shell-command execution, or unsafe dynamic-code evaluation into Samren.
 2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
