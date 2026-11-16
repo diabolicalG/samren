@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `18138781cb77303c87cab9c1c022ebdf7be34549`  
+**Latest code checkpoint:** `62c325db78fc8fe16c42402a66a07f5b15a9205a`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -80,7 +80,14 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added published episode playback metadata at `/api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`.
 - Added a first-party watch page at `/watch/:slug/:episodeNumber` with native video controls and WebVTT subtitle tracks.
 
-**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`; its CI run is pending at the time of this update. An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
+**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`; its CI run passed (`43888383356`). An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
+
+### Latest hardening and test checkpoint
+
+- Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
+- Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
+- Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
+- These changes are committed through `62c325db78fc8fe16c42402a66a07f5b15a9205a`. CI for the new storage/delivery test commits is still running; do not treat these latest tests as green until the latest branch-head run completes.
 
 ## 5. Verification
 
