@@ -14,25 +14,34 @@ export async function reconcileStalePendingMediaAssets(olderThanMs = DEFAULT_PEN
   }
 
   const cutoff = new Date(now - olderThanMs);
-  const pending = await prisma.mediaAsset.findMany({
-    where: { processingState: "PENDING", createdAt: { lt: cutoff } },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: RECONCILIATION_BATCH_SIZE,
-    select: { id: true, storageKey: true },
-  });
-
+  let cursorId: string | undefined;
   let failed = 0;
-  for (const asset of pending) {
-    if (!isManagedStorageKey(asset.storageKey)) continue;
 
-    const changed = await prisma.mediaAsset.updateMany({
-      where: { id: asset.id, processingState: "PENDING" },
-      data: { processingState: "FAILED" },
+  while (true) {
+    const pending = await prisma.mediaAsset.findMany({
+      where: { processingState: "PENDING", createdAt: { lt: cutoff } },
+      orderBy: { id: "asc" },
+      take: RECONCILIATION_BATCH_SIZE,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      select: { id: true, storageKey: true },
     });
-    if (changed.count !== 1) continue;
+    if (pending.length === 0) break;
 
-    await deleteStoredMedia(asset.storageKey).catch(() => undefined);
-    failed += 1;
+    for (const asset of pending) {
+      if (!isManagedStorageKey(asset.storageKey)) continue;
+
+      const changed = await prisma.mediaAsset.updateMany({
+        where: { id: asset.id, processingState: "PENDING" },
+        data: { processingState: "FAILED" },
+      });
+      if (changed.count !== 1) continue;
+
+      await deleteStoredMedia(asset.storageKey).catch(() => undefined);
+      failed += 1;
+    }
+
+    cursorId = pending[pending.length - 1].id;
+    if (pending.length < RECONCILIATION_BATCH_SIZE) break;
   }
 
   return failed;
