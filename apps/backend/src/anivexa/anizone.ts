@@ -1,4 +1,4 @@
-import { anivexaFetch, anivexaJson, anivexaReadText } from "./http.js";
+import { anivexaFetch, anivexaJson, anivexaReadText, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 
 type Media = {
   id: number;
@@ -246,6 +246,30 @@ export function parseAniZoneEpisodes(html: string): Episode[] {
   return Array.isArray(items) ? parseEpisodeItems(items) : [];
 }
 
+
+export function parseAniZonePlayerData(html: string): { src: string; subtitles: Array<{ file: string; title: string; language: string; format: string; default: boolean }> } | null {
+  const match = String(html).match(/vidstackPlayer\s*\(\s*JSON\.parse\('((?:[^'\\]|\\.)*)'\)\s*\)/i);
+  const value = match?.[1];
+  if (!value) return null;
+  const parsed = decodeJsonArgument(value);
+  if (!parsed || typeof parsed !== "object") return null;
+  const player = parsed as Record<string, unknown>;
+  if (typeof player.src !== "string" || !player.src) return null;
+  const subtitles = Array.isArray(player.subtitles) ? player.subtitles.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const subtitle = item as Record<string, unknown>;
+    if (typeof subtitle.file !== "string" || !subtitle.file) return [];
+    return [{
+      file: subtitle.file,
+      title: String(subtitle.title ?? "").slice(0, 80),
+      language: String(subtitle.language ?? "").slice(0, 16),
+      format: String(subtitle.format ?? "vtt").slice(0, 8),
+      default: Boolean(subtitle.default),
+    }];
+  }) : [];
+  return { src: player.src, subtitles };
+}
+
 async function scrapeEpisodes(slug: string, expected: number): Promise<Episode[]> {
   const initial = await requestPage(`/anime/${encodeURIComponent(slug)}`);
   let state = initialPage(initial.raw, initial.cookies);
@@ -293,5 +317,48 @@ export async function getAniZoneEpisodes(anilistId: number) {
       sub: episodes.filter((episode) => episode.hasSub).map((episode) => ({ id: `watch/anizone/${anilistId}/sub/anizone-${episode.number}`, number: episode.number, title: episode.title, duration: episode.duration, sourceNumber: episode.sourceNumber, audio: "sub" as const })),
       dub: [],
     },
+  };
+}
+
+
+export async function getAniZoneStreams(anilistId: number, episodeNumber: number, audio: "sub" | "dub") {
+  if (audio !== "sub") throw new Error("AniZone currently exposes subbed streams only");
+  const catalogue = await getAniZoneEpisodes(anilistId);
+  const episode = catalogue.episodes.sub.find((item) => item.number === episodeNumber);
+  if (!episode || !Number.isSafeInteger(episode.sourceNumber) || episode.sourceNumber < 1) {
+    throw new Error("AniZone episode was not found");
+  }
+  const page = await fetchPage("/anime/" + encodeURIComponent(String(catalogue.meta.id)) + "/" + episode.sourceNumber);
+  const player = parseAniZonePlayerData(page);
+  if (!player) throw new Error("AniZone player payload was not found");
+  const allowedStreams = anivexaStreamAllowedHosts();
+  if (!allowedStreams.size) throw new Error("Anivexa stream hosts have not been allowlisted");
+  let streamUrl: string;
+  try { streamUrl = new URL(player.src, BASE).href; } catch { throw new Error("AniZone player returned an invalid stream URL"); }
+  if (!isAnivexaUrlAllowed(streamUrl, allowedStreams)) throw new Error("AniZone stream host is not allowlisted");
+  const subtitles = player.subtitles.flatMap((subtitle) => {
+    let url: string;
+    try { url = new URL(subtitle.file, BASE).href; } catch { return []; }
+    if (!isAnivexaUrlAllowed(url, allowedStreams)) return [];
+    return [{
+      url,
+      label: subtitle.title,
+      srclang: subtitle.language,
+      format: subtitle.format,
+      default: subtitle.default,
+    }];
+  });
+  return {
+    anilistId,
+    episode: episodeNumber,
+    audio,
+    streams: [{
+      url: streamUrl,
+      type: /\.m3u8(?:$|[?#])/i.test(streamUrl) ? "hls" : "mp4",
+      quality: "auto",
+      provider: "AniZone",
+      audio,
+      subtitles,
+    }],
   };
 }
