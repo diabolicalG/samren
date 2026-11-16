@@ -336,6 +336,9 @@ export async function getAniZoneStreams(anilistId: number, episodeNumber: number
   let streamUrl: string;
   try { streamUrl = new URL(player.src, BASE).href; } catch { throw new Error("AniZone player returned an invalid stream URL"); }
   if (!isAnivexaUrlAllowed(streamUrl, allowedStreams)) throw new Error("AniZone stream host is not allowlisted");
+  const streamPath = new URL(streamUrl).pathname;
+  const streamType = /\\.m3u8$/i.test(streamPath) ? "hls" : /\\.(mp4|m4v)$/i.test(streamPath) ? "mp4" : null;
+  if (!streamType) throw new Error("AniZone returned an unsupported media format");
   const subtitles = player.subtitles.flatMap((subtitle) => {
     let url: string;
     try { url = new URL(subtitle.file, BASE).href; } catch { return []; }
