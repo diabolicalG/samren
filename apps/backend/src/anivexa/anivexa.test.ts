@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
-import { parseAniZoneEpisodes, parseAniZonePlayerData } from "./anizone.js";
+import { aniZoneStreamType, parseAniZoneEpisodes, parseAniZonePlayerData } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
 import { createCipheriv } from "node:crypto";
@@ -39,6 +39,19 @@ describe("AniZone episode payload parsing", () => {
 });
 
 
+
+describe("AniZone media format detection", () => {
+  it("recognizes HLS and MP4 paths, including query strings and uppercase extensions", () => {
+    expect(aniZoneStreamType("https://cdn.example-stream.net/episode.m3u8?token=abc")).toBe("hls");
+    expect(aniZoneStreamType("https://cdn.example-stream.net/episode.MP4")).toBe("mp4");
+    expect(aniZoneStreamType("https://cdn.example-stream.net/episode.m4v")).toBe("mp4");
+  });
+
+  it("rejects unsupported and invalid media URLs", () => {
+    expect(aniZoneStreamType("https://cdn.example-stream.net/watch/123")).toBeNull();
+    expect(aniZoneStreamType("not a URL")).toBeNull();
+  });
+});
 
 describe("AniZone player payload parsing", () => {
   it("extracts the static Vidstack HLS source and subtitle metadata", () => {
