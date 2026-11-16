@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `3b45fbe0869d72e492483b1d5db66ab8042526b8`  
+**Latest code checkpoint:** `4dd5f77a8f9488cc00606f8b7b0828a9c80e1626`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -87,6 +87,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
 - Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
 - Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
+- Added an authenticated upload integration test covering successful signature-verified PNG upload, READY asset metadata, signature mismatch rejection, and managed-file cleanup. The first CI attempt (`43891871691`) ran against the preceding test commit with an incorrect route prefix and failed with 404; the route prefix was corrected in `4dd5f77a8f9488cc00606f8b7b0828a9c80e1626`. That corrected commit still needs a fresh CI result before the upload test can be called green.
 - These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. CI run `43889715112` passed the storage/delivery regression suite and all workflow steps. The subsequent quality-selector test run `43890218066` also passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds. [Latest workflow run](https://github.com/diabolicalG/samren/actions/runs/43890218066).
 
 ## 5. Verification
@@ -102,7 +103,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Area | Status | Remaining work |
 |---|---|---|
 | Local storage primitives | PARTIAL — HARDENED | Operational stale-file cleanup; broader failure/race and deployment tests |
-| Admin upload | PARTIAL | Current endpoint is bounded raw-binary, not multipart; upload/association workflow remains separate; complete lifecycle/failure reconciliation |
+| Admin upload | PARTIAL — INTEGRATION TEST ADDED | Current endpoint is bounded raw-binary, not multipart; upload/association workflow remains separate; corrected upload integration test awaits CI; complete lifecycle/failure reconciliation |
 | Signature validation/checksum | PARTIAL | Unit tests pass; broaden malformed/large-input cases |
 | Public media delivery | PARTIAL — TESTED | GET/HEAD/range tests pass; add more publication and failure-path coverage |
 | Artwork URLs/rendering | PARTIAL | Verify with real uploaded assets and responsive layouts |
