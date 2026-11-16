@@ -240,6 +240,7 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
 
 function WatchPage() {
   const { slug = "", episodeNumber = "" } = useParams();
+  const [selectedSourceId, setSelectedSourceId] = useState("");
   const number = Number(episodeNumber);
   const playbackQuery = useQuery({
     queryKey: ["catalog", "playback", slug, number],
@@ -256,7 +257,9 @@ function WatchPage() {
   if (playbackQuery.isError || !playbackQuery.data) return <main className="page-shell"><section className="simple-page"><span className="section-kicker">FIRST-PARTY PLAYER</span><h1>Episode unavailable.</h1><p>This episode may be unpublished or unavailable for playback.</p><Link className="text-link" to={`/anime/${slug}`}>Return to episode guide</Link></section></main>;
 
   const playback = playbackQuery.data;
-  const source = playback.sources.find((item) => item.isDefault) ?? playback.sources[0];
+  const source = playback.sources.find((item) => item.id === selectedSourceId)
+    ?? playback.sources.find((item) => item.isDefault)
+    ?? playback.sources[0];
   const episodes = animeQuery.data?.episodes ?? [];
   const episodeIndex = episodes.findIndex((item) => item.episodeNumber === playback.episode.episodeNumber);
   const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
@@ -271,14 +274,33 @@ function WatchPage() {
         {playback.episode.synopsis ? <p>{playback.episode.synopsis}</p> : null}
       </section>
       {source ? (
-        <div className="video-frame">
-          <video controls playsInline preload="metadata" src={source.url} onLoadedMetadata={(event) => { const saved = Number(window.localStorage.getItem(progressKey)); if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved; }} onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }} onEnded={() => window.localStorage.removeItem(progressKey)}>
-            {playback.subtitles.map((track) => <track key={track.id} kind="subtitles" src={track.url} srcLang={track.languageCode} label={track.label} default={track.isDefault} />)}
-            Your browser does not support HTML video playback.
-          </video>
-        </div>
+        <>
+          {playback.sources.length > 1 ? (
+            <label className="ui-field playback-source-select" htmlFor="playback-source">
+              Video quality
+              <select
+                className="ui-input"
+                id="playback-source"
+                value={source.id}
+                onChange={(event) => setSelectedSourceId(event.target.value)}
+              >
+                {playback.sources.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.qualityLabel || item.mimeType}{item.isDefault ? " · Default" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <div className="video-frame">
+            <video key={source.id} controls playsInline preload="metadata" src={source.url} onLoadedMetadata={(event) => { const saved = Number(window.localStorage.getItem(progressKey)); if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved; }} onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }} onEnded={() => window.localStorage.removeItem(progressKey)}>
+              {playback.subtitles.map((track) => <track key={track.id} kind="subtitles" src={track.url} srcLang={track.languageCode} label={track.label} default={track.isDefault} />)}
+              Your browser does not support HTML video playback.
+            </video>
+          </div>
+          <p className="playback-quality">{source.qualityLabel || source.mimeType} · First-party media</p>
+        </>
       ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
-      {source ? <p className="playback-quality">{source.qualityLabel || source.mimeType} · First-party media</p> : null}
       {playback.subtitles.length ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
       <nav className="watch-navigation" aria-label="Episode navigation">
         {previousEpisode ? <Link className="ui-button ui-button--secondary" to={`/watch/${slug}/${previousEpisode.episodeNumber}`}>← Episode {previousEpisode.episodeNumber}</Link> : <span />}
