@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `84de3c4ee3ea6f658e4165129361a135c1abaafe`  
+**Latest code checkpoint:** `39ff0da4d5e4c35c08b43a131b0410c75e8bbad3`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -70,6 +70,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - Limits: 15 MiB for images, 2 MiB for subtitles, 2 GiB for video.
 - The upload endpoint creates a `PENDING` `MediaAsset` record before writing, transitions it to `READY` only after storage and signature validation, and transitions it to `FAILED` on processing errors. Database writes are guarded by the expected `PENDING` state to prevent stale-upload reconciliation races.
 - API startup marks stale managed `PENDING` assets older than 24 hours as `FAILED` and removes their managed file when present. Reconciliation is conditional, paginated in batches of 500, skips legacy metadata-only storage keys, and does not block API startup on failure.
+- API startup also scans only old regular files matching the generated managed-storage layout. Files without a database reference or attached to a `FAILED` record are removed; files referenced by `READY` or `PENDING` records are preserved. Database checks are batched and deletion failures are retried on a later startup.
 - Added an admin upload control and API client method.
 - Legacy metadata-only assets remain supported. Deletion only unlinks files with Samren-generated managed storage keys.
 
@@ -104,13 +105,14 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - The earlier Kuhi security and provider test checkpoints also passed CI, including private-DNS rejection.
 - Multipart upload CI run `43894938150` passed Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests, and frontend/backend production builds. The first attempt `43894219693` stopped at typecheck because Formidable lacked declarations; a local declaration was added and the corrected run passed. [Multipart workflow run](https://github.com/diabolicalG/samren/actions/runs/43894938150).
 - Lifecycle CI run `43896585549` passed all workflow steps. It verifies the PENDING-to-READY upload path, signature-mismatch transition to FAILED, stale pending reconciliation, pagination beyond legacy metadata records, typecheck, all API tests, Python tests and production builds. [Lifecycle workflow run](https://github.com/diabolicalG/samren/actions/runs/43896585549).
+- Orphan-file reconciliation CI run `43897217999` passed all workflow steps, including generated-path filtering, stale-file selection, database-reference preservation, typecheck, backend/frontend/Python tests and production builds. [Orphan reconciliation workflow run](https://github.com/diabolicalG/samren/actions/runs/43897217999).
 - GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
 
 | Area | Status | Remaining work |
 |---|---|---|
-| Local storage primitives | PARTIAL — HARDENED | Startup cleanup removes only stale generated temp files; broader failure/race and deployment tests |
+| Local storage primitives | PARTIAL — HARDENED | Startup cleanup covers stale temp files, stale PENDING assets and unreferenced/FAILED managed files; multi-instance and deletion-failure operational tests remain |
 | Admin upload | PARTIAL — MULTIPART + RAW + LIFECYCLE | Multipart/raw upload and PENDING/READY/FAILED lifecycle tests pass CI run `43896585549`; upload/association workflow remains separate; startup reconciliation is best-effort and orphan cleanup remains outstanding |
 | Signature validation/checksum | PARTIAL | Unit tests pass; broaden malformed/large-input cases |
 | Public media delivery | PARTIAL — TESTED | GET/HEAD/range tests pass; add more publication and failure-path coverage |
@@ -135,7 +137,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 ## 8. Next checkpoints
 
 1. Resolve the Anivexa source-reuse rights question: the user has authorized copying from the read-only Anime-streaming reference into Samren, but the referenced Anivexa project still has no declared licence and credits a separate upstream. Obtain upstream reuse permission or use an independently implemented adapter based on documented behavior. Preserve Anime-streaming as read-only and do not reproduce embedded credentials or unsafe shell execution.
-2. Add orphan-file reconciliation for failed filesystem deletions and broaden storage failure/race tests under multi-instance deployment conditions.
+2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
 5. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
