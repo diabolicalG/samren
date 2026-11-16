@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
-import { deleteStoredMedia } from "../media/storage.js";
+import { deleteStoredMedia, isManagedStorageKey } from "../media/storage.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
 import {
@@ -353,7 +353,7 @@ adminCatalogRouter.delete("/assets/:id", requireTrustedOrigin, async (request, r
       return;
     }
     await prisma.mediaAsset.delete({ where: { id: id.data } });
-    await deleteStoredMedia(asset.storageKey);
+    if (isManagedStorageKey(asset.storageKey)) await deleteStoredMedia(asset.storageKey);
     response.status(204).end();
   } catch (error) {
     sendError(response, error);
