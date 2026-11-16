@@ -174,3 +174,19 @@ The earlier Sections 4, 6, 7, 8, and 9 describe the baseline and first checkpoin
 ### Current status
 
 **Phase 3 remains IN PROGRESS and is not frozen.** The local upload/storage/delivery foundation and initial playback UI are present. Provider integration, complete first-party watch wiring, remaining UI behavior, full test verification, and final security audit remain open.
+
+
+## 13. Kuhi submodule origin resolved
+
+The previously unknown Kuhi submodule origin has now been identified by matching the exact gitlink commit SHA `d9a785ad030d6fc6a8ad709291be9612c864449e` against public Git commit objects.
+
+- Upstream repository: `aryaniiil/anime-api`
+- Exact source commit: `d9a785ad030d6fc6a8ad709291be9612c864449e`
+- License at that commit: MIT (`LICENSE` must be retained with copied portions)
+- Runtime dependencies declared upstream: FastAPI, Uvicorn, and HTTPX.
+- The source tree includes the provider race layer, provider adapters, AniList extraction, parsing, and endpoint router.
+- Samren already has a FastAPI application under `apps/api/src/main.py` and its existing unified media API package, with FastAPI and HTTPX dependencies available. The preferred integration path is to extend this existing application rather than add a second service.
+
+The upstream service also exposes generic HLS manifest and segment proxy routes that accept arbitrary URL parameters. Those routes are **not approved for direct copying**. Any proxy capability retained in Samren must enforce fixed trusted provider hosts, redirect validation, bounded response sizes, timeouts, and safe referer handling. The copied endpoint router and provider implementations still require review before being mounted.
+
+**Status update:** Kuhi source is no longer blocked by an unknown submodule URL. Integration has not yet been completed or tested.
