@@ -309,3 +309,5 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .playback-quality { color: var(--muted); font-size: 11px; }
 .episode-row { color: inherit; }
 .episode-row:hover { border-color: rgba(167,139,250,.48); }
+
+.watch-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
