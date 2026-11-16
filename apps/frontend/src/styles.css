@@ -284,3 +284,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-inline-edit > button { align-self: end; }
 .admin-taxonomy-list > li:has(.admin-inline-edit) { display: block; }
 @media (max-width: 560px) { .admin-inline-edit { grid-template-columns: 1fr; } }
+
+
+/* Phase 3 — first-party media */
+.anime-poster-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.anime-poster-image ~ .poster-mark { opacity: 0; }
+.detail-art-image { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.admin-upload-card { margin: 18px 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: rgba(18,23,34,.72); }
+.admin-upload-card h3 { margin: 0 0 8px; font: 700 16px Manrope,sans-serif; }
+.admin-upload-card p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.admin-upload-card form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; align-items: end; }
+.admin-upload-card form > p, .admin-upload-card form > button { grid-column: 1 / -1; }
+.admin-success { color: #9de7c1 !important; }
+@media (max-width: 640px) { .admin-upload-card form { grid-template-columns: 1fr; } }
