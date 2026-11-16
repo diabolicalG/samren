@@ -16,7 +16,7 @@ function configuredHosts() {
   return [...new Set([...DEFAULT_HOSTS, ...configured])];
 }
 
-function isPublicAddress(address) {
+export function isPublicAddress(address) {
   if (isIP(address) === 4) {
     const [a, b, c] = address.split(".").map(Number);
     return !(a === 0 || a === 10 || a === 127 || a >= 224
@@ -59,14 +59,18 @@ export function createPinnedLookup(addresses) {
   };
 }
 
+export function validatePublicAddresses(addresses) {
+  if (!Array.isArray(addresses) || !addresses.length || addresses.some(({ address }) => !isPublicAddress(address))) {
+    throw new Error("Anivexa outbound host resolved to a non-public address");
+  }
+  return addresses;
+}
+
 async function resolvePublicAddresses(host) {
   const addresses = isIP(host)
     ? [{ address: host, family: isIP(host) }]
     : await lookup(host, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some(({ address }) => !isPublicAddress(address))) {
-    throw new Error("Anivexa outbound host resolved to a non-public address");
-  }
-  return addresses;
+  return validatePublicAddresses(addresses);
 }
 
 async function pinnedHttpsRequest(url, { method, headers, body, signal }, addresses, maxBytes) {
@@ -125,7 +129,7 @@ async function pinnedHttpsRequest(url, { method, headers, body, signal }, addres
 export async function safeFetch(input, init = {}, allowed = configuredHosts()) {
   let url = new URL(input instanceof Request ? input.url : String(input));
   let method = init.method ?? (input instanceof Request ? input.method : "GET");
-  let body = init.body ?? (input instanceof Request ? input.body : undefined);
+  let body = init.body ?? (input instanceof Request && input.body ? Buffer.from(await input.clone().arrayBuffer()) : undefined);
   const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
   const maxBytes = 5 * 1024 * 1024;
 
