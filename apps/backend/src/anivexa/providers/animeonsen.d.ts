@@ -9,3 +9,11 @@ export function videoSubtitles(video: {
   srclang: string;
   default: boolean;
 }>;
+
+export function getEpisodes(anilistId: number, context?: Record<string, unknown>): Promise<unknown>;
+export function getStreams(anilistId: number, episode: number, audio?: "sub" | "dub"): Promise<{
+  anilistId: number;
+  episode: number;
+  audio: "sub" | "dub";
+  streams: Array<Record<string, unknown>>;
+}>;
