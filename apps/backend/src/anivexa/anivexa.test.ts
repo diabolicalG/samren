@@ -149,7 +149,10 @@ describe("AniKoto safe embed extraction primitives", () => {
   });
 
   it("ignores route-like text inside comments and regular expressions while decoding escaped literals", () => {
-    const script = String.raw`// "stream/getSources-fake"\nconst pattern = /stream\\/getSources-regex/;\nconst route = "stream\\x2fgetSources";\nconst modern = "stream/getSources2";`;
+    const script = String.raw`// "stream/getSources-fake"
+const pattern = /stream\\/getSources-regex/;
+const route = "stream\\x2fgetSources";
+const modern = "stream/getSources2";`;
     expect(parseMegaPlayRoutes(script)).toEqual({ legacy: "stream/getSources", modern: "stream/getSources2" });
   });
   it("decrypts a static AES-CBC source payload from literal key and IV values", () => {
