@@ -1,4 +1,4 @@
-import { anivexaJson, anivexaText } from "./http.js";
+import { anivexaFetch, anivexaJson, anivexaReadText, anivexaText } from "./http.js";
 
 type Media = {
   id: number;
@@ -85,8 +85,117 @@ async function getMedia(anilistId: number): Promise<Media> {
   return data.data.Media;
 }
 
+type PageResponse = { raw: string; cookies: string[] };
+type PageState = { items: unknown[]; snapshot: string; cursor: string | null; hasMore: boolean; csrf: string; cookies: Map<string, string> };
+
+function responseCookies(headers: Headers): string[] {
+  const extended = headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof extended.getSetCookie === "function") return extended.getSetCookie();
+  const value = headers.get("set-cookie");
+  return value ? [value] : [];
+}
+
+function mergeCookies(current: Map<string, string>, values: string[]): Map<string, string> {
+  const merged = new Map(current);
+  for (const value of values) {
+    const match = String(value).match(/^\\s*([^=;\\s]+)=([^;]*)/);
+    if (match) merged.set(match[1], match[2]);
+  }
+  return merged;
+}
+
+function cookieHeader(cookies: Map<string, string>): string {
+  return [...cookies.entries()].map(([key, value]) => `${key}=${value}`).join("; ");
+}
+
+async function requestPage(path: string, init: RequestInit = {}): Promise<PageResponse> {
+  const response = await anivexaFetch(new URL(path, BASE).href, {
+    ...init,
+    headers: {
+      "User-Agent": UA,
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      Referer: `${BASE}/`,
+      ...init.headers,
+    },
+  });
+  if (!response.ok) throw new Error(`AniZone upstream returned HTTP ${response.status}`);
+  return { raw: await anivexaReadText(response), cookies: responseCookies(response.headers) };
+}
+
 async function fetchPage(path: string): Promise<string> {
-  return anivexaText(new URL(path, BASE).href, { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", Referer: BASE });
+  return (await requestPage(path)).raw;
+}
+
+function decodeEntities(value: string): string {
+  return value.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, " ");
+}
+
+function snapshot(html: string): string {
+  const value = [...html.matchAll(/wire:snapshot="([^"]*)"/gi)].find((match) => match[1].includes("pages.anime-detail"))?.[1] ?? "";
+  return decodeEntities(value);
+}
+
+function cursor(html: string): string | null {
+  return html.match(/nextCursor:\\s*'([^']+)'/i)?.[1] ?? null;
+}
+
+function hasMore(html: string): boolean {
+  return /hasMore:\\s*true/i.test(html);
+}
+
+function csrf(html: string): string {
+  return html.match(/csrf-token"\\s+content="([^"]+)"/i)?.[1] ?? "";
+}
+
+function initialPage(html: string, cookies: string[]): PageState {
+  const items = jsonArgument(html, "items");
+  const state = {
+    items: Array.isArray(items) ? items : [],
+    snapshot: snapshot(html),
+    cursor: cursor(html),
+    hasMore: hasMore(html),
+    csrf: csrf(html),
+    cookies: mergeCookies(new Map(), cookies),
+  };
+  if (!state.items.length || !state.snapshot || !state.csrf) throw new Error("AniZone initial episode page payload is incomplete");
+  return state;
+}
+
+async function loadPage(state: PageState, slug: string): Promise<PageState> {
+  const response = await requestPage("/livewire/update", {
+    method: "POST",
+    headers: {
+      "Accept": "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+      "X-Livewire": "",
+      "X-CSRF-TOKEN": state.csrf,
+      "X-Requested-With": "XMLHttpRequest",
+      "Origin": BASE,
+      "Referer": `${BASE}/anime/${slug}`,
+      "Cookie": cookieHeader(state.cookies),
+    },
+    body: JSON.stringify({
+      components: [{
+        snapshot: state.snapshot,
+        updates: {},
+        calls: [{ path: "", method: "loadPage", params: [state.cursor] }],
+      }],
+    }),
+  });
+  let payload: { components?: Array<{ snapshot?: string; effects?: { dispatches?: Array<{ name?: string; params?: { items?: unknown[]; nextCursor?: string; hasMore?: boolean } }> }> }> };
+  try { payload = JSON.parse(response.raw) as typeof payload; } catch { throw new Error("AniZone returned invalid pagination JSON"); }
+  const component = payload.components?.[0];
+  const dispatch = component?.effects?.dispatches?.find((item) => item.name === "items-loaded");
+  if (!component?.snapshot || !Array.isArray(dispatch?.params?.items)) throw new Error("AniZone pagination response was incomplete");
+  return {
+    items: dispatch.params.items,
+    snapshot: component.snapshot,
+    cursor: dispatch.params.nextCursor ?? null,
+    hasMore: Boolean(dispatch.params.hasMore),
+    csrf: state.csrf,
+    cookies: mergeCookies(state.cookies, response.cookies),
+  };
 }
 
 async function search(query: string): Promise<Candidate[]> {
@@ -109,9 +218,7 @@ async function search(query: string): Promise<Candidate[]> {
   });
 }
 
-function parseEpisodes(html: string): Episode[] {
-  const items = jsonArgument(html, "items");
-  if (!Array.isArray(items)) return [];
+function parseEpisodeItems(items: unknown[]): Episode[] {
   const seen = new Set<number>();
   return items.flatMap((raw) => {
     if (!raw || typeof raw !== "object") return [];
@@ -131,6 +238,25 @@ function parseEpisodes(html: string): Episode[] {
       hasSub: Number(item.videos_count) > 0,
     }];
   }).sort((a, b) => a.number - b.number);
+}
+
+export function parseAniZoneEpisodes(html: string): Episode[] {
+  const items = jsonArgument(html, "items");
+  return Array.isArray(items) ? parseEpisodeItems(items) : [];
+}
+
+async function scrapeEpisodes(slug: string, expected: number): Promise<Episode[]> {
+  const initial = await requestPage(`/anime/${encodeURIComponent(slug)}`);
+  let state = initialPage(initial.raw, initial.cookies);
+  const items = [...state.items];
+  let pages = 1;
+  const maxPages = expected > 0 ? Math.min(20, Math.ceil(expected / 20) + 2) : 5;
+  while (state.hasMore && state.cursor && items.length < (expected || 100) && pages < maxPages) {
+    state = await loadPage(state, slug);
+    items.push(...state.items);
+    pages += 1;
+  }
+  return parseEpisodeItems(items);
 }
 
 export async function getAniZoneEpisodes(anilistId: number) {
@@ -157,8 +283,7 @@ export async function getAniZoneEpisodes(anilistId: number) {
     throw new Error("AniZone could not be matched to this AniList entry with sufficient confidence");
   }
 
-  const html = await fetchPage(`/anime/${encodeURIComponent(selected.slug)}`);
-  const sourceEpisodes = parseEpisodes(html);
+  const sourceEpisodes = await scrapeEpisodes(selected.slug, expectedEpisodes);
   if (!sourceEpisodes.length) throw new Error("AniZone returned no episode records on its initial episode page");
   const episodes = expectedEpisodes > 0 ? sourceEpisodes.filter((episode) => episode.number <= expectedEpisodes) : sourceEpisodes;
   return {
