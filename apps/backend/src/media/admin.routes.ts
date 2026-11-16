@@ -17,26 +17,6 @@ const allowedMime: Record<string, string[]> = {
   SUBTITLE: ["text/vtt", "application/x-subrip", "application/x-ass"],
 };
 
-function signatureMatches(kind: string, mime: string, bytes: Buffer) {
-  if (kind === "POSTER" || kind === "BANNER") {
-    if (mime === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-    if (mime === "image/png") return bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
-    if (mime === "image/webp") return bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
-    if (mime === "image/avif") return bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" && /^(avif|avis)$/.test(bytes.toString("ascii", 8, 12));
-  }
-  if (kind === "VIDEO") {
-    if (mime === "video/mp4") return bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp";
-    if (mime === "video/webm") return bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3]));
-  }
-  if (kind === "SUBTITLE") {
-    const text = bytes.toString("utf8").replace(/^\uFEFF/, "").trimStart();
-    if (mime === "text/vtt") return text.startsWith("WEBVTT");
-    if (mime === "application/x-subrip") return /^\d+\s*\r?\n\d{2}:\d{2}:\d{2},\d{3}/.test(text);
-    if (mime === "application/x-ass") return text.startsWith("[Script Info]");
-  }
-  return false;
-}
-
 adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
   const kind = String(request.get("x-media-kind") ?? "").toUpperCase() as UploadMediaKind;
   const mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
