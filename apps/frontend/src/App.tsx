@@ -150,7 +150,7 @@ function AnimeDetailPage() {
     <main className="page-shell detail-page">
       <Link className="text-link" to="/browse">← Back to catalogue</Link>
       <section className="detail-hero">
-        <div className="detail-art" aria-hidden="true"><Clapperboard size={44} strokeWidth={1.1} /></div>
+        <div className="detail-art" aria-hidden="true">{anime.posterAsset?.url ? <img className="detail-art-image" src={anime.posterAsset.url} alt="" /> : <Clapperboard size={44} strokeWidth={1.1} />}</div>
         <div className="detail-copy">
           <span className="section-kicker">{formatLabel(anime.type)} · {formatLabel(anime.releaseStatus)}</span>
           <h1>{anime.title}</h1>
@@ -234,6 +234,46 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
         </section>
       </div>
     </div>
+  );
+}
+
+function MediaUploadForm() {
+  const [kind, setKind] = useState<AdminMediaAsset["mediaKind"]>("POSTER");
+  const [file, setFile] = useState<File | null>(null);
+  const queryClient = useQueryClient();
+  const maxBytes = kind === "VIDEO" ? 2 * 1024 * 1024 * 1024 : kind === "SUBTITLE" ? 2 * 1024 * 1024 : 15 * 1024 * 1024;
+  const tooLarge = Boolean(file && file.size > maxBytes);
+  const uploadMutation = useMutation({
+    mutationFn: () => {
+      if (!file) throw new Error("Choose a file before uploading");
+      return apiClient.adminUploadAsset(file, kind);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "catalog", "assets"] });
+      setFile(null);
+    },
+  });
+
+  return (
+    <Surface className="admin-upload-card">
+      <h3>Upload a first-party media file</h3>
+      <p>Files are streamed to private local storage and checked against their content signatures. Remote URLs are not accepted.</p>
+      <form onSubmit={(event) => { event.preventDefault(); uploadMutation.mutate(); }}>
+        <label className="ui-field" htmlFor="media-upload-kind">Media kind
+          <select className="ui-input" id="media-upload-kind" value={kind} onChange={(event) => { setKind(event.target.value as AdminMediaAsset["mediaKind"]); setFile(null); }}>
+            <option value="POSTER">Poster</option><option value="BANNER">Banner</option><option value="VIDEO">Video</option><option value="SUBTITLE">Subtitle</option>
+          </select>
+        </label>
+        <label className="ui-field" htmlFor="media-upload-file">File
+          <input key={file ? "selected" : "empty"} className="ui-input" id="media-upload-file" type="file" accept={kind === "POSTER" || kind === "BANNER" ? "image/jpeg,image/png,image/webp,image/avif" : kind === "VIDEO" ? "video/mp4,video/webm" : ".vtt,.srt,.ass,text/vtt"} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+        </label>
+        <p className="admin-asset-note">Maximum: {kind === "VIDEO" ? "2 GiB" : kind === "SUBTITLE" ? "2 MiB" : "15 MiB"}</p>
+        {tooLarge ? <p className="admin-error" role="alert">This file exceeds the selected media kind's upload limit.</p> : null}
+        {uploadMutation.isError ? <p className="admin-error" role="alert">{uploadMutation.error.message}</p> : null}
+        {uploadMutation.isSuccess ? <p className="admin-success" role="status">Upload complete. The asset is ready to associate with catalogue content.</p> : null}
+        <button className="ui-button ui-button--primary" type="submit" disabled={!file || tooLarge || uploadMutation.isPending}>{uploadMutation.isPending ? "Uploading…" : "Upload media"}</button>
+      </form>
+    </Surface>
   );
 }
 
@@ -569,9 +609,10 @@ function AdminPage() {
         </div>
       </section>
       <section className="admin-taxonomy admin-assets">
-        <div className="catalog-section-heading"><div><span className="section-kicker">FIRST-PARTY MEDIA</span><h2>Asset metadata</h2></div><span>Metadata only · no upload or playback</span></div>
+        <div className="catalog-section-heading"><div><span className="section-kicker">FIRST-PARTY MEDIA</span><h2>Media library</h2></div><span>Private local uploads</span></div>
+        <MediaUploadForm />
         <Surface className="admin-taxonomy-card">
-          <p className="admin-asset-note">Register internal storage metadata for a future first-party asset workflow. This does not upload a file, make it available publicly, or accept a remote URL.</p>
+          <p className="admin-asset-note">The upload control above stores validated files. The metadata editor below is retained for legacy/manual records; use uploads for new assets.</p>
           <form onSubmit={(event) => { event.preventDefault(); createAssetMutation.mutate(); }}>
             <TextField id="asset-storage-key" label="Internal storage key" required maxLength={500} placeholder="catalogue/posters/example.webp" value={assetStorageKey} onChange={(event) => setAssetStorageKey(event.target.value)} />
             <TextField id="asset-filename" label="Original filename" required maxLength={255} value={assetFilename} onChange={(event) => setAssetFilename(event.target.value)} />
