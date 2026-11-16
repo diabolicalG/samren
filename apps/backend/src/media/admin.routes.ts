@@ -7,7 +7,7 @@ import formidable, { type File as FormidableFile } from "formidable";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
-import { deleteStoredMedia, storeMediaStream } from "./storage.js";
+import { createMediaStorageKey, deleteStoredMedia, storeMediaStream } from "./storage.js";
 import { detectMediaSignature, type UploadMediaKind } from "./signature.js";
 
 export const adminMediaRouter = Router();
@@ -87,50 +87,62 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   let multipartFile: FormidableFile | undefined;
   let multipartTempDirectory: string | undefined;
+  let storageKey: string | undefined;
+  let pendingAssetId: string | undefined;
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
 
   try {
+    let source: NodeJS.ReadableStream = request;
     if (isMultipart) {
       const parsedMultipart = await parseMultipartUpload(request, maxBytes);
       multipartFile = parsedMultipart.file;
       multipartTempDirectory = parsedMultipart.directory;
       filename = String(multipartFile.originalFilename ?? "").trim();
       mime = String(multipartFile.mimetype ?? "").split(";")[0].trim().toLowerCase();
-      if (!isSafeFilename(filename)) {
-        response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The uploaded filename is invalid" } });
-        return;
-      }
-      if (!allowedMime[kind].includes(mime)) {
-        response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The file content type is not supported for this media kind" } });
-        return;
-      }
-      stored = await storeMediaStream(createReadStream(multipartFile.filepath), maxBytes);
-    } else {
-      if (!isSafeFilename(filename)) {
-        response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
-        return;
-      }
-      if (!allowedMime[kind].includes(mime)) {
-        response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The media kind and content type are not supported" } });
-        return;
-      }
-      stored = await storeMediaStream(request, maxBytes);
+      source = createReadStream(multipartFile.filepath);
     }
 
+    if (!isSafeFilename(filename)) {
+      response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The uploaded filename is invalid" } });
+      return;
+    }
+    if (!allowedMime[kind].includes(mime)) {
+      response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The file content type is not supported for this media kind" } });
+      return;
+    }
+
+    storageKey = createMediaStorageKey();
+    const pendingAsset = await prisma.mediaAsset.create({
+      data: {
+        storageKey,
+        originalFilename: filename,
+        mediaKind: kind,
+        mimeType: mime,
+        sizeBytes: 0n,
+        checksumSha256: null,
+        processingState: "PENDING",
+      },
+      select: { id: true },
+    });
+    pendingAssetId = pendingAsset.id;
+
+    stored = await storeMediaStream(source as import("node:stream").Readable, maxBytes, storageKey);
     const detected = detectMediaSignature(kind, stored.signature);
     if (!detected || detected.mimeType !== mime) {
-      await deleteStoredMedia(stored.storageKey);
+      await deleteStoredMedia(storageKey);
       stored = undefined;
+      await prisma.mediaAsset.update({
+        where: { id: pendingAssetId },
+        data: { processingState: "FAILED" },
+      });
+      pendingAssetId = undefined;
       response.status(415).json({ data: null, error: { code: "FILE_SIGNATURE_MISMATCH", message: "The uploaded file content does not match its declared media type" } });
       return;
     }
 
-    const asset = await prisma.mediaAsset.create({
+    const asset = await prisma.mediaAsset.update({
+      where: { id: pendingAssetId },
       data: {
-        storageKey: stored.storageKey,
-        originalFilename: filename,
-        mediaKind: kind as "POSTER" | "BANNER" | "VIDEO" | "SUBTITLE",
-        mimeType: mime,
         sizeBytes: BigInt(stored.sizeBytes),
         checksumSha256: stored.checksumSha256,
         processingState: "READY",
@@ -140,12 +152,19 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
         sizeBytes: true, checksumSha256: true, processingState: true, createdAt: true,
       },
     });
+    pendingAssetId = undefined;
     response.status(201).json({
       data: { ...asset, sizeBytes: asset.sizeBytes.toString() },
       error: null,
     });
   } catch (error) {
-    if (stored) await deleteStoredMedia(stored.storageKey).catch(() => undefined);
+    if (storageKey) await deleteStoredMedia(storageKey).catch(() => undefined);
+    if (pendingAssetId) {
+      await prisma.mediaAsset.updateMany({
+        where: { id: pendingAssetId, processingState: "PENDING" },
+        data: { processingState: "FAILED" },
+      }).catch(() => undefined);
+    }
     if (!response.headersSent) {
       const tooLarge = isPayloadTooLarge(error);
       response.status(tooLarge ? 413 : 400).json({
