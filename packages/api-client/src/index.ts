@@ -1,6 +1,13 @@
 import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogPlayback, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
-function uploadMimeType(file: File) {\n  if (file.type) return file.type;\n  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";\n  const byExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", avif: "image/avif", mp4: "video/mp4", webm: "video/webm", vtt: "text/vtt", srt: "application/x-subrip", ass: "application/x-ass" };\n  return byExtension[extension] ?? "application/octet-stream";\n}\n\nexport type ApiClientOptions = {
+function uploadMimeType(file: File) {
+  if (file.type) return file.type;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const byExtension: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", avif: "image/avif", mp4: "video/mp4", webm: "video/webm", vtt: "text/vtt", srt: "application/x-subrip", ass: "application/x-ass" };
+  return byExtension[extension] ?? "application/octet-stream";
+}
+
+export type ApiClientOptions = {
   baseUrl?: string;
   credentials?: RequestCredentials;
 };
