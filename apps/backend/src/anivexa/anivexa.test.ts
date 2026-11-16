@@ -4,7 +4,8 @@ import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
 import { parseAniZoneEpisodes } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
-import { parseAniKotoDirectSource, extractAniKotoEmbed } from "./anikoto-embed.js";
+import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
+import { createCipheriv } from "node:crypto";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -96,6 +97,32 @@ describe("AniKoto direct and embed source policy", () => {
 
   it("does not fetch embed pages outside the upstream host allowlist", async () => {
     await expect(extractAniKotoEmbed("https://player.attacker.invalid/embed-1/abc", new Set(["example-stream.net"]))).resolves.toEqual([]);
+  });
+});
+
+
+
+describe("AniKoto safe embed extraction primitives", () => {
+  it("identifies legacy and modern MegaPlay source routes without evaluating JavaScript", () => {
+    expect(parseMegaPlayRoutes(String.raw\`const a = "stream/getSources"; const b = "stream/getSources2";\`)).toEqual({
+      legacy: "stream/getSources",
+      modern: "stream/getSources2",
+    });
+  });
+
+  it("decrypts a static AES-CBC source payload from literal key and IV values", () => {
+    const keyText = "0123456789abcdef";
+    const ivText = "abcdef0123456789";
+    const key = Buffer.alloc(32);
+    Buffer.from(keyText).copy(key);
+    const cipher = createCipheriv("aes-256-cbc", key, Buffer.from(ivText));
+    const encrypted = Buffer.concat([cipher.update(JSON.stringify({ file: "https://cdn.example-stream.net/video.m3u8" })), cipher.final()]).toString("base64url");
+    const script = 'const key = "' + keyText + '"; const iv = "' + ivText + '";';
+    expect(decryptStaticMegaPlay(encrypted, script)).toBe("https://cdn.example-stream.net/video.m3u8");
+  });
+
+  it("fails closed when an encrypted payload cannot be decoded", () => {
+    expect(decryptStaticMegaPlay("not-valid-encrypted-data", 'const x = "literal";')).toBeNull();
   });
 });
 
