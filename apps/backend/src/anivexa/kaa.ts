@@ -1,4 +1,4 @@
-import { anivexaJson, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
+import { anivexaAllowedHosts, anivexaJson, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 
 type Media = {
   id: number;
@@ -53,11 +53,10 @@ function searchQueries(titles: string[]): string[] {
   }))].slice(0, 12);
 }
 
-export function parseKaaServerId(value: string): string | null {
+export function parseKaaServerId(value: string, allowedHosts = anivexaAllowedHosts()): string | null {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return null;
-    if (url.hostname.toLowerCase() !== "kaa.lt" && url.hostname.toLowerCase() !== "www.kaa.lt") return null;
+    if (!isAnivexaUrlAllowed(value, allowedHosts) || (url.port && url.port !== "443")) return null;
     const id = url.searchParams.get("id");
     return id && /^[A-Za-z0-9_-]{1,128}$/.test(id) ? id : null;
   } catch {
