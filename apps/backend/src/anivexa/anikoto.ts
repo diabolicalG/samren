@@ -144,3 +144,92 @@ export async function getAniKotoEpisodes(anilistId: number) {
     },
   };
 }
+
+
+type ServerItem = { linkId: string; name: string; serverType: string };
+
+function htmlAttribute(tag: string, name: string): string {
+  return tag.match(new RegExp("\\b" + name + "\\s*=\\s*[\"']([^\"']*)[\"']", "i"))?.[1] ?? "";
+}
+
+export function parseAniKotoServerItems(html: string, audio: "sub" | "dub"): ServerItem[] {
+  const found = new Map<string, ServerItem>();
+  for (const section of html.matchAll(/<div\b[^>]*data-type=["']([^"']+)["'][^>]*>([\s\S]*?)<\/ul>\s*<\/div>/gi)) {
+    const serverType = decode(section[1]);
+    if (serverType !== audio && !(audio === "sub" && serverType === "hsub")) continue;
+    for (const item of section[2].matchAll(/<li\b[^>]*data-link-id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/li>/gi)) {
+      const tag = item[0].match(/<li\b[^>]*>/i)?.[0] ?? "";
+      const linkId = decode(htmlAttribute(tag, "data-link-id") || item[1]);
+      const name = decode(item[2].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()).slice(0, 80);
+      if (linkId && !found.has(linkId)) found.set(linkId, { linkId, name: name || "AniKoto server", serverType });
+    }
+  }
+  return [...found.values()].slice(0, 12);
+}
+
+function directMediaType(value: string): "hls" | "mp4" | null {
+  try {
+    const url = new URL(value);
+    if (/\.m3u8$/i.test(url.pathname)) return "hls";
+    if (/\.(mp4|m4v|webm)$/i.test(url.pathname)) return "mp4";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeDirectFragment(value: string): string | null {
+  const fragment = value.split("#")[1] ?? "";
+  if (!/^aHR0c/i.test(fragment)) return null;
+  try {
+    const decoded = Buffer.from(fragment, "base64").toString("utf8");
+    return /^https:\/\//i.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAniKotoStreams(anilistId: number, episodeNumber: number, audio: "sub" | "dub") {
+  const catalogue = await getAniKotoEpisodes(anilistId);
+  const candidate: Candidate = { slug: catalogue.meta.id, name: catalogue.meta.title, japanese: "" };
+  const inspected = await inspect(candidate);
+  const episode = inspected?.episodes.find((item) => item.number === episodeNumber);
+  if (!episode || (audio === "sub" ? !episode.hasSub : !episode.hasDub) || !episode.ids) {
+    throw new Error("AniKoto episode or requested audio version was not found");
+  }
+
+  const serverData = await anivexaJson<{ result?: string }>(
+    BASE + "/ajax/server/list?servers=" + encodeURIComponent(episode.ids),
+    { headers: { "User-Agent": UA, Accept: "application/json", "X-Requested-With": "XMLHttpRequest", Referer: BASE + "/" } },
+  );
+  const servers = parseAniKotoServerItems(serverData.result ?? "", audio);
+  const allowedStreams = anivexaStreamAllowedHosts();
+  if (!allowedStreams.size) throw new Error("AniKoto stream hosts have not been allowlisted");
+
+  const streams: Array<{ url: string; type: "hls" | "mp4"; quality: string; server: string; audio: "sub" | "dub" }> = [];
+  const seen = new Set<string>();
+  for (const server of servers) {
+    let resolvedUrl = "";
+    if (/^https:\/\//i.test(server.linkId)) {
+      resolvedUrl = server.linkId;
+    } else {
+      const resolved = await anivexaJson<{ result?: { url?: string } }>(
+        BASE + "/ajax/server?get=" + encodeURIComponent(server.linkId),
+        { headers: { "User-Agent": UA, Accept: "application/json", "X-Requested-With": "XMLHttpRequest", Referer: BASE + "/" } },
+      ).catch(() => null);
+      resolvedUrl = resolved?.result?.url ?? "";
+    }
+
+    const candidates = [resolvedUrl, decodeDirectFragment(resolvedUrl)].filter((value): value is string => Boolean(value));
+    for (const value of candidates) {
+      const type = directMediaType(value);
+      if (!type || !isAnivexaUrlAllowed(value, allowedStreams) || seen.has(value)) continue;
+      seen.add(value);
+      streams.push({ url: value, type, quality: "auto", server: server.name, audio });
+    }
+  }
+  if (!streams.length) {
+    throw new Error("AniKoto returned no direct media source supported by the configured stream-host policy");
+  }
+  return { anilistId, episode: episodeNumber, audio, streams };
+}
