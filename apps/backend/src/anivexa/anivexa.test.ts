@@ -9,6 +9,7 @@ describe("Anivexa HTTP policy", () => {
   it("accepts only HTTPS hosts in the explicit allowlist", () => {
     expect(isAnivexaUrlAllowed("https://graphql.anilist.co", allowed)).toBe(true);
     expect(isAnivexaUrlAllowed("https://www.animegg.org/search", allowed)).toBe(true);
+    expect(isAnivexaUrlAllowed("https://anizone.to/anime", new Set(["anizone.to"]))).toBe(true);
     expect(isAnivexaUrlAllowed("http://www.animegg.org", allowed)).toBe(false);
     expect(isAnivexaUrlAllowed("https://animegg.org.attacker.invalid", allowed)).toBe(false);
     expect(isAnivexaUrlAllowed("https://user:pass@animegg.org", allowed)).toBe(false);
