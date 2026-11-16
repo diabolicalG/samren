@@ -1,4 +1,5 @@
 import { getEpisodes as getAniWavesEpisodes, default as aniWavesProvider } from "./providers/aniwaves.js";
+import { getEpisodes as getAnimeNoSubEpisodes, default as animeNoSubProvider } from "./providers/animenosub.js";
 import { getEpisodes as getReAnimeEpisodes, default as reAnimeProvider } from "./providers/reanime.js";
 import { getEpisodes as getAnimeOnsenEpisodes, getStreams as getAnimeOnsenStreams } from "./providers/animeonsen.js";
 
@@ -35,4 +36,12 @@ export async function getAnimeOnsenEpisodes(anilistId: number): Promise<unknown>
 
 export async function getAnimeOnsenStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
   return getAnimeOnsenStreams(anilistId, episode, audio);
+}
+
+export async function getAnimeNoSubEpisodes(anilistId: number): Promise<unknown> {
+  return getAnimeNoSubEpisodes(anilistId);
+}
+
+export async function getAnimeNoSubStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
+  return legacyWatch(animeNoSubProvider, `/watch/animenosub/${anilistId}/${audio}/animenosub-${episode}`);
 }
