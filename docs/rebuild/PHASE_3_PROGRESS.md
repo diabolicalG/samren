@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `5d5fc40627c55bc7eb3a27ae103ac939f40c27e1`  
+**Latest code checkpoint:** `828df8ad1c4382084d84556c95f9dc936efd7de8`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (draft; not merged)
 
 ## 1. Repository boundaries
@@ -31,8 +31,12 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Anime-streaming contains a TypeScript `KuhiProvider` client and provider contracts under `apps/backend/src/services/streaming`.
 - The Kuhi service itself is a Git submodule at `services/kuhi`, gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`.
 - The reference repository has no root `.gitmodules` file, and GitHub's submodule entry does not expose a canonical source URL.
-- The client can be adapted, but the service cannot be faithfully copied without its source repository URL or an authorized local clone.
-- **BLOCKED:** obtain the canonical submodule source. Do not invent a URL or replace it with an unrelated service.
+- The missing submodule URL was bypassed without guessing: the reference repository also contains a separately licensed Kuhi API v3 implementation under `apps/kuhi-api`.
+- Adapted the MIT-licensed provider modules into Samren's existing Python API: AniBD, AniKoto, AnimeGG, AnimeOnsen, AniNeko, AniWaves, AniZone, KAA, MKissa and ReAnime, with shared matching/cache/media/race helpers.
+- Added native `/v1/kuhi/search`, `/providers`, `/episodes/{anilist_id}` and `/extract/{anilist_id}` routes. The extract route returns only allowlisted direct HTTPS streams and subtitle URLs; provider cookies/headers and raw URLs in episode metadata are omitted.
+- Added an outbound HTTP transport that enforces HTTPS, explicit hostname allowlists, redirect revalidation and a 10 MiB response cap. Empty allowlists fail closed. `KUHI_PROVIDER_ALLOWED_HOSTS` and `KUHI_STREAM_ALLOWED_HOSTS` must be configured deliberately.
+- Preserved the upstream MIT license and attribution in `apps/api/THIRD_PARTY_NOTICES.md`.
+- The original Kuhi TypeScript client/submodule was not copied; the Python Kuhi API implementation is now the selected native integration path.
 
 ### Anivexa
 
@@ -44,7 +48,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - Some handlers expose raw upstream error details, cookies, request headers or diagnostic data.
   - The aggregator uses wildcard CORS.
 - No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
-- **NOT STARTED:** no Anivexa provider/extractor source has been copied into Samren. A provider-by-provider dependency, license and security review remains required.
+- **NOT STARTED:** no Anivexa provider/extractor source has been copied into Samren. Its tree has no project LICENSE/NOTICE, its README points to a separate upstream Anivexa API project, and source contains shell execution and embedded credentials. The user-approved copy must not proceed until reuse rights are confirmed; unsafe code must be rewritten or excluded.
 
 ## 4. Implemented first-party media work
 
@@ -82,7 +86,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 - CI run `43832779866` passed all workflow steps for checkpoint `843582214b5cd32d1c4d4d9a7d5d0a223e686a05`: Prisma validation/generation/migration, seed/idempotence, lint, typecheck, backend tests, frontend tests and production build.
 - A later CI run `43832904848` failed one existing admin asset deletion test because newly added file cleanup rejected a legacy metadata-only storage key. The cleanup now checks `isManagedStorageKey` and only unlinks generated keys.
-- A follow-up CI run is required to verify that correction at the current branch head. Do not treat the earlier green run as verification of later commits.
+- CI run `43887063532` is running against `828df8ad1c4382084d84556c95f9dc936efd7de8`; its outcome must be checked before claiming the Python integration passes.
 - No local runtime is available in this session; GitHub Actions is the executable validation environment.
 
 ## 6. Current completion matrix
@@ -96,7 +100,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Artwork URLs/rendering | PARTIAL | Verify on real uploaded assets and responsive layouts |
 | Episode playback metadata | PARTIAL | Add playback integration tests and episode navigation/progress |
 | Frontend player | PARTIAL | Add previous/next, quality selection and browser playback verification |
-| Kuhi client/service | BLOCKED / PARTIAL SOURCE | Obtain canonical submodule source; adapt and test client securely |
+| Kuhi providers/API | IMPLEMENTED; CI VERIFICATION PENDING | Run Python tests; configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
 | Anivexa providers/extractors | NOT STARTED | Resolve reuse rights, then port safe provider subset and required extractors |
 | Provider security tests | NOT STARTED | URL validation, SSRF, timeouts, response limits, secrets and error redaction |
 | Final Phase 3 audit | NOT STARTED | Complete only after all acceptance gates pass |
