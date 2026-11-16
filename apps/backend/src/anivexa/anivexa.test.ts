@@ -7,6 +7,7 @@ import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItem
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
 import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed, videoSubtitles } from "./providers/animeonsen.js";
 import { createCipheriv } from "node:crypto";
+import { parseKaaServerId, buildKaaStreamUrl } from "./kaa.js";
 import { createPinnedLookup, isPublicAddress, validatePublicAddresses } from "./core/safe-fetch.js";
 
 
@@ -271,5 +272,27 @@ describe("Anivexa API", () => {
 
     expect(response.status).toBe(503);
     expect(response.body.error.code).toBe("ANIVEXA_DISABLED");
+  });
+});
+
+
+describe("KickAssAnime stream URL policy", () => {
+  it("extracts only bounded IDs from HTTPS KickAssAnime server URLs", () => {
+    expect(parseKaaServerId("https://kaa.lt/embed?id=abc_123-xyz")).toBe("abc_123-xyz");
+    expect(parseKaaServerId("https://www.kaa.lt/player?id=0123456789abcdef")).toBe("0123456789abcdef");
+    expect(parseKaaServerId("http://kaa.lt/embed?id=abc")).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt.attacker.invalid/embed?id=abc")).toBeNull();
+    expect(parseKaaServerId("https://user:pass@kaa.lt/embed?id=abc")).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt:8443/embed?id=abc")).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt/embed?id=../private")).toBeNull();
+    expect(parseKaaServerId("https://player.invalid/embed?id=abc")).toBeNull();
+  });
+
+  it("constructs the fixed HLS CDN URL only when its host is allowlisted", () => {
+    expect(buildKaaStreamUrl("abc_123", new Set(["krussdomi.com"])))
+      .toBe("https://hls.krussdomi.com/manifest/abc_123/master.m3u8");
+    expect(buildKaaStreamUrl("abc_123", new Set(["other.invalid"]))).toBeNull();
+    expect(buildKaaStreamUrl("../private", new Set(["krussdomi.com"]))).toBeNull();
+    expect(buildKaaStreamUrl("abc_123", new Set())).toBeNull();
   });
 });
