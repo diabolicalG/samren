@@ -106,6 +106,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Multipart upload CI run `43894938150` passed Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests, and frontend/backend production builds. The first attempt `43894219693` stopped at typecheck because Formidable lacked declarations; a local declaration was added and the corrected run passed. [Multipart workflow run](https://github.com/diabolicalG/samren/actions/runs/43894938150).
 - Lifecycle CI run `43896585549` passed all workflow steps. It verifies the PENDING-to-READY upload path, signature-mismatch transition to FAILED, stale pending reconciliation, pagination beyond legacy metadata records, typecheck, all API tests, Python tests and production builds. [Lifecycle workflow run](https://github.com/diabolicalG/samren/actions/runs/43896585549).
 - Orphan-file reconciliation CI run `43897217999` passed all workflow steps, including generated-path filtering, stale-file selection, database-reference preservation, typecheck, backend/frontend/Python tests and production builds. [Orphan reconciliation workflow run](https://github.com/diabolicalG/samren/actions/runs/43897217999).
+- Anivexa initial provider-port CI run `43899918673` passed all workflow steps, including Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend/frontend tests, Python API tests and production builds. This validates the initial AnimeGG episode-discovery integration, not live provider availability or stream playback. [Anivexa initial provider CI](https://github.com/diabolicalG/samren/actions/runs/43899918673).
 - GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
@@ -120,8 +121,8 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | BLOCKED / NOT STARTED | Obtain upstream reuse permission or a clear licence; then port a safe subset |
-| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa-specific tests cannot start until reuse path is cleared |
+| Anivexa providers/extractors | PARTIAL — FIRST NATIVE PROVIDER PORTED | AnimeGG episode discovery is ported with guarded HTTP and disabled-by-default routing; remaining providers, watch extraction, mapping/cache parity and provider-specific tests remain |
+| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect, size and disabled-route tests now exist; add DNS policy, extractor URL checks and broader provider tests |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
 ## 7. Security requirements retained
@@ -136,7 +137,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Resolve the Anivexa source-reuse rights question: the user has authorized copying from the read-only Anime-streaming reference into Samren, but the referenced Anivexa project still has no declared licence and credits a separate upstream. Obtain upstream reuse permission or use an independently implemented adapter based on documented behavior. Preserve Anime-streaming as read-only and do not reproduce embedded credentials or unsafe shell execution.
+1. Continue the user-authorized Anivexa copy/port into Samren only. Add the remaining approved providers and extractors in controlled increments; do not modify Anime-streaming. Do not carry embedded credentials, shell-command execution, or unsafe dynamic-code evaluation into Samren.
 2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
