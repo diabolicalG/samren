@@ -240,3 +240,32 @@ describe("administrator workspace", () => {
     expect(screen.queryByRole("button", { name: /create draft/i })).toBeNull();
   });
 });
+
+
+describe("first-party watch experience", () => {
+  it("lets viewers switch between available video qualities", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockResolvedValue({
+      episode: { id: "episode-1", episodeNumber: 1, title: "Pilot", synopsis: null, durationSeconds: 1200 },
+      sources: [
+        { id: "source-sd", qualityLabel: "480p", isDefault: true, mimeType: "video/mp4", url: "/api/v1/media/asset-sd" },
+        { id: "source-hd", qualityLabel: "1080p", isDefault: false, mimeType: "video/mp4", url: "/api/v1/media/asset-hd" },
+      ],
+      subtitles: [],
+    });
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({
+      episodes: [{ id: "episode-1", episodeNumber: 1, title: "Pilot" }],
+    } as never);
+
+    renderApp("/watch/the-clockwork-orbit/1");
+
+    const quality = await screen.findByLabelText("Video quality") as HTMLSelectElement;
+    expect(quality.value).toBe("source-sd");
+    fireEvent.change(quality, { target: { value: "source-hd" } });
+
+    await waitFor(() => {
+      expect(quality.value).toBe("source-hd");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/media/asset-hd");
+    });
+  });
+});
