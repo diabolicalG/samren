@@ -77,6 +77,44 @@ describe("admin catalogue management", () => {
     expect(seasons.status).toBe(200);
   });
 
+  it("accepts a bounded first-party image upload only when its file signature matches", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const uploaded = await agent
+      .post("/api/v1/admin/media/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .set("x-original-filename", "phase3-upload.png")
+      .set("Content-Type", "image/png")
+      .send(pngHeader);
+
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.data).toMatchObject({
+      originalFilename: "phase3-upload.png",
+      mediaKind: "POSTER",
+      mimeType: "image/png",
+      sizeBytes: String(pngHeader.length),
+      processingState: "READY",
+    });
+    assetId = uploaded.body.data.id as string;
+
+    const mismatch = await agent
+      .post("/api/v1/admin/media/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .set("x-original-filename", "not-a-png.png")
+      .set("Content-Type", "image/png")
+      .send(Buffer.from("not an image"));
+
+    expect(mismatch.status).toBe(415);
+    expect(mismatch.body.error.code).toBe("FILE_SIGNATURE_MISMATCH");
+
+    const removed = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
+    expect(removed.status).toBe(204);
+    assetId = undefined;
+  });
+
   it("creates, publishes, edits, and archives a first-party catalogue record", async () => {
     const agent = await login(adminEmail, adminPassword);
     const created = await agent
