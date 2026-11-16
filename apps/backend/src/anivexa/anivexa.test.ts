@@ -23,6 +23,9 @@ describe("Anivexa DNS-pinned transport", () => {
     const single = vi.fn();
     lookup("provider.example", {}, single);
     expect(single).toHaveBeenCalledWith(null, pinned[0].address, 4);
+    const familyFiltered = vi.fn();
+    lookup("provider.example", { family: 6 }, familyFiltered);
+    expect(familyFiltered).toHaveBeenCalledWith(null, pinned[1].address, 6);
   });
   it("rejects private, loopback, link-local and documentation DNS answers, including mixed sets", () => {
     expect(isPublicAddress("127.0.0.1")).toBe(false);
