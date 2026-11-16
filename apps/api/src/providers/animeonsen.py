@@ -3,7 +3,7 @@ import base64
 import re
 from urllib.parse import quote, unquote, urlparse
 
-import httpx
+from src.providers import _safe_http as httpx
 
 from src.providers import _cache
 
