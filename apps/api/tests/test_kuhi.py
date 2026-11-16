@@ -83,3 +83,29 @@ def test_kuhi_outbound_transport_blocks_when_allowlist_is_empty(monkeypatch):
     monkeypatch.delenv("KUHI_PROVIDER_ALLOWED_HOSTS", raising=False)
     with pytest.raises(ValueError):
         validate_provider_url("https://graphql.anilist.co/graphql")
+
+def test_kuhi_episodes_route_redacts_raw_source_links(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    async def fake_episodes(anilist_id):
+        return {
+            "anilistId": anilist_id,
+            "providers": {
+                "anineko": {
+                    "meta": {"id": "123", "title": "Example", "source": "anineko", "matchScore": 0.9},
+                    "episodes": {
+                        "sub": [{"id": "watch/anineko/123/sub/anineko-1", "number": 1, "title": "Episode 1", "sourceLink": "https://internal.example/private"}],
+                        "dub": [],
+                    },
+                },
+            },
+        }
+
+    monkeypatch.setattr(kuhi.provider_race, "merged_episodes", fake_episodes)
+    with TestClient(app) as client:
+        response = client.get("/v1/kuhi/episodes/123")
+    assert response.status_code == 200, response.text
+    episode = response.json()["providers"]["anineko"]["episodes"]["sub"][0]
+    assert episode["number"] == 1
+    assert "sourceLink" not in episode
+
