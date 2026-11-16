@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
+import { parseAniZoneEpisodes } from "./anizone.js";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -17,6 +18,20 @@ describe("Anivexa HTTP policy", () => {
     expect(isAnivexaUrlAllowed("https://animegg.org", new Set())).toBe(false);
     expect(isAnivexaUrlAllowed("https://cdn.example-stream.net/video.m3u8", new Set(["example-stream.net"]))).toBe(true);
     expect(isAnivexaUrlAllowed("https://untrusted.invalid/video.m3u8", new Set(["example-stream.net"]))).toBe(false);
+  });
+});
+
+describe("AniZone episode payload parsing", () => {
+  it("parses embedded episode metadata without evaluating provider scripts", () => {
+    const html = String.raw`items:JSON.parse('[{"slug":"1","url":"/anime/example/1","title_list":{"1":"Episode 1"},"duration":"23:45","videos_count":1}]')`;
+
+    expect(parseAniZoneEpisodes(html)).toEqual([{
+      number: 1,
+      sourceNumber: 1,
+      title: "Episode 1",
+      duration: 1425,
+      hasSub: true,
+    }]);
   });
 });
 
