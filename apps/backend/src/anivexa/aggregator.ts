@@ -53,17 +53,17 @@ function safeText(value: unknown, fallback: string, max = 100): string {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
-function normalizeStream(provider: ProviderId, audio: AudioType, raw: unknown): AggregatedStream | null {
+function normalizeStream(provider: ProviderId, audio: AudioType, raw: unknown, allowedHosts: Set<string>): AggregatedStream | null {
   if (!raw || typeof raw !== "object") return null;
   const stream = raw as Record<string, unknown>;
   if (typeof stream.url !== "string" || typeof stream.type !== "string") return null;
   const type = stream.type.toLowerCase();
   if (!SUPPORTED_TYPES.has(type)) return null;
-  if (!isAnivexaUrlAllowed(stream.url, anivexaStreamAllowedHosts())) return null;
+  if (!isAnivexaUrlAllowed(stream.url, allowedHosts)) return null;
   const subtitles = Array.isArray(stream.subtitles) ? stream.subtitles.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const subtitle = item as Record<string, unknown>;
-    if (typeof subtitle.url !== "string" || !isAnivexaUrlAllowed(subtitle.url, anivexaStreamAllowedHosts())) return [];
+    if (typeof subtitle.url !== "string" || !isAnivexaUrlAllowed(subtitle.url, allowedHosts)) return [];
     return [{
       url: subtitle.url,
       label: safeText(subtitle.label, "Subtitle"),
@@ -89,14 +89,16 @@ export class ProviderAggregator {
   private readonly pool: BoundedWorkerPool;
   private readonly circuits: ProviderCircuitBreaker;
   private readonly adapters: ProviderAdapter[];
+  private readonly streamAllowedHosts: Set<string>;
 
   constructor(
-    options: { concurrency?: number; maxQueue?: number; failureThreshold?: number; cooldownMs?: number } = {},
+    options: { concurrency?: number; maxQueue?: number; failureThreshold?: number; cooldownMs?: number; streamAllowedHosts?: Set<string> } = {},
     providers: ProviderAdapter[] = adapters,
   ) {
     this.pool = new BoundedWorkerPool(options.concurrency ?? 4, options.maxQueue ?? 64);
     this.circuits = new ProviderCircuitBreaker(options.failureThreshold ?? 3, options.cooldownMs ?? 30_000);
     this.adapters = providers;
+    this.streamAllowedHosts = options.streamAllowedHosts ?? anivexaStreamAllowedHosts();
   }
 
   get status() {
@@ -124,7 +126,7 @@ export class ProviderAggregator {
         const result = await adapter.extract(anilistId, episode, audio) as ProviderResult;
         const streams = Array.isArray(result?.streams) ? result.streams : [];
         for (const raw of streams) {
-          const candidate = normalizeStream(adapter.id, audio, raw);
+          const candidate = normalizeStream(adapter.id, audio, raw, this.streamAllowedHosts);
           if (candidate) {
             this.circuits.success(adapter.id);
             return candidate;
