@@ -109,3 +109,17 @@ def test_kuhi_episodes_route_redacts_raw_source_links(monkeypatch):
     assert episode["number"] == 1
     assert "sourceLink" not in episode
 
+
+@pytest.mark.anyio
+async def test_kuhi_outbound_transport_rejects_private_dns_results(monkeypatch):
+    import asyncio
+
+    from src.providers import _safe_http
+
+    class FakeLoop:
+        async def getaddrinfo(self, host, port, type=None):
+            return [(None, None, None, None, ("10.0.0.8", 443))]
+
+    monkeypatch.setattr(asyncio, "get_running_loop", lambda: FakeLoop())
+    with pytest.raises(ValueError, match="non-public"):
+        await _safe_http.validate_resolved_host("provider.example")
