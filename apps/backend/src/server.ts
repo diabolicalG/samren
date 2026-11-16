@@ -1,7 +1,7 @@
 import { app } from "./app.js";
 import { env } from "./config/env.js";
 import { cleanupStaleMediaTempFiles } from "./media/storage.js";
-import { reconcileStalePendingMediaAssets } from "./media/lifecycle.js";
+import { reconcileOrphanedManagedMediaFiles, reconcileStalePendingMediaAssets } from "./media/lifecycle.js";
 
 async function start() {
   try {
@@ -16,6 +16,13 @@ async function start() {
     if (failed > 0) process.stdout.write(`Marked ${failed} abandoned media asset(s) as failed\n`);
   } catch {
     process.stderr.write("Pending media reconciliation did not complete; continuing API startup\n");
+  }
+
+  try {
+    const removed = await reconcileOrphanedManagedMediaFiles();
+    if (removed > 0) process.stdout.write(`Removed ${removed} unreferenced managed media file(s)\n`);
+  } catch {
+    process.stderr.write("Orphan media reconciliation did not complete; continuing API startup\n");
   }
 
   app.listen(env.PORT, env.HOST, () => {
