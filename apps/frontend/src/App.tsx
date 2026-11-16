@@ -15,6 +15,7 @@ function AnimeCard({ anime }: { anime: CatalogAnimeCard }) {
     <Link className="anime-card-link" to={`/anime/${anime.slug}`}>
       <article className="anime-card">
         <div className="anime-poster" aria-hidden="true">
+          {anime.posterAsset?.url ? <img className="anime-poster-image" src={anime.posterAsset.url} alt="" loading="lazy" /> : null}
           <span className="poster-mark"><Clapperboard size={24} strokeWidth={1.3} /></span>
           {anime.featured ? <span className="poster-featured">FEATURED</span> : null}
           <span className="poster-year">{anime.releaseYear ?? "—"}</span>
