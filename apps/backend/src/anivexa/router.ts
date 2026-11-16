@@ -5,6 +5,7 @@ import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
 import { getAniZoneEpisodes, getAniZoneStreams } from "./anizone.js";
 import { getAniKotoEpisodes, getAniKotoStreams } from "./anikoto.js";
 import { getKaaEpisodes, getKaaStreams } from "./kaa.js";
+import { providerAggregator } from "./aggregator.js";
 
 export const anivexaRouter = Router();
 
@@ -84,4 +85,79 @@ anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
   } catch {
     response.status(502).json({ data: null, error: { code: "ANIVEXA_EXTRACTION_FAILED", message: "Anivexa stream extraction is temporarily unavailable" } });
   }
+});
+
+
+const aggregateParamsSchema = z.object({
+  anilistId: z.coerce.number().int().positive().max(2_147_483_647),
+  episode: z.coerce.number().int().positive().max(10_000),
+});
+const fallbackBodySchema = z.object({ provider: providerSchema });
+
+anivexaRouter.get("/aggregate/providers", (_request, response) => {
+  if (!env.ANIVEXA_ENABLED) {
+    response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
+    return;
+  }
+  response.setHeader("Cache-Control", "no-store");
+  response.status(200).json({ data: providerAggregator.status, error: null });
+});
+
+anivexaRouter.get("/aggregate/:anilistId/:episode", async (request, response) => {
+  if (!env.ANIVEXA_ENABLED) {
+    response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
+    return;
+  }
+  const params = aggregateParamsSchema.safeParse(request.params);
+  const audio = audioSchema.safeParse(request.query.audio ?? "sub");
+  if (!params.success || !audio.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number and audio type are required" } });
+    return;
+  }
+  if (!env.ANIVEXA_ALLOWED_HOSTS.trim() || !env.ANIVEXA_STREAM_ALLOWED_HOSTS.trim()) {
+    response.status(503).json({ data: null, error: { code: "ANIVEXA_HOSTS_NOT_CONFIGURED", message: "Anivexa upstream and stream hosts must both be allowlisted" } });
+    return;
+  }
+  try {
+    const result = await providerAggregator.start(params.data.anilistId, params.data.episode, audio.data);
+    response.setHeader("Cache-Control", "private, no-store");
+    response.status(200).json({ data: result, error: null });
+  } catch {
+    response.status(502).json({ data: null, error: { code: "ANIVEXA_ALL_PROVIDERS_FAILED", message: "No provider returned a valid playable stream" } });
+  }
+});
+
+anivexaRouter.post("/aggregate/:sessionId/fallback", async (request, response) => {
+  if (!env.ANIVEXA_ENABLED) {
+    response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
+    return;
+  }
+  const sessionId = z.string().uuid().safeParse(request.params.sessionId);
+  const body = fallbackBodySchema.safeParse(request.body);
+  if (!sessionId.success || !body.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid playback session and failed provider are required" } });
+    return;
+  }
+  try {
+    const result = await providerAggregator.fallback(sessionId.data, body.data.provider);
+    response.setHeader("Cache-Control", "private, no-store");
+    response.status(200).json({ data: result, error: null });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const notFound = message.includes("expired or was not found");
+    response.status(notFound ? 404 : 409).json({
+      data: null,
+      error: { code: notFound ? "PLAYBACK_SESSION_EXPIRED" : "NO_FALLBACK_AVAILABLE", message: notFound ? "Playback session expired; start a new provider search" : "No alternate provider is currently available" },
+    });
+  }
+});
+
+anivexaRouter.delete("/aggregate/:sessionId", async (request, response) => {
+  const sessionId = z.string().uuid().safeParse(request.params.sessionId);
+  if (!sessionId.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid playback session is required" } });
+    return;
+  }
+  await providerAggregator.close(sessionId.data);
+  response.status(204).end();
 });
