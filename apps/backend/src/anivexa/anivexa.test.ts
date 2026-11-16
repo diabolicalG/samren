@@ -14,12 +14,21 @@ describe("Anivexa HTTP policy", () => {
     expect(isAnivexaUrlAllowed("https://user:pass@animegg.org", allowed)).toBe(false);
     expect(isAnivexaUrlAllowed("https://127.0.0.1", allowed)).toBe(false);
     expect(isAnivexaUrlAllowed("https://animegg.org", new Set())).toBe(false);
+    expect(isAnivexaUrlAllowed("https://cdn.example-stream.net/video.m3u8", new Set(["example-stream.net"]))).toBe(true);
+    expect(isAnivexaUrlAllowed("https://untrusted.invalid/video.m3u8", new Set(["example-stream.net"]))).toBe(false);
   });
 });
 
 describe("Anivexa API", () => {
   it("keeps Anivexa disabled unless explicitly enabled", async () => {
     const response = await request(app).get("/api/v1/anivexa/providers");
+
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("ANIVEXA_DISABLED");
+  });
+
+  it("keeps stream extraction disabled until the integration is enabled", async () => {
+    const response = await request(app).get("/api/v1/anivexa/extract/21/1?audio=sub");
 
     expect(response.status).toBe(503);
     expect(response.body.error.code).toBe("ANIVEXA_DISABLED");
