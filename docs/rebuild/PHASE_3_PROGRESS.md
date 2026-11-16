@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `62c325db78fc8fe16c42402a66a07f5b15a9205a`  
+**Latest code checkpoint:** `a54e19dffccc595114654827afae0798837578bb`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -87,7 +87,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
 - Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
 - Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
-- These changes are committed through `62c325db78fc8fe16c42402a66a07f5b15a9205a`. CI for the new storage/delivery test commits is still running; do not treat these latest tests as green until the latest branch-head run completes.
+- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. The CI run for the corrected delivery tests (`43889715112`) has passed Prisma validation/generation/migrations, seed idempotence, lint, typecheck and backend API tests; frontend tests, Python tests and production builds were still running at the time of this document update.
 
 ## 5. Verification
 
