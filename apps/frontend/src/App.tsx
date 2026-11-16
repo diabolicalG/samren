@@ -246,12 +246,22 @@ function WatchPage() {
     queryFn: () => apiClient.catalogPlayback(slug, number),
     enabled: Boolean(slug) && Number.isSafeInteger(number) && number > 0,
   });
+  const animeQuery = useQuery({
+    queryKey: ["catalog", "anime", slug],
+    queryFn: () => apiClient.catalogAnimeBySlug(slug),
+    enabled: Boolean(slug),
+  });
 
   if (playbackQuery.isLoading) return <main className="page-shell"><div className="catalog-loading" role="status">Loading playback…</div></main>;
   if (playbackQuery.isError || !playbackQuery.data) return <main className="page-shell"><section className="simple-page"><span className="section-kicker">FIRST-PARTY PLAYER</span><h1>Episode unavailable.</h1><p>This episode may be unpublished or unavailable for playback.</p><Link className="text-link" to={`/anime/${slug}`}>Return to episode guide</Link></section></main>;
 
   const playback = playbackQuery.data;
   const source = playback.sources.find((item) => item.isDefault) ?? playback.sources[0];
+  const episodes = animeQuery.data?.episodes ?? [];
+  const episodeIndex = episodes.findIndex((item) => item.episodeNumber === playback.episode.episodeNumber);
+  const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
+  const nextEpisode = episodeIndex >= 0 && episodeIndex < episodes.length - 1 ? episodes[episodeIndex + 1] : null;
+  const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
   return (
     <main className="page-shell watch-page">
       <Link className="text-link" to={`/anime/${slug}`}>← Back to episode guide</Link>
@@ -262,7 +272,7 @@ function WatchPage() {
       </section>
       {source ? (
         <div className="video-frame">
-          <video controls playsInline preload="metadata" src={source.url}>
+          <video controls playsInline preload="metadata" src={source.url} onLoadedMetadata={(event) => { const saved = Number(window.localStorage.getItem(progressKey)); if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved; }} onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }} onEnded={() => window.localStorage.removeItem(progressKey)}>
             {playback.subtitles.map((track) => <track key={track.id} kind="subtitles" src={track.url} srcLang={track.languageCode} label={track.label} default={track.isDefault} />)}
             Your browser does not support HTML video playback.
           </video>
@@ -270,6 +280,10 @@ function WatchPage() {
       ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
       {source ? <p className="playback-quality">{source.qualityLabel || source.mimeType} · First-party media</p> : null}
       {playback.subtitles.length ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
+      <nav className="watch-navigation" aria-label="Episode navigation">
+        {previousEpisode ? <Link className="ui-button ui-button--secondary" to={`/watch/${slug}/${previousEpisode.episodeNumber}`}>← Episode {previousEpisode.episodeNumber}</Link> : <span />}
+        {nextEpisode ? <Link className="ui-button ui-button--primary" to={`/watch/${slug}/${nextEpisode.episodeNumber}`}>Episode {nextEpisode.episodeNumber} →</Link> : null}
+      </nav>
     </main>
   );
 }
