@@ -5,7 +5,30 @@ import { isAnivexaUrlAllowed } from "./http.js";
 import { aniZoneStreamType, parseAniZoneEpisodes, parseAniZonePlayerData } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
+import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed } from "./providers/animeonsen.js";
 import { createCipheriv } from "node:crypto";
+
+
+describe("AnimeOnsen dynamic-origin and media URL policy", () => {
+  it("accepts only explicitly configured HTTPS API and search origins", () => {
+    const allowed = new Set(["api.animeonsen.example"]);
+    expect(validateAnimeOnsenOrigin("https://api.animeonsen.example/", allowed)).toBe("https://api.animeonsen.example");
+    expect(() => validateAnimeOnsenOrigin("https://api.animeonsen.example.attacker.invalid/", allowed)).toThrow();
+    expect(() => validateAnimeOnsenOrigin("http://api.animeonsen.example/", allowed)).toThrow();
+    expect(() => validateAnimeOnsenOrigin("https://user:secret@api.animeonsen.example/", allowed)).toThrow();
+    expect(() => validateAnimeOnsenOrigin("https://api.animeonsen.example/redirect", allowed)).toThrow();
+    expect(() => validateAnimeOnsenOrigin("https://api.animeonsen.example:8443/", allowed)).toThrow();
+  });
+
+  it("allows only HTTPS stream/subtitle hosts from the separate media allowlist", () => {
+    const allowed = new Set(["animeonsen-cdn.example"]);
+    expect(isAnimeOnsenMediaUrlAllowed("https://media.animeonsen-cdn.example/episode.mpd", allowed)).toBe(true);
+    expect(isAnimeOnsenMediaUrlAllowed("http://media.animeonsen-cdn.example/episode.mpd", allowed)).toBe(false);
+    expect(isAnimeOnsenMediaUrlAllowed("https://animeonsen-cdn.example.attacker.invalid/episode.mpd", allowed)).toBe(false);
+    expect(isAnimeOnsenMediaUrlAllowed("https://user:secret@animeonsen-cdn.example/episode.mpd", allowed)).toBe(false);
+    expect(isAnimeOnsenMediaUrlAllowed("https://animeonsen-cdn.example:8443/episode.mpd", allowed)).toBe(false);
+  });
+});
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
