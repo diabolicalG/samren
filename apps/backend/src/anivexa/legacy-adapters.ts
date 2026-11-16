@@ -1,5 +1,7 @@
 import { getEpisodes as fetchAniWavesEpisodes, default as aniWavesProvider } from "./providers/aniwaves.js";
 import { getEpisodes as fetchAnimeNoSubEpisodes, default as animeNoSubProvider } from "./providers/animenosub.js";
+import { getEpisodes as fetchAniPmEpisodes, default as aniPmProvider } from "./providers/anipm.js";
+import { getEpisodes as fetchSenshiEpisodes, default as senshiProvider } from "./providers/senshi.js";
 import { getEpisodes as fetchReAnimeEpisodes, default as reAnimeProvider } from "./providers/reanime.js";
 import { getEpisodes as fetchAnimeOnsenEpisodes, getStreams as fetchAnimeOnsenStreams } from "./providers/animeonsen.js";
 
@@ -44,4 +46,20 @@ export async function getAnimeNoSubEpisodes(anilistId: number): Promise<Record<s
 
 export async function getAnimeNoSubStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
   return legacyWatch(animeNoSubProvider, `/watch/animenosub/${anilistId}/${audio}/animenosub-${episode}`);
+}
+
+export async function getAniPmEpisodes(anilistId: number): Promise<Record<string, unknown>> {
+  return fetchAniPmEpisodes(anilistId);
+}
+
+export async function getAniPmStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
+  return legacyWatch(aniPmProvider, `/watch/anipm/${anilistId}/${audio}/anipm-${episode}`);
+}
+
+export async function getSenshiEpisodes(anilistId: number): Promise<Record<string, unknown>> {
+  return fetchSenshiEpisodes(anilistId);
+}
+
+export async function getSenshiStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
+  return legacyWatch(senshiProvider, `/watch/senshi/${anilistId}/${audio}/senshi-${episode}`);
 }
