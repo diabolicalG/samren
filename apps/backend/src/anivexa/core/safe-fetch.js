@@ -7,7 +7,7 @@ const DEFAULT_HOSTS = [
   "www.animegg.org", "animegg.org", "anizone.to", "aniwaves.ru",
   "www.animeonsen.xyz", "animeonsen.xyz", "reanime.to", "flixcloud.cc",
   "nova.upn.one", "vidplay.site", "vidplay.online", "vidmoly.net",
-  "animenosub.to", "anikototv.to", "mapper.nekostream.site",
+  "animenosub.to", "anikototv.to", "senshi.to", "s.vidcloud.se", "mapper.nekostream.site",
   "mkissa.to", "api.mkissa.net", "cdn.mkissa.net", "ani.pm", "embed.settlar.io",
 ];
 
