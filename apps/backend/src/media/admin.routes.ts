@@ -1,5 +1,9 @@
 import { Router } from "express";
+import { createReadStream } from "node:fs";
 import { basename } from "node:path";
+import { tmpdir } from "node:os";
+import { unlink } from "node:fs/promises";
+import formidable, { type File as FormidableFile } from "formidable";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
@@ -17,32 +21,105 @@ const allowedMime: Record<string, string[]> = {
   SUBTITLE: ["text/vtt", "application/x-subrip", "application/x-ass"],
 };
 
+function isSafeFilename(filename: string) {
+  return Boolean(filename) && filename.length <= 255 && basename(filename) === filename
+    && !filename.includes("/") && !filename.includes(String.fromCharCode(92))
+    && !filename.split("").some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    });
+}
+
+async function parseMultipartUpload(request: import("express").Request, maxBytes: number): Promise<FormidableFile> {
+  const temporaryPaths = new Set<string>();
+  const form = formidable({
+    uploadDir: tmpdir(),
+    maxFiles: 1,
+    maxFields: 0,
+    maxFieldsSize: 1024,
+    maxFileSize: maxBytes,
+    maxTotalFileSize: maxBytes,
+    allowEmptyFiles: false,
+    minFileSize: 1,
+    multiples: false,
+    keepExtensions: false,
+  });
+  form.on("fileBegin", (_fieldName, file) => temporaryPaths.add(file.filepath));
+
+  try {
+    const [fields, files] = await form.parse(request);
+    if (Object.keys(fields).length !== 0 || Object.keys(files).length !== 1 || !files.file || files.file.length !== 1) {
+      throw new Error("Multipart upload must contain exactly one file field named file");
+    }
+    return files.file[0];
+  } catch (error) {
+    await Promise.all([...temporaryPaths].map((filepath) => unlink(filepath).catch(() => undefined)));
+    throw error;
+  }
+}
+
+function isPayloadTooLarge(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  if ("httpCode" in error && error.httpCode === 413) return true;
+  return "message" in error && typeof error.message === "string" && error.message.toLowerCase().includes("exceeds");
+}
+
 adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
   const kind = String(request.get("x-media-kind") ?? "").toUpperCase() as UploadMediaKind;
-  const mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  const filename = String(request.get("x-original-filename") ?? "upload").trim();
-  const declaredLength = Number(request.get("content-length") ?? 0);
+  if (!Object.hasOwn(allowedMime, kind)) {
+    response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The media kind is not supported" } });
+    return;
+  }
 
-  if (!Object.hasOwn(allowedMime, kind) || !allowedMime[kind].includes(mime)) {
-    response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The media kind and content type are not supported" } });
-    return;
-  }
-  if (!filename || filename.length > 255 || basename(filename) !== filename || filename.includes("/") || filename.includes(String.fromCharCode(92)) || filename.split("").some((character) => { const code = character.charCodeAt(0); return code < 32 || code === 127; })) {
-    response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
-    return;
-  }
   const maxBytes = MAX_UPLOAD_BYTES[kind];
-  if (request.get("transfer-encoding") === undefined && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
+  const isMultipart = Boolean(request.is("multipart/form-data"));
+  const declaredLength = Number(request.get("content-length") ?? 0);
+  if (isMultipart && request.get("content-length") !== undefined
+    && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes + 64 * 1024)) {
+    response.status(413).json({ data: null, error: { code: "UPLOAD_SIZE_INVALID", message: "The multipart upload exceeds the permitted request size" } });
+    return;
+  }
+  if (!isMultipart && request.get("transfer-encoding") === undefined
+    && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
     response.status(413).json({ data: null, error: { code: "UPLOAD_SIZE_INVALID", message: "The upload size is missing or exceeds the limit" } });
     return;
   }
 
+  let filename = String(request.get("x-original-filename") ?? "upload").trim();
+  let mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  let multipartFile: FormidableFile | undefined;
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
+
   try {
-    stored = await storeMediaStream(request, maxBytes);
+    if (isMultipart) {
+      multipartFile = await parseMultipartUpload(request, maxBytes);
+      filename = String(multipartFile.originalFilename ?? "").trim();
+      mime = String(multipartFile.mimetype ?? "").split(";")[0].trim().toLowerCase();
+      if (!isSafeFilename(filename)) {
+        response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The uploaded filename is invalid" } });
+        return;
+      }
+      if (!allowedMime[kind].includes(mime)) {
+        response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The file content type is not supported for this media kind" } });
+        return;
+      }
+      stored = await storeMediaStream(createReadStream(multipartFile.filepath), maxBytes);
+    } else {
+      if (!isSafeFilename(filename)) {
+        response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
+        return;
+      }
+      if (!allowedMime[kind].includes(mime)) {
+        response.status(400).json({ data: null, error: { code: "INVALID_MEDIA_TYPE", message: "The media kind and content type are not supported" } });
+        return;
+      }
+      stored = await storeMediaStream(request, maxBytes);
+    }
+
     const detected = detectMediaSignature(kind, stored.signature);
     if (!detected || detected.mimeType !== mime) {
       await deleteStoredMedia(stored.storageKey);
+      stored = undefined;
       response.status(415).json({ data: null, error: { code: "FILE_SIGNATURE_MISMATCH", message: "The uploaded file content does not match its declared media type" } });
       return;
     }
@@ -66,10 +143,16 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
       data: { ...asset, sizeBytes: asset.sizeBytes.toString() },
       error: null,
     });
-  } catch {
+  } catch (error) {
     if (stored) await deleteStoredMedia(stored.storageKey).catch(() => undefined);
     if (!response.headersSent) {
-      response.status(400).json({ data: null, error: { code: "UPLOAD_FAILED", message: "The media upload could not be completed" } });
+      const tooLarge = isPayloadTooLarge(error);
+      response.status(tooLarge ? 413 : 400).json({
+        data: null,
+        error: { code: tooLarge ? "UPLOAD_TOO_LARGE" : "UPLOAD_FAILED", message: "The media upload could not be completed" },
+      });
     }
+  } finally {
+    if (multipartFile) await unlink(multipartFile.filepath).catch(() => undefined);
   }
 });
