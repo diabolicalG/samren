@@ -4,7 +4,7 @@ import { mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { env } from "../config/env.js";
 
-const STORAGE_KEY_PATTERN = /^[a-f0-9]{2}\\/[a-f0-9]{32}$/;
+const STORAGE_KEY_PATTERN = /^[a-f0-9]{2}[/][a-f0-9]{32}$/;
 const MAX_BUFFER_BYTES = 50 * 1024 * 1024;
 
 export type StoredMedia = {
