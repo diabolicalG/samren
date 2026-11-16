@@ -51,7 +51,8 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
     response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "The filename is invalid" } });
     return;
   }
-  const maxBytes = MAX_UPLOAD_BYTES[kind];\n  if (request.get("transfer-encoding") === undefined && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
+  const maxBytes = MAX_UPLOAD_BYTES[kind];
+  if (request.get("transfer-encoding") === undefined && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
     response.status(413).json({ data: null, error: { code: "UPLOAD_SIZE_INVALID", message: "The upload size is missing or exceeds the limit" } });
     return;
   }
@@ -59,7 +60,8 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
   try {
     stored = await storeMediaStream(request, maxBytes);
-    const detected = detectMediaSignature(kind, stored.signature);\n    if (!detected || detected.mimeType !== mime) {
+    const detected = detectMediaSignature(kind, stored.signature);
+    if (!detected || detected.mimeType !== mime) {
       await deleteStoredMedia(stored.storageKey);
       response.status(415).json({ data: null, error: { code: "FILE_SIGNATURE_MISMATCH", message: "The uploaded file content does not match its declared media type" } });
       return;
