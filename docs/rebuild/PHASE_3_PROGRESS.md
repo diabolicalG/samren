@@ -87,7 +87,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
 - Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
 - Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
-- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. The CI run for the corrected delivery tests (`43889715112`) has passed Prisma validation/generation/migrations, seed idempotence, lint, typecheck and backend API tests; frontend tests, Python tests and production builds were still running at the time of this document update.
+- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. The CI run for the corrected delivery tests (`43889715112`) completed successfully on `a54e19dffccc595114654827afae0798837578bb`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds all passed. [Workflow run](https://github.com/diabolicalG/samren/actions/runs/43889715112).
 
 ## 5. Verification
 
