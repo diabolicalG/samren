@@ -3,7 +3,7 @@ import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
 import { parseAniZoneEpisodes } from "./anizone.js";
-import { parseAniKotoEpisodes, parseAniKotoSearchResults } from "./anikoto.js";
+import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -56,6 +56,23 @@ describe("AniKoto episode parsing", () => {
     expect(parseAniKotoEpisodes(html)).toEqual([
       { number: 1, ids: "server-1", title: "Episode 1", hasSub: true, hasDub: false, malId: 123 },
       { number: 2, ids: "server-2", title: "Episode 2", hasSub: false, hasDub: true, malId: null },
+    ]);
+  });
+});
+
+
+
+describe("AniKoto server-list parsing", () => {
+  const html = String.raw\`<div class="type" data-type="sub"><ul><li data-link-id="sub-1"><a>Sub Server</a></li><li data-link-id="sub-2">Backup</li></ul></div><div class="type" data-type="dub"><ul><li data-link-id="dub-1">Dub Server</li></ul></div><div class="type" data-type="dl"><ul><li data-link-id="download-1">Download</li></ul></div>\`;
+
+  it("selects only the requested audio servers and supports hardsub for sub", () => {
+    expect(parseAniKotoServerItems(html, "sub")).toEqual([
+      { linkId: "sub-1", name: "Sub Server", serverType: "sub" },
+      { linkId: "sub-2", name: "Backup", serverType: "sub" },
+    ]);
+    expect(parseAniKotoServerItems(html.replace('data-type="sub"', 'data-type="hsub"'), "sub")[0].serverType).toBe("hsub");
+    expect(parseAniKotoServerItems(html, "dub")).toEqual([
+      { linkId: "dub-1", name: "Dub Server", serverType: "dub" },
     ]);
   });
 });
