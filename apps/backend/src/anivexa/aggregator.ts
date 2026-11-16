@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
-import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
+import { getAnimeGGStreams } from "./animegg.js";
 import { getAniZoneStreams } from "./anizone.js";
 import { getAniKotoStreams } from "./anikoto.js";
 import { getKaaStreams } from "./kaa.js";
