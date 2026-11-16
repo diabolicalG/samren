@@ -431,6 +431,12 @@ async function handleWatch(anilistId, audio, epNum, ctx = {}) {
   });
 }
 
+export async function getStreams(anilistId, episode, audio = "sub") {
+  const response = await handleWatch(anilistId, audio, episode);
+  if (!response.ok) throw new Error("AnimeOnsen stream extraction failed");
+  return response.json();
+}
+
 export default {
   async fetch(request) {
     if (request.method === "OPTIONS") {
