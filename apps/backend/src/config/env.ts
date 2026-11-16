@@ -8,6 +8,8 @@ const schema = z.object({
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   DATABASE_URL: z.string().min(1).optional(),
   MEDIA_STORAGE_ROOT: z.string().min(1).default(".data/media"),
+  ANIVEXA_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  ANIVEXA_ALLOWED_HOSTS: z.string().default(""),
 });
 
 const parsed = schema.safeParse(process.env);
