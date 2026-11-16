@@ -150,8 +150,8 @@ describe("AniKoto safe embed extraction primitives", () => {
 
   it("ignores route-like text inside comments and regular expressions while decoding escaped literals", () => {
     const script = String.raw`// "stream/getSources-fake"
-const pattern = /stream\\/getSources-regex/;
-const route = "stream\\x2fgetSources";
+const pattern = /stream\/getSources-regex/;
+const route = "stream\x2fgetSources";
 const modern = "stream/getSources2";`;
     expect(parseMegaPlayRoutes(script)).toEqual({ legacy: "stream/getSources", modern: "stream/getSources2" });
   });
