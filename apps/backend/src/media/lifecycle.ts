@@ -1,5 +1,5 @@
 import { prisma } from "../db/prisma.js";
-import { deleteStoredMedia, isManagedStorageKey } from "./storage.js";
+import { deleteStoredMedia, isManagedStorageKey, listStaleManagedMediaKeys } from "./storage.js";
 
 const DEFAULT_PENDING_AGE_MS = 24 * 60 * 60 * 1000;
 const RECONCILIATION_BATCH_SIZE = 500;
@@ -45,4 +45,37 @@ export async function reconcileStalePendingMediaAssets(olderThanMs = DEFAULT_PEN
   }
 
   return failed;
+}
+
+
+/**
+ * Remove old managed files that no longer have a usable database reference.
+ * READY and PENDING records are preserved; FAILED records are safe to clean.
+ */
+export async function reconcileOrphanedManagedMediaFiles(olderThanMs = DEFAULT_PENDING_AGE_MS, now = Date.now()) {
+  const candidates = await listStaleManagedMediaKeys(olderThanMs, now);
+  let removed = 0;
+
+  for (let offset = 0; offset < candidates.length; offset += RECONCILIATION_BATCH_SIZE) {
+    const batch = candidates.slice(offset, offset + RECONCILIATION_BATCH_SIZE);
+    const assets = await prisma.mediaAsset.findMany({
+      where: { storageKey: { in: batch } },
+      select: { storageKey: true, processingState: true },
+    });
+    const usableReferences = new Set(
+      assets.filter((asset) => asset.processingState !== "FAILED").map((asset) => asset.storageKey),
+    );
+
+    for (const storageKey of batch) {
+      if (usableReferences.has(storageKey)) continue;
+      try {
+        await deleteStoredMedia(storageKey);
+        removed += 1;
+      } catch {
+        // A later startup can retry; do not block API availability.
+      }
+    }
+  }
+
+  return removed;
 }
