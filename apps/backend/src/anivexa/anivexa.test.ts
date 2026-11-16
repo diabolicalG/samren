@@ -3,6 +3,7 @@ import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
 import { parseAniZoneEpisodes } from "./anizone.js";
+import { parseAniKotoEpisodes } from "./anikoto.js";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -32,6 +33,16 @@ describe("AniZone episode payload parsing", () => {
       duration: 1425,
       hasSub: true,
     }]);
+  });
+});
+
+describe("AniKoto episode parsing", () => {
+  it("parses sub and dub flags and rejects duplicate episode numbers", () => {
+    const html = String.raw`<a data-id="server-1" data-num="1" data-sub="1" data-dub="0" data-mal="123"><span class="d-title">Episode 1</span></a><a data-id="server-1b" data-num="1" data-sub="1" data-dub="1"><span class="d-title">Duplicate</span></a><a data-id="server-2" data-num="2" data-sub="0" data-dub="1"><span class="d-title">Episode 2</span></a>`;
+    expect(parseAniKotoEpisodes(html)).toEqual([
+      { number: 1, ids: "server-1", title: "Episode 1", hasSub: true, hasDub: false, malId: 123 },
+      { number: 2, ids: "server-2", title: "Episode 2", hasSub: false, hasDub: true, malId: null },
+    ]);
   });
 });
 
