@@ -5,7 +5,7 @@ import { isAnivexaUrlAllowed } from "./http.js";
 import { aniZoneStreamType, parseAniZoneEpisodes, parseAniZonePlayerData } from "./anizone.js";
 import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItems } from "./anikoto.js";
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
-import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed } from "./providers/animeonsen.js";
+import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed, videoSubtitles } from "./providers/animeonsen.js";
 import { createCipheriv } from "node:crypto";
 
 
@@ -44,6 +44,30 @@ describe("Anivexa HTTP policy", () => {
     expect(isAnivexaUrlAllowed("https://animegg.org", new Set())).toBe(false);
     expect(isAnivexaUrlAllowed("https://cdn.example-stream.net/video.m3u8", new Set(["example-stream.net"]))).toBe(true);
     expect(isAnivexaUrlAllowed("https://untrusted.invalid/video.m3u8", new Set(["example-stream.net"]))).toBe(false);
+  });
+});
+
+describe("AnimeOnsen subtitle metadata", () => {
+  it("filters untrusted subtitle hosts and never forwards bearer headers", () => {
+    const previous = process.env.ANIVEXA_STREAM_ALLOWED_HOSTS;
+    process.env.ANIVEXA_STREAM_ALLOWED_HOSTS = "animeonsen-cdn.example";
+    try {
+      expect(videoSubtitles({
+        metadata: { subtitles: { en: "English", xx: "Unknown" } },
+        uri: { subtitles: {
+          en: "https://animeonsen-cdn.example/en.vtt",
+          xx: "https://attacker.invalid/xx.vtt",
+        } },
+      })).toEqual([{
+        url: "https://animeonsen-cdn.example/en.vtt",
+        label: "English",
+        srclang: "en",
+        default: false,
+      }]);
+    } finally {
+      if (previous === undefined) delete process.env.ANIVEXA_STREAM_ALLOWED_HOSTS;
+      else process.env.ANIVEXA_STREAM_ALLOWED_HOSTS = previous;
+    }
   });
 });
 
