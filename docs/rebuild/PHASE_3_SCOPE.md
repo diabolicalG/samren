@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTATION AUTHORIZED — revised scope approved by product owner on 2026-11-15  
 **Repository:** `diabolicalG/samren`  
-**Branch:** `main`  
+**Implementation branch:** `phase-3-media-providers`  
 **Planning baseline:** `9726d72336daa5e635b0905ce44a90b6470a1639`  
 **Previous phase:** Phase 2 — COMPLETE and FROZEN  
 **Storage decision:** Local, application-managed filesystem storage  
@@ -21,7 +21,7 @@ Administrators must be able to upload and manage poster, banner, video and subti
 
 Local uploaded media and provider-resolved external streams are separate media paths. Provider streams must never be represented as locally stored MediaAsset records.
 
-If an episode has no ready, valid first-party video asset, the watch experience must show an intentional unavailable state. It must never attempt a third-party fallback.
+If an episode has no ready, valid first-party video asset, the watch experience may offer the separately approved Kuhi/Anivexa provider path. It must not silently treat remote streams as first-party assets.
 
 ## 2. Baseline and existing contracts
 
@@ -328,7 +328,7 @@ The following are not part of Phase 3:
 - S3 or other cloud/object storage implementation.
 - CDN, multi-region or multi-host storage replication.
 - FFmpeg transcoding, adaptive-bitrate generation, HLS packaging and background media-processing workers.
-- External media hosting, streaming providers, embeds, source resolvers, scraping or stream proxies.
+- Additional external media hosts, providers, embeds, source resolvers, scraping integrations or stream proxies beyond the approved Kuhi/Anivexa implementation.
 - Public user registration, account recovery, MFA, role management or session redesign.
 - Server-synchronized watch history, cross-device resume, watchlists, favourites and personal library.
 - Downloads/offline playback and DRM.
@@ -343,9 +343,7 @@ Any proposal to add one of these requires a separate scope decision before imple
 - Local managed filesystem storage: APPROVED.
 - Planning document creation: APPROVED.
 
-**Implementation authorization: NOT GRANTED.**
-
-No Phase 3 implementation may begin until the user reviews this document and gives a separate, explicit instruction authorizing implementation. Phase 2 remains complete and frozen. Phase 3 remains NOT STARTED until that authorization is received.
+**Implementation authorization:** SUPERSEDED by the explicit approval in Section 13. Implementation is authorized on the dedicated `phase-3-media-providers` branch. Phase 2 remains complete and frozen.
 
 
 ---
