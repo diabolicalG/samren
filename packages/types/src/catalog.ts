@@ -202,3 +202,15 @@ export type AdminSubtitleTrack = {
     processingState: "PENDING" | "READY" | "FAILED";
   };
 };
+
+export type CatalogPlayback = {
+  episode: {
+    id: string;
+    episodeNumber: number;
+    title: string;
+    synopsis: string | null;
+    durationSeconds: number | null;
+  };
+  sources: Array<{ id: string; qualityLabel: string | null; isDefault: boolean; mimeType: string; url: string }>;
+  subtitles: Array<{ id: string; languageCode: string; label: string; isDefault: boolean; format: "VTT"; url: string }>;
+};
