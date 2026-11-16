@@ -22,35 +22,69 @@ function decodeFragment(value: string): string | null {
   } catch { return null; }
 }
 
+function decodeScriptString(value: string): string {
+  return value.replace(/\\u([\dA-Fa-f]{4})|\\x([\dA-Fa-f]{2})|\\([\\\'"bnfrtv0])/g, (_, unicode: string | undefined, hex: string | undefined, escaped: string | undefined) => {
+    if (unicode) return String.fromCharCode(Number.parseInt(unicode, 16));
+    if (hex) return String.fromCharCode(Number.parseInt(hex, 16));
+    return ({ b: "\b", n: "\n", f: "\f", r: "\r", t: "\t", v: "\v", "0": "\0" } as Record<string, string>)[escaped ?? ""] ?? escaped ?? "";
+  });
+}
+
 function scriptStrings(script: string): string[] {
   const values: string[] = [];
   let index = 0;
+  let previous = "";
   while (index < script.length) {
     const char = script[index];
     if (char === "/" && script[index + 1] === "/") {
       const end = script.indexOf("\n", index + 2);
-      index = end < 0 ? script.length : end + 1;
+      if (end < 0) break;
+      index = end + 1;
       continue;
     }
     if (char === "/" && script[index + 1] === "*") {
       const end = script.indexOf("*/", index + 2);
-      index = end < 0 ? script.length : end + 2;
+      if (end < 0) break;
+      index = end + 2;
       continue;
     }
-    if (char !== "'" && char !== '"') { index += 1; continue; }
-    const quote = char;
-    let value = "";
-    index += 1;
-    while (index < script.length && script[index] !== quote) {
-      if (script[index] === "\\" && index + 1 < script.length) {
+    if (char === "/" && /[=(:,[!&|?{};]/.test(previous)) {
+      index += 1;
+      let inClass = false;
+      while (index < script.length) {
+        if (script[index] === "\\") { index += 2; continue; }
+        if (script[index] === "[") inClass = true;
+        if (script[index] === "]") inClass = false;
+        if (script[index] === "/" && !inClass) {
+          index += 1;
+          while (/[a-z]/i.test(script[index] ?? "")) index += 1;
+          break;
+        }
         index += 1;
-        const escaped = script[index];
-        value += ({ n: "\n", r: "\r", t: "\t" } as Record<string, string>)[escaped] ?? escaped;
-        index += 1;
-      } else { value += script[index]; index += 1; }
+      }
+      continue;
     }
+    if (char === "\'" || char === '"\') {
+      const quote = char;
+      let value = "";
+      index += 1;
+      while (index < script.length && script[index] !== quote) {
+        if (script[index] === "\\" && index + 1 < script.length) { value += script[index]; index += 1; }
+        value += script[index];
+        index += 1;
+      }
+      values.push(decodeScriptString(value));
+      index += 1;
+      continue;
+    }
+    if (char === "`") {
+      index += 1;
+      while (index < script.length && script[index] !== "`") index += script[index] === "\\" ? 2 : 1;
+      index += 1;
+      continue;
+    }
+    if (!/\s/.test(char)) previous = char;
     index += 1;
-    if (value) values.push(value);
   }
   return [...new Set(values)];
 }
