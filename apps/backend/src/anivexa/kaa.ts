@@ -117,7 +117,7 @@ async function resolveSeries(media: Media): Promise<{ slug: string; title: strin
     }
   }
   const ranked = [...candidates.values()].map((item) => {
-    const titleScore = Math.max(...titles.map((title) => similarity(title, String(item.title_en || item.title || item.slug))));
+    const titleScore = Math.max(...titles.map((title) => Math.max(similarity(title, String(item.title_en || "")), similarity(title, String(item.title || "")), similarity(title, String(item.slug || "").replace(/-/g, " ")))));
     const yearScore = !media.seasonYear || !item.year ? 1 : media.seasonYear === item.year ? 1 : Math.abs(media.seasonYear - item.year) === 1 ? 0.8 : 0.45;
     const formatOk = formatMatches(media.format, item.type);
     return { item, titleScore, score: titleScore * 0.82 + yearScore * 0.10 + (formatOk ? 0.08 : 0), formatOk };
@@ -182,6 +182,7 @@ export async function getKaaEpisodes(anilistId: number) {
   if (!episodes.length) throw new Error("KickAssAnime returned no episode records");
   const expected = Number(media.episodes ?? 0);
   const bounded = expected > 0 ? episodes.filter((episode) => episode.number <= expected) : episodes;
+  const locales = Array.isArray(info.locales) ? info.locales.filter((value): value is string => typeof value === "string") : series.locales;
   const base = (episode: Episode, audio: "sub" | "dub") => ({
     id: `watch/kaa/${anilistId}/${audio}/kaa-${episode.number}`,
     number: episode.number,
@@ -190,7 +191,7 @@ export async function getKaaEpisodes(anilistId: number) {
     duration: episode.duration,
     audio,
   });
-  const hasDub = series.locales.includes("en-US");
+  const hasDub = locales.includes("en-US");
   return {
     meta: { id: series.slug, title: series.title, source: "kaa", matchScore: Number(series.score.toFixed(3)), numbering: "local", episodeOffset: 0 },
     episodes: { sub: bounded.map((episode) => base(episode, "sub")), dub: hasDub ? bounded.map((episode) => base(episode, "dub")) : [] },
@@ -204,9 +205,10 @@ export async function getKaaStreams(anilistId: number, episodeNumber: number, au
   const episodes = await fetchEpisodes(series.slug, info);
   const expected = Number(media.episodes ?? 0);
   const bounded = expected > 0 ? episodes.filter((episode) => episode.number <= expected) : episodes;
+  const locales = Array.isArray(info.locales) ? info.locales.filter((value): value is string => typeof value === "string") : series.locales;
   const episode = bounded.find((item) => item.number === episodeNumber);
   if (!episode) throw new Error("KickAssAnime episode was not found");
-  if (audio === "dub" && !series.locales.includes("en-US")) throw new Error("KickAssAnime has no English dub for this series");
+  if (audio === "dub" && !locales.includes("en-US")) throw new Error("KickAssAnime has no English dub for this series");
   const data = await anivexaJson<{ servers?: Server[] }>(new URL(`/api/show/${encodeURIComponent(series.slug)}/episode/${encodeURIComponent(episode.fullSlug)}`, BASE).href, {
     headers: { Accept: "application/json", "User-Agent": USER_AGENT },
   });
@@ -218,7 +220,7 @@ export async function getKaaStreams(anilistId: number, episodeNumber: number, au
     if (!id) return [];
     const url = buildKaaStreamUrl(id, allowed);
     if (!url) return [];
-    return [{ url, type: "hls", provider: "KickAssAnime", server: String(server.name || "KAA").slice(0, 64), quality: "auto", audio }];
+    return [{ url, type: "hls", provider: "KickAssAnime", server: String(server.name || "KAA").slice(0, 64), quality: "auto", audio, referer: "https://krussdomi.com/" }];
   });
   const unique = [...new Map(streams.map((stream) => [stream.url, stream])).values()];
   if (!unique.length) throw new Error("KickAssAnime returned no stream URLs allowed by the configured policy");
