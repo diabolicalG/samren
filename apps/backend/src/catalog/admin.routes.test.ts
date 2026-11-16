@@ -109,6 +109,8 @@ describe("admin catalogue management", () => {
 
     expect(mismatch.status).toBe(415);
     expect(mismatch.body.error.code).toBe("FILE_SIGNATURE_MISMATCH");
+    const failedAsset = await prisma.mediaAsset.findFirst({ where: { originalFilename: "not-a-png.png" }, select: { processingState: true } });
+    expect(failedAsset?.processingState).toBe("FAILED");
 
     const removed = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
     expect(removed.status).toBe(204);
