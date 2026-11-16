@@ -13,6 +13,36 @@ import { get, set, isFresh, SHOW_IDENTITY_TTL } from "../core/smartcache.js";
 const SITE = "https://www.animeonsen.xyz";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36";
 
+function configuredHosts(name) {
+  return new Set(String(process.env[name] || "").split(",").map((host) => host.trim().toLowerCase()).filter(Boolean));
+}
+
+export function validateAnimeOnsenOrigin(value, allowedHosts) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")
+      || url.pathname !== "/" || url.search || url.hash || !allowedHosts.has(host)) {
+      throw new Error("AnimeOnsen supplied an unapproved service origin");
+    }
+    return url.origin;
+  } catch {
+    throw new Error("AnimeOnsen supplied an unapproved service origin");
+  }
+}
+
+export function isAnimeOnsenMediaUrlAllowed(value, allowedHosts) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+    return url.protocol === "https:" && !url.username && !url.password
+      && (!url.port || url.port === "443")
+      && [...allowedHosts].some((suffix) => host === suffix || host.endsWith("." + suffix));
+  } catch {
+    return false;
+  }
+}
+
 let session = null;
 let sessionInFlight = null;
 
@@ -102,7 +132,7 @@ async function responseJson(response, label) {
 
 async function apiJson(path, retry = true) {
   const current = await getSession();
-  const response = await fetch(`${current.apiOrigin}${path}`, {
+  validateAnimeOnsenOrigin(current.apiOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_API_HOSTS"));\n  const response = await fetch(`${current.apiOrigin}${path}`, {
     headers: {
       Authorization: `Bearer ${current.token}`,
       Accept: "application/json, text/plain, */*",
@@ -120,7 +150,7 @@ async function apiJson(path, retry = true) {
 
 async function search(query, retry = true) {
   const current = await getSession();
-  const response = await fetch(`${current.searchOrigin}/multi-search`, {
+  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));\n  const response = await fetch(`${current.searchOrigin}/multi-search`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${current.searchToken}`,
