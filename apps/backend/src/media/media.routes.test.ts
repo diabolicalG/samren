@@ -44,7 +44,7 @@ describe("public media delivery", () => {
     const response = await request(app).get("/media/asset-1");
 
     expect(response.status).toBe(200);
-    expect(response.text).toBe("0123456789");
+    expect(response.body.toString()).toBe("0123456789");
     expect(response.headers["content-type"]).toContain("video/mp4");
     expect(response.headers["accept-ranges"]).toBe("bytes");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
@@ -73,7 +73,7 @@ describe("public media delivery", () => {
 
     expect(response.status).toBe(206);
     expect(response.headers["content-range"]).toBe("bytes 7-9/10");
-    expect(response.text).toBe("789");
+    expect(response.body.toString()).toBe("789");
   });
 
   it("rejects malformed and unsatisfiable byte ranges", async () => {
