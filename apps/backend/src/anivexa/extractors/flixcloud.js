@@ -1,3 +1,4 @@
+import { safeFetch } from "../core/safe-fetch.js";
 import { webcrypto as crypto } from "node:crypto";
 
 const encoder = new TextEncoder();
@@ -337,7 +338,7 @@ function runDecrypt(wasmBytes, fragment, keyFragment, token, seed) {
   return out;
 }
 
-export async function extractFlixcloud(embedHtml, { fetchImpl = fetch, apiBase = "https://flixcloud.cc", headers = {}, referer } = {}) {
+export async function extractFlixcloud(embedHtml, { fetchImpl = safeFetch, apiBase = "https://flixcloud.cc", headers = {}, referer } = {}) {
   const data = parseJsLiteral(extractSsrObj(embedHtml));
   const seed = data.obfuscation_seed;
   if (!seed) {
