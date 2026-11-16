@@ -60,3 +60,24 @@ def test_kuhi_extract_rejects_unknown_provider():
     with TestClient(app) as client:
         response = client.get("/v1/kuhi/extract/16498?e=1&type=sub&provider=unknown")
     assert response.status_code == 422
+
+def test_kuhi_outbound_transport_requires_allowlisted_https_hosts(monkeypatch):
+    from src.providers._safe_http import validate_provider_url
+
+    monkeypatch.setenv("KUHI_PROVIDER_ALLOWED_HOSTS", "graphql.anilist.co,provider.example")
+    validate_provider_url("https://graphql.anilist.co/graphql")
+    validate_provider_url("https://video.provider.example/master.m3u8")
+    with pytest.raises(ValueError):
+        validate_provider_url("http://provider.example/video")
+    with pytest.raises(ValueError):
+        validate_provider_url("https://127.0.0.1/internal")
+    with pytest.raises(ValueError):
+        validate_provider_url("https://untrusted.example/video")
+
+
+def test_kuhi_outbound_transport_blocks_when_allowlist_is_empty(monkeypatch):
+    from src.providers._safe_http import validate_provider_url
+
+    monkeypatch.delenv("KUHI_PROVIDER_ALLOWED_HOSTS", raising=False)
+    with pytest.raises(ValueError):
+        validate_provider_url("https://graphql.anilist.co/graphql")
