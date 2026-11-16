@@ -30,48 +30,55 @@ export async function anivexaFetch(
     if (!isAnivexaUrlAllowed(current, allowed)) throw new Error("Anivexa request host is not allowlisted");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    let response: Response;
     try {
-      response = await fetch(current, { ...init, redirect: "manual", signal: controller.signal });
+      const response = await fetch(current, { ...init, redirect: "manual", signal: controller.signal });
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get("location");
+        await response.body?.cancel();
+        if (!location || redirects === MAX_REDIRECTS) throw new Error("Anivexa redirect limit exceeded");
+        current = new URL(location, current).href;
+        continue;
+      }
+
+      const declared = Number(response.headers.get("content-length") ?? 0);
+      if (declared > MAX_RESPONSE_BYTES) {
+        await response.body?.cancel();
+        throw new Error("Anivexa response exceeded the size limit");
+      }
+      if (!response.body) return response;
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAX_RESPONSE_BYTES) {
+            await reader.cancel();
+            throw new Error("Anivexa response exceeded the size limit");
+          }
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
     } finally {
       clearTimeout(timer);
     }
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-    const location = response.headers.get("location");
-    if (!location || redirects === MAX_REDIRECTS) throw new Error("Anivexa redirect limit exceeded");
-    current = new URL(location, current).href;
   }
   throw new Error("Anivexa redirect limit exceeded");
 }
 
 export async function anivexaReadText(response: Response): Promise<string> {
-  const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > MAX_RESPONSE_BYTES) throw new Error("Anivexa response exceeded the size limit");
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_RESPONSE_BYTES) {
-        await reader.cancel();
-        throw new Error("Anivexa response exceeded the size limit");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
+  return response.text();
 }
 
 export async function anivexaText(url: string, headers: HeadersInit = {}): Promise<string> {
