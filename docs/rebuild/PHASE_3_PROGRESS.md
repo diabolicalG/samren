@@ -59,6 +59,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added generated opaque storage keys with strict format validation.
 - Added root/parent canonicalization and path containment checks.
 - Added atomic temporary-file writes, restrictive file permissions, SHA-256 checksums and cleanup on failure.
+- Added conservative startup cleanup for abandoned generated temp files older than 24 hours. It scans only canonical two-character shard directories and generated temp-file names, preserves symlinks/unrelated files, and is best-effort so cleanup failure does not block API startup.
 - Added bounded streaming writes with incremental hashing and size enforcement.
 - Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT and ASS.
 - Added an ADMIN- and trusted-Origin-protected raw-binary upload endpoint:
@@ -102,7 +103,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 | Area | Status | Remaining work |
 |---|---|---|
-| Local storage primitives | PARTIAL — HARDENED | Operational stale-file cleanup; broader failure/race and deployment tests |
+| Local storage primitives | PARTIAL — HARDENED | Startup cleanup now removes only stale generated temp files; broader failure/race and deployment tests |
 | Admin upload | PARTIAL — INTEGRATION TEST ADDED | Current endpoint is bounded raw-binary, not multipart; upload/association workflow remains separate; corrected upload integration test passes CI run `43892195844`; complete lifecycle/failure reconciliation |
 | Signature validation/checksum | PARTIAL | Unit tests pass; broaden malformed/large-input cases |
 | Public media delivery | PARTIAL — TESTED | GET/HEAD/range tests pass; add more publication and failure-path coverage |
@@ -126,10 +127,9 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Obtain written reuse permission or a clear licence from the Anivexa upstream rights holder; the upstream repository currently declares no licence. Do not copy its source until this is resolved.
-2. Complete the approved native Anivexa provider/extractor integration after the rights gate, replacing unsafe shell execution, hard-coded credentials, unsafe diagnostics and wildcard CORS.
-3. Reconcile the upload endpoint with the approved multipart requirement and document/test the PENDING/READY/FAILED lifecycle and database/filesystem failure behavior.
-4. Add operational stale-temporary-file cleanup and broader storage failure/race tests.
+1. Complete the approved native Anivexa provider/extractor integration with a safe implementation; preserve the Anime-streaming repository as read-only, and do not reproduce embedded credentials or unsafe shell execution.
+2. Reconcile the upload endpoint with the approved multipart requirement and document/test the PENDING/READY/FAILED lifecycle and database/filesystem failure behavior.
+3. Broaden storage failure/race tests and verify startup cleanup under deployment conditions.
 5. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 6. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
 7. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
