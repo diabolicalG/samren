@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { env } from "../config/env.js";
 import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
 import { getAniZoneStreams } from "./anizone.js";
 import { getAniKotoStreams } from "./anikoto.js";
@@ -202,4 +203,9 @@ export class ProviderAggregator {
   }
 }
 
-export const providerAggregator = new ProviderAggregator();
+export const providerAggregator = new ProviderAggregator({
+  concurrency: env.ANIVEXA_WORKER_CONCURRENCY,
+  maxQueue: env.ANIVEXA_WORKER_QUEUE_MAX,
+  failureThreshold: env.ANIVEXA_PROVIDER_FAILURE_THRESHOLD,
+  cooldownMs: env.ANIVEXA_PROVIDER_COOLDOWN_MS,
+});
