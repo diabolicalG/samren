@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 const originalRoot = process.env.MEDIA_STORAGE_ROOT;
-let temporaryRoot: string;
+let temporaryRoot = "";
 
 afterEach(async () => {
   vi.resetModules();
@@ -18,12 +18,11 @@ describe("local media storage", () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
     vi.resetModules();
-    vi.resetModules();
     const { storeMediaBuffer } = await import("./storage.js");
     const bytes = Buffer.from("samren-media-test");
     const stored = await storeMediaBuffer(bytes);
 
-    expect(stored.storageKey).toMatch(/^[a-f0-9]{2}\\/[a-f0-9]{32}$/);
+    expect(stored.storageKey).toMatch(/^[a-f0-9]{2}[/][a-f0-9]{32}$/);
     expect(stored.absolutePath.startsWith(await import("node:fs/promises").then((fs) => fs.realpath(temporaryRoot)))).toBe(true);
     expect(await readFile(stored.absolutePath)).toEqual(bytes);
     expect(stored.sizeBytes).toBe(bytes.length);
@@ -43,6 +42,7 @@ describe("local media storage", () => {
   it("rejects empty and oversized buffers", async () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
     const { storeMediaBuffer } = await import("./storage.js");
     await expect(storeMediaBuffer(Buffer.alloc(0))).rejects.toThrow("non-empty");
     await expect(storeMediaBuffer(Buffer.alloc(50 * 1024 * 1024 + 1))).rejects.toThrow("limit");
