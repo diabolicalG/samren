@@ -93,7 +93,9 @@ async function extractVidplay(embed: URL): Promise<ExtractedSource[]> {
 }
 
 export function parseMegaPlayRoutes(script: string): { legacy: string | undefined; modern: string | undefined } {
-  const { legacy, modern } = parseMegaPlayRoutes(script);
+  const routes = scriptStrings(script).filter((value) => /^stream\/getSources[\w/-]*$/i.test(value)).sort((left, right) => left.length - right.length);
+  const legacy = routes[0];
+  const modern = routes.find((route) => route !== legacy && Boolean(legacy) && route.startsWith(legacy));
   return { legacy, modern };
 }
 
@@ -106,9 +108,7 @@ async function extractMegaPlay(embed: URL): Promise<ExtractedSource[]> {
   const scripts = await Promise.all(scriptUrls.map((url) => anivexaText(url, { Accept: "text/javascript,*/*", Referer: embed.href }).catch(() => "")));
   const script = scripts.find((value) => /getSources/i.test(value) && /AES-CBC/i.test(value));
   if (!script) return [];
-  const routes = scriptStrings(script).filter((value) => /^stream\/getSources[\w/-]*$/i.test(value)).sort((a, b) => a.length - b.length);
-  const legacy = routes[0];
-  const modern = routes.find((route) => route !== legacy && Boolean(legacy) && route.startsWith(legacy));
+  const { legacy, modern } = parseMegaPlayRoutes(script);
   if (!legacy && !modern) return [];
 
   const getSource = async (route: string): Promise<string | null> => {
