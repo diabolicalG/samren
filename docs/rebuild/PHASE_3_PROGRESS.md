@@ -4,7 +4,7 @@
 **Branch:** `phase-3-media-providers`
 **Scope authorization:** Product-owner revision dated 2026-11-15
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`
-**Latest checkpoint:** `8b93a7dd88d83a8a9dbe3248b1cf36f28e6c31d1`
+**Latest checkpoint:** `4149993cf0725cbcd3af79bc8b28351429ee8518` (storage test correction)
 
 ## 1. Repository verification
 
@@ -79,3 +79,26 @@ This checkpoint is documentation and source-audit work only. No application code
 6. Port the approved Anivexa provider/extractor subset with per-provider tests.
 7. Run full CI, security audit, and Phase 2 regression suite.
 8. Freeze Phase 3 only after all acceptance gates pass.
+
+## 8. Implementation checkpoint — local storage primitives
+
+Implemented on `phase-3-media-providers`:
+
+- Added `MEDIA_STORAGE_ROOT` configuration, defaulting to the private `.data/media` directory.
+- Added generated opaque storage keys with strict format validation.
+- Added canonical-root and canonical-parent containment checks to reject path escapes and symlink escapes.
+- Added atomic temporary-file writes, restrictive file/directory permissions, SHA-256 calculation, and cleanup on write failure.
+- Added local delete and file-stat helpers.
+- Added unit tests for storage-key validation, traversal rejection, file contents, checksum calculation, and empty/oversized buffer rejection.
+- Documented the storage-root setting in `apps/backend/.env.example`.
+
+**Limitations of this checkpoint:**
+
+- This is the storage primitive only; no HTTP upload endpoint, streaming multipart parser, signature sniffing, Prisma asset lifecycle transaction, media delivery route, or player integration is claimed complete.
+- The current storage write helper accepts a bounded Buffer (50 MiB maximum); the approved upload path still needs a streaming implementation to avoid buffering large media in memory.
+- The tests have been authored but have not been executed in a local runtime in this session. No passing test result is claimed.
+- The existing admin metadata-only asset endpoints remain unchanged.
+
+## 9. Next checkpoint
+
+Implement streaming writes with byte limits and file-signature validation, then add the authenticated admin upload route and a database-backed asset lifecycle with rollback/cleanup. Follow with safe media delivery and byte-range handling.
