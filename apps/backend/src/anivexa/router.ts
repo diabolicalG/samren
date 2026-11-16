@@ -2,18 +2,19 @@ import { Router } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
+import { getAniZoneEpisodes } from "./anizone.js";
 
 export const anivexaRouter = Router();
 
 const paramsSchema = z.object({ anilistId: z.coerce.number().int().positive().max(2_147_483_647) });
-const providerSchema = z.enum(["animegg"]);
+const providerSchema = z.enum(["animegg", "anizone"]);
 
 anivexaRouter.get("/providers", (_request, response) => {
   if (!env.ANIVEXA_ENABLED) {
     response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
     return;
   }
-  response.status(200).json({ data: { providers: ["animegg"], status: "enabled" }, error: null });
+  response.status(200).json({ data: { providers: ["animegg", "anizone"], status: "enabled" }, error: null });
 });
 
 anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
@@ -32,7 +33,9 @@ anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
     return;
   }
   try {
-    const result = await getAnimeGGEpisodes(params.data.anilistId);
+    const result = provider.data === "animegg"
+      ? await getAnimeGGEpisodes(params.data.anilistId)
+      : await getAniZoneEpisodes(params.data.anilistId);
     response.setHeader("Cache-Control", "public, max-age=300");
     response.status(200).json({ data: { anilistId: params.data.anilistId, provider: provider.data, ...result }, error: null });
   } catch {
