@@ -132,7 +132,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
       await deleteStoredMedia(storageKey);
       stored = undefined;
       await prisma.mediaAsset.update({
-        where: { id: pendingAssetId },
+        where: { id: pendingAssetId, processingState: "PENDING" },
         data: { processingState: "FAILED" },
       });
       pendingAssetId = undefined;
@@ -141,7 +141,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
     }
 
     const asset = await prisma.mediaAsset.update({
-      where: { id: pendingAssetId },
+      where: { id: pendingAssetId, processingState: "PENDING" },
       data: {
         sizeBytes: BigInt(stored.sizeBytes),
         checksumSha256: stored.checksumSha256,
