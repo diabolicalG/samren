@@ -1,8 +1,10 @@
 import { Router, type Response } from "express";
-import { prisma } from "../db/prisma.js";\nimport { z } from "zod";
+import { prisma } from "../db/prisma.js";
+import { z } from "zod";
 import { catalogListQuerySchema, catalogSlugSchema } from "./catalog.schemas.js";
 import {
-  findPublishedAnimeBySlug,\n  findPublishedEpisodePlayback,
+  findPublishedAnimeBySlug,
+  findPublishedEpisodePlayback,
   listPublishedAnime,
   listPublishedEpisodes,
   listPublishedGenres,
