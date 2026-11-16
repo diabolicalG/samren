@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -30,6 +30,9 @@ describe("local media storage", () => {
     expect(stored.sizeBytes).toBe(bytes.length);
     const { createHash } = await import("node:crypto");
     expect(stored.checksumSha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+    expect((await stat(temporaryRoot)).mode & 0o777).toBe(0o700);
+    expect((await stat(path.dirname(stored.absolutePath))).mode & 0o777).toBe(0o700);
+    expect((await stat(stored.absolutePath)).mode & 0o777).toBe(0o600);
   });
 
   it("rejects traversal and malformed storage keys", async () => {
