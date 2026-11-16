@@ -6,11 +6,12 @@ vi.mock("../db/prisma.js", () => ({
 vi.mock("./storage.js", () => ({
   isManagedStorageKey: (storageKey: string) => /^[a-f0-9]{2}\/[a-f0-9]{32}$/.test(storageKey),
   deleteStoredMedia: vi.fn().mockResolvedValue(undefined),
+  listStaleManagedMediaKeys: vi.fn().mockResolvedValue([]),
 }));
 
 import { prisma } from "../db/prisma.js";
-import { deleteStoredMedia } from "./storage.js";
-import { reconcileStalePendingMediaAssets } from "./lifecycle.js";
+import { deleteStoredMedia, listStaleManagedMediaKeys } from "./storage.js";
+import { reconcileOrphanedManagedMediaFiles, reconcileStalePendingMediaAssets } from "./lifecycle.js";
 
 describe("pending media reconciliation", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -65,6 +66,28 @@ describe("pending media reconciliation", () => {
 
     expect(await reconcileStalePendingMediaAssets(60_000, 1_800_000)).toBe(0);
     expect(deleteStoredMedia).not.toHaveBeenCalled();
+  });
+
+  it("removes only stale files without usable database references", async () => {
+    const missing = "ab/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const failed = "bc/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const ready = "cd/cccccccccccccccccccccccccccccccc";
+    const pending = "de/dddddddddddddddddddddddddddddddd";
+    vi.mocked(listStaleManagedMediaKeys).mockResolvedValue([missing, failed, ready, pending]);
+    vi.mocked(prisma.mediaAsset.findMany).mockResolvedValue([
+      { storageKey: failed, processingState: "FAILED" },
+      { storageKey: ready, processingState: "READY" },
+      { storageKey: pending, processingState: "PENDING" },
+    ] as never);
+
+    const removed = await reconcileOrphanedManagedMediaFiles(60_000, 1_800_000);
+
+    expect(removed).toBe(2);
+    expect(deleteStoredMedia).toHaveBeenCalledTimes(2);
+    expect(deleteStoredMedia).toHaveBeenCalledWith(missing);
+    expect(deleteStoredMedia).toHaveBeenCalledWith(failed);
+    expect(deleteStoredMedia).not.toHaveBeenCalledWith(ready);
+    expect(deleteStoredMedia).not.toHaveBeenCalledWith(pending);
   });
 
   it("rejects unsafe reconciliation thresholds", async () => {
