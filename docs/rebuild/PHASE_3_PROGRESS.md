@@ -108,7 +108,8 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Orphan-file reconciliation CI run `43897217999` passed all workflow steps, including generated-path filtering, stale-file selection, database-reference preservation, typecheck, backend/frontend/Python tests and production builds. [Orphan reconciliation workflow run](https://github.com/diabolicalG/samren/actions/runs/43897217999).
 - Anivexa initial provider-port CI run `43899918673` passed all workflow steps, including Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend/frontend tests, Python API tests and production builds. [Initial AnimeGG episode-discovery CI](https://github.com/diabolicalG/samren/actions/runs/43899918673).
 - AnimeGG watch extraction CI run `43900588919` passed all workflow steps. It verifies the added extraction route, stream-host allowlist policy, lint, typecheck, backend/frontend tests, Python tests and production builds. [AnimeGG extraction CI](https://github.com/diabolicalG/samren/actions/runs/43900588919).
-- AniZone provider CI run `43901242289` passed all workflow steps. It validates the second provider adapter and route registration, including typecheck, backend/frontend/Python tests and production builds. AniZone currently reads the initial episode page only; Livewire pagination and watch extraction remain outstanding. [AniZone provider CI](https://github.com/diabolicalG/samren/actions/runs/43901242289).
+- AniZone provider CI run `43901242289` passed all workflow steps. [AniZone initial provider CI](https://github.com/diabolicalG/samren/actions/runs/43901242289).
+- AniZone Livewire pagination and AniKoto episode-discovery changes are covered by CI run `43902567326` (pagination) and `43902891845` (AniKoto and final fixture correction); both passed all workflow steps, including typecheck, backend/frontend/Python tests and production builds. [AniKoto provider CI](https://github.com/diabolicalG/samren/actions/runs/43902891845).
 - GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
@@ -123,8 +124,8 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | PARTIAL — TWO PROVIDERS | AnimeGG episode discovery and watch extraction plus AniZone initial-page episode discovery are ported; routes remain disabled by default; AniZone pagination/watch extraction, remaining providers, mapping/cache parity and live playback tests remain |
-| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist and disabled-route tests pass; add AniZone pagination/session tests, DNS pinning review and broader provider tests |
+| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery with AniList title matching and sub/dub classification are ported; remaining provider watch extraction, mapping/cache parity and live playback tests remain |
+| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist and disabled-route tests pass; add AniKoto live fixture tests, DNS pinning review and broader provider tests |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
 ## 7. Security requirements retained
