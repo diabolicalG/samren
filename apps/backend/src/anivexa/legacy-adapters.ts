@@ -2,6 +2,7 @@ import { getEpisodes as fetchAniWavesEpisodes, default as aniWavesProvider } fro
 import { getEpisodes as fetchAnimeNoSubEpisodes, default as animeNoSubProvider } from "./providers/animenosub.js";
 import { getEpisodes as fetchAniPmEpisodes, default as aniPmProvider } from "./providers/anipm.js";
 import { getEpisodes as fetchSenshiEpisodes, default as senshiProvider } from "./providers/senshi.js";
+import { getEpisodes as fetchAnimeDunyaEpisodes, default as animeDunyaProvider } from "./providers/animedunya.js";
 import { getEpisodes as fetchReAnimeEpisodes, default as reAnimeProvider } from "./providers/reanime.js";
 import { getEpisodes as fetchAnimeOnsenEpisodes, getStreams as fetchAnimeOnsenStreams } from "./providers/animeonsen.js";
 
@@ -62,4 +63,12 @@ export async function getSenshiEpisodes(anilistId: number): Promise<Record<strin
 
 export async function getSenshiStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
   return legacyWatch(senshiProvider, `/watch/senshi/${anilistId}/${audio}/senshi-${episode}`);
+}
+
+export async function getAnimeDunyaEpisodes(anilistId: number): Promise<Record<string, unknown>> {
+  return fetchAnimeDunyaEpisodes(anilistId);
+}
+
+export async function getAnimeDunyaStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
+  return legacyWatch(animeDunyaProvider, `/watch/animedunya/${anilistId}/${audio}/animedunya-${episode}`);
 }
