@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -19,6 +19,7 @@ describe("local media storage", () => {
   it("writes atomically under the configured root and returns a SHA-256 checksum", async () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    await chmod(temporaryRoot, 0o755);
     vi.resetModules();
     const { storeMediaBuffer } = await import("./storage.js");
     const bytes = Buffer.from("samren-media-test");
