@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -78,5 +78,47 @@ describe("local media storage", () => {
     expect(directories).toHaveLength(1);
     const files = await readdir(path.join(temporaryRoot, directories[0]));
     expect(files).toHaveLength(0);
+  });
+});
+
+
+describe("stale media temporary-file cleanup", () => {
+  it("removes only old generated temp files and preserves fresh, unrelated, and symlink entries", async () => {
+    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-cleanup-"));
+    process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
+    const { cleanupStaleMediaTempFiles, storeMediaBuffer } = await import("./storage.js");
+    const stored = await storeMediaBuffer(Buffer.from("valid media"));
+    const shard = path.dirname(stored.absolutePath);
+    const now = Date.now();
+
+    const stale = `${stored.absolutePath}.${"a".repeat(8)}-aaaa-4aaa-8aaa-aaaaaaaaaaaa.tmp`;
+    const fresh = `${stored.absolutePath}.${"b".repeat(8)}-bbbb-4bbb-8bbb-bbbbbbbbbbbb.tmp`;
+    const unrelated = path.join(shard, "operator-notes.tmp");
+    const symlinkPath = `${stored.absolutePath}.${"c".repeat(8)}-cccc-4ccc-8ccc-cccccccccccc.tmp`;
+
+    await writeFile(stale, "abandoned partial");
+    await writeFile(fresh, "active partial");
+    await writeFile(unrelated, "keep");
+    await utimes(stale, new Date(now - 120_000), new Date(now - 120_000));
+    await symlink(stale, symlinkPath);
+
+    const removed = await cleanupStaleMediaTempFiles(60_000, now);
+
+    expect(removed).toBe(1);
+    await expect(readFile(stale)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readFile(fresh, "utf8")).toBe("active partial");
+    expect(await readFile(unrelated, "utf8")).toBe("keep");
+    expect((await lstat(symlinkPath)).isSymbolicLink()).toBe(true);
+    expect(await readFile(stored.absolutePath)).toEqual(Buffer.from("valid media"));
+    expect(await readdir(shard)).toContain(path.basename(fresh));
+  });
+
+  it("rejects unsafe cleanup thresholds", async () => {
+    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-cleanup-"));
+    process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
+    const { cleanupStaleMediaTempFiles } = await import("./storage.js");
+    await expect(cleanupStaleMediaTempFiles(1)).rejects.toThrow("Invalid stale media cleanup parameters");
   });
 });
