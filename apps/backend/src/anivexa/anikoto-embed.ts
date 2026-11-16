@@ -8,7 +8,7 @@ function mediaType(value: string): "hls" | "mp4" | null {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) return null;
     if (/\.m3u8$/i.test(url.pathname)) return "hls";
-    if (/\.(mp4|m4v|webm)$/i.test(url.pathname)) return "mp4";
+    if (/\.(mp4|m4v)$/i.test(url.pathname)) return "mp4";
     return null;
   } catch { return null; }
 }
@@ -55,7 +55,7 @@ function scriptStrings(script: string): string[] {
   return [...new Set(values)];
 }
 
-function decryptStaticMegaPlay(enc: string, script: string): string | null {
+export function decryptStaticMegaPlay(enc: string, script: string): string | null {
   const encrypted = Buffer.from(enc, "base64url");
   if (!encrypted.length || encrypted.length % 16) return null;
   const literals = scriptStrings(script).filter((value) => Buffer.byteLength(value) > 0 && Buffer.byteLength(value) <= 32);
@@ -90,6 +90,11 @@ async function extractVidplay(embed: URL): Promise<ExtractedSource[]> {
     : typeof data.sources === "string" ? [data.sources] : [];
   return values.filter((value): value is string => typeof value === "string")
     .map((url) => ({ url, type: mediaType(url) })).filter((item): item is ExtractedSource => item.type !== null);
+}
+
+export function parseMegaPlayRoutes(script: string): { legacy: string | undefined; modern: string | undefined } {
+  const { legacy, modern } = parseMegaPlayRoutes(script);
+  return { legacy, modern };
 }
 
 async function extractMegaPlay(embed: URL): Promise<ExtractedSource[]> {
