@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants, createWriteStream } from "node:fs";
-import { chmod, mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { chmod, lstat, mkdir, open, readdir, realpath, rename, rm, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import { Transform } from "node:stream";
@@ -154,4 +154,41 @@ export async function readStoredMediaStat(storageKey: string) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
     throw error;
   }
+}
+
+
+/**
+ * Remove only abandoned temporary files created by this storage module.
+ * The conservative age threshold avoids touching uploads that may still be active.
+ */
+export async function cleanupStaleMediaTempFiles(olderThanMs = 24 * 60 * 60 * 1000, now = Date.now()) {
+  if (!Number.isSafeInteger(olderThanMs) || olderThanMs < 60_000 || !Number.isFinite(now)) {
+    throw new Error("Invalid stale media cleanup parameters");
+  }
+
+  const root = await canonicalRoot();
+  const cutoff = now - olderThanMs;
+  let removed = 0;
+  const shards = await readdir(root, { withFileTypes: true });
+
+  for (const shard of shards) {
+    if (!shard.isDirectory() || !/^[a-f0-9]{2}$/.test(shard.name)) continue;
+    const shardPath = path.join(root, shard.name);
+    const canonicalShard = await realpath(shardPath);
+    if (path.dirname(canonicalShard) !== root) continue;
+
+    const entries = await readdir(canonicalShard, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !/^[a-f0-9]{32}\.[a-f0-9-]{36}\.tmp$/i.test(entry.name)) continue;
+      if (entry.name.slice(0, 2).toLowerCase() !== shard.name.toLowerCase()) continue;
+
+      const candidate = path.join(canonicalShard, entry.name);
+      const details = await lstat(candidate);
+      if (!details.isFile() || details.isSymbolicLink() || details.mtimeMs > cutoff) continue;
+      await unlink(candidate);
+      removed += 1;
+    }
+  }
+
+  return removed;
 }
