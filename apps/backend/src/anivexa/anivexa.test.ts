@@ -3,7 +3,7 @@ import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
 import { parseAniZoneEpisodes } from "./anizone.js";
-import { parseAniKotoEpisodes } from "./anikoto.js";
+import { parseAniKotoEpisodes, parseAniKotoSearchResults } from "./anikoto.js";
 
 describe("Anivexa HTTP policy", () => {
   const allowed = new Set(["anilist.co", "animegg.org"]);
@@ -33,6 +33,20 @@ describe("AniZone episode payload parsing", () => {
       duration: 1425,
       hasSub: true,
     }]);
+  });
+});
+
+describe("AniKoto search result parsing", () => {
+  it("handles reordered attributes and rejects foreign hosts", () => {
+    const html = `
+      <a href="https://anikototv.to/watch/example-show/ep-1" data-jp="Example JP" class="d-title name">Example <b>Show</b></a>
+      <a class="name d-title" data-jp="Evil" href="https://anikototv.to.attacker.invalid/watch/evil">Evil</a>
+      <a class="name d-title" data-jp="Bad" href="http://anikototv.to/watch/insecure">Insecure</a>
+      <a class="name d-title" data-jp="Duplicate" href="https://anikototv.to/watch/example-show">Duplicate</a>
+    `;
+    expect(parseAniKotoSearchResults(html)).toEqual([
+      { slug: "example-show", japanese: "Example JP", name: "Example Show" },
+    ]);
   });
 });
 
