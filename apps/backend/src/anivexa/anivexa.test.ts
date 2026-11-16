@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { app } from "../app.js";
 import { isAnivexaUrlAllowed } from "./http.js";
@@ -7,7 +7,27 @@ import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItem
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
 import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed, videoSubtitles } from "./providers/animeonsen.js";
 import { createCipheriv } from "node:crypto";
+import { createPinnedLookup } from "./core/safe-fetch.js";
 
+
+describe("Anivexa DNS-pinned transport", () => {
+  it("returns only the prevalidated addresses without performing another DNS lookup", () => {
+    const pinned = [
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+    ];
+    const lookup = createPinnedLookup(pinned);
+    const all = vi.fn();
+    lookup("provider.example", { all: true }, all);
+    expect(all).toHaveBeenCalledWith(null, pinned);
+    const single = vi.fn();
+    lookup("provider.example", {}, single);
+    expect(single).toHaveBeenCalledWith(null, pinned[0].address, 4);
+  });
+  it("rejects an empty pin set instead of falling back to system DNS", () => {
+    expect(() => createPinnedLookup([])).toThrow(/validated addresses/);
+  });
+});
 
 describe("AnimeOnsen dynamic-origin and media URL policy", () => {
   it("accepts only explicitly configured HTTPS API and search origins", () => {
