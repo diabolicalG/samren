@@ -164,7 +164,7 @@ function AnimeDetailPage() {
       </section>
       <section className="episode-section">
         <div className="catalog-section-heading"><div><span className="section-kicker">EPISODE GUIDE</span><h2>Episodes</h2></div><span>{anime.episodes.length} published</span></div>
-        {anime.episodes.length ? <div className="episode-list">{anime.episodes.map((episode) => <article className="episode-row" key={episode.id}><span className="episode-number">{String(episode.episodeNumber).padStart(2, "0")}</span><div><h3>{episode.title}</h3>{episode.synopsis ? <p>{episode.synopsis}</p> : null}</div><span className="episode-duration">{episode.durationSeconds ? `${Math.round(episode.durationSeconds / 60)} min` : "—"}</span></article>)}</div> : <Surface className="catalog-empty"><p>Episodes have not been published for this title yet.</p></Surface>}
+        {anime.episodes.length ? <div className="episode-list">{anime.episodes.map((episode) => <Link className="episode-row" key={episode.id} to={`/watch/${anime.slug}/${episode.episodeNumber}`}><span className="episode-number">{String(episode.episodeNumber).padStart(2, "0")}</span><div><h3>{episode.title}</h3>{episode.synopsis ? <p>{episode.synopsis}</p> : null}</div><span className="episode-duration">{episode.durationSeconds ? `${Math.round(episode.durationSeconds / 60)} min` : "—"}</span></Link>)}</div> : <Surface className="catalog-empty"><p>Episodes have not been published for this title yet.</p></Surface>}
         <p className="playback-note">First-party playback is introduced in Phase 3. This catalogue does not link to third-party streams.</p>
       </section>
     </main>
@@ -235,6 +235,42 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
         </section>
       </div>
     </div>
+  );
+}
+
+function WatchPage() {
+  const { slug = "", episodeNumber = "" } = useParams();
+  const number = Number(episodeNumber);
+  const playbackQuery = useQuery({
+    queryKey: ["catalog", "playback", slug, number],
+    queryFn: () => apiClient.catalogPlayback(slug, number),
+    enabled: Boolean(slug) && Number.isSafeInteger(number) && number > 0,
+  });
+
+  if (playbackQuery.isLoading) return <main className="page-shell"><div className="catalog-loading" role="status">Loading playback…</div></main>;
+  if (playbackQuery.isError || !playbackQuery.data) return <main className="page-shell"><section className="simple-page"><span className="section-kicker">FIRST-PARTY PLAYER</span><h1>Episode unavailable.</h1><p>This episode may be unpublished or unavailable for playback.</p><Link className="text-link" to={`/anime/${slug}`}>Return to episode guide</Link></section></main>;
+
+  const playback = playbackQuery.data;
+  const source = playback.sources.find((item) => item.isDefault) ?? playback.sources[0];
+  return (
+    <main className="page-shell watch-page">
+      <Link className="text-link" to={`/anime/${slug}`}>← Back to episode guide</Link>
+      <section className="watch-heading">
+        <span className="section-kicker">NOW PLAYING · EPISODE {playback.episode.episodeNumber}</span>
+        <h1>{playback.episode.title}</h1>
+        {playback.episode.synopsis ? <p>{playback.episode.synopsis}</p> : null}
+      </section>
+      {source ? (
+        <div className="video-frame">
+          <video controls playsInline preload="metadata" src={source.url}>
+            {playback.subtitles.map((track) => <track key={track.id} kind="subtitles" src={track.url} srcLang={track.languageCode} label={track.label} default={track.isDefault} />)}
+            Your browser does not support HTML video playback.
+          </video>
+        </div>
+      ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
+      {source ? <p className="playback-quality">{source.qualityLabel || source.mimeType} · First-party media</p> : null}
+      {playback.subtitles.length ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
+    </main>
   );
 }
 
@@ -661,6 +697,7 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/search" element={<BrowsePage />} />
         <Route path="/anime/:slug" element={<AnimeDetailPage />} />
+        <Route path="/watch/:slug/:episodeNumber" element={<WatchPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<main className="page-shell"><section className="simple-page"><span className="section-kicker">COMING INTO FOCUS</span><h1>That page is not ready yet.</h1><Link className="text-link" to="/">Return home</Link></section></main>} />
       </Routes>
