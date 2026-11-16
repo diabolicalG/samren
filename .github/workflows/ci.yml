@@ -65,5 +65,15 @@ jobs:
         run: pnpm --filter @samren/backend test
       - name: Frontend smoke and accessibility tests
         run: pnpm --filter @samren/frontend test
+      - name: Install Python API dependencies
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python API dependencies
+        working-directory: apps/api
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Python API tests
+        working-directory: apps/api
+        run: pytest -q
       - name: Build frontend and backend
         run: pnpm build
