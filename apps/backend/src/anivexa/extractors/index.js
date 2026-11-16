@@ -1,3 +1,4 @@
+import { safeFetch } from "../core/safe-fetch.js";
 import { canExtractByse, extractByse } from "./byse.js";
 import { canExtractDataSv, extractDataSv } from "./datasv.js";
 import { canExtractNova, extractNova } from "./nova.js";
@@ -23,6 +24,24 @@ const videoExtractors = [
   { name: "nova", matches: canExtractNova, extract: extractNova },
 ];
 
+const extractorHosts = {
+  byse: ["bysesayeveum.com", "gn1r5n.org"],
+  datasv: ["play.echovideo.ru"],
+  vidplay: ["play.echovideo.ru"],
+  vidmoly: ["vidmoly.net", "vidmoly.biz", "vidmoly.to"],
+  nova: ["nova.upn.one"],
+};
+
 export function findVideoExtractor(url) {
-  return videoExtractors.find((extractor) => extractor.matches(url)) ?? null;
+  const extractor = videoExtractors.find((item) => item.matches(url));
+  if (!extractor) return null;
+  const allowedHosts = extractorHosts[extractor.name];
+  if (!allowedHosts) return null;
+  return {
+    ...extractor,
+    extract: (embedUrl, options = {}) => extractor.extract(embedUrl, {
+      ...options,
+      fetchImpl: (input, init = {}) => safeFetch(input, init, allowedHosts),
+    }),
+  };
 }
