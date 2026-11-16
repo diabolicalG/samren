@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `ec81860fca48535ca8062d7d79cd8efe969a4da7`  
+**Latest code checkpoint:** `fa7153149ff64d67cf6c948f68f98d2775ad14e7`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -112,6 +112,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - AnimeGG watch extraction CI run `43900588919` passed all workflow steps. It verifies the added extraction route, stream-host allowlist policy, lint, typecheck, backend/frontend tests, Python tests and production builds. [AnimeGG extraction CI](https://github.com/diabolicalG/samren/actions/runs/43900588919).
 - AniZone provider CI run `43901242289` passed all workflow steps. [AniZone initial provider CI](https://github.com/diabolicalG/samren/actions/runs/43901242289).
 - AniZone Livewire pagination and AniKoto episode-discovery changes are covered by CI run `43902567326` (pagination) and `43902891845` (AniKoto and final fixture correction); both passed all workflow steps, including typecheck, backend/frontend/Python tests and production builds. [AniKoto provider CI](https://github.com/diabolicalG/samren/actions/runs/43902891845).
+- AniKoto direct extraction CI run `43907502476` passed all workflow steps on `fa7153149ff64d67cf6c948f68f98d2775ad14e7`, including lint, typecheck, backend/frontend tests, Python API tests and production builds. It covers server-list parsing and the direct-source extraction route; live provider playback and embed-only MegaPlay extraction remain unverified.
 - GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
