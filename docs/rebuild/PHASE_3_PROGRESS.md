@@ -176,4 +176,4 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Expanded address filtering to reject private, loopback, link-local, carrier-grade NAT, multicast/reserved IPv4, non-global IPv6, IPv4-mapped private IPv6 and IPv6 documentation/special-use ranges. Mixed public/private DNS answer sets fail closed.
 - Added regression tests for pinned IPv4/IPv6 lookup callbacks, empty pin sets, private/loopback/link-local/documentation addresses and mixed DNS answer sets.
 - Request bodies are buffered before transmission; unsupported streaming bodies fail closed rather than silently falling back to native fetch.
-- This checkpoint is implementation-complete pending CI verification. It does not establish live provider availability or browser playback.
+- CI run [43917982848](https://github.com/diabolicalG/samren/actions/runs/43917982848) passed on `3d3dd37baca7aa1340c739c4f5eccfcbd18798d3`, including lint, typecheck, backend/frontend/Python tests and production builds. This does not establish live provider availability or browser playback.
