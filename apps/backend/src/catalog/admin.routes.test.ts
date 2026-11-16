@@ -115,6 +115,50 @@ describe("admin catalogue management", () => {
     assetId = undefined;
   });
 
+  it("accepts a bounded multipart upload with one signature-verified file", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const uploaded = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .attach("file", pngHeader, { filename: "multipart-poster.png", contentType: "image/png" });
+
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.data).toMatchObject({
+      originalFilename: "multipart-poster.png",
+      mediaKind: "POSTER",
+      mimeType: "image/png",
+      sizeBytes: String(pngHeader.length),
+      processingState: "READY",
+    });
+    const multipartAssetId = uploaded.body.data.id as string;
+    const deleted = await agent.delete("/api/v1/admin/catalog/assets/" + multipartAssetId).set("Origin", origin);
+    expect(deleted.status).toBe(204);
+  });
+
+  it("rejects multipart uploads with extra fields or multiple files", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const extraField = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .field("unexpected", "not allowed")
+      .attach("file", pngHeader, { filename: "extra-field.png", contentType: "image/png" });
+    expect(extraField.status).toBe(400);
+
+    const multipleFiles = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .attach("file", pngHeader, { filename: "first.png", contentType: "image/png" })
+      .attach("second", pngHeader, { filename: "second.png", contentType: "image/png" });
+    expect(multipleFiles.status).toBe(400);
+  });
+
   it("creates, publishes, edits, and archives a first-party catalogue record", async () => {
     const agent = await login(adminEmail, adminPassword);
     const created = await agent
