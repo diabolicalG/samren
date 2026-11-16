@@ -1,12 +1,12 @@
-import { getEpisodes as getAniWavesEpisodes, default as aniWavesProvider } from "./providers/aniwaves.js";
-import { getEpisodes as getAnimeNoSubEpisodes, default as animeNoSubProvider } from "./providers/animenosub.js";
-import { getEpisodes as getReAnimeEpisodes, default as reAnimeProvider } from "./providers/reanime.js";
-import { getEpisodes as getAnimeOnsenEpisodes, getStreams as getAnimeOnsenStreams } from "./providers/animeonsen.js";
+import { getEpisodes as fetchAniWavesEpisodes, default as aniWavesProvider } from "./providers/aniwaves.js";
+import { getEpisodes as fetchAnimeNoSubEpisodes, default as animeNoSubProvider } from "./providers/animenosub.js";
+import { getEpisodes as fetchReAnimeEpisodes, default as reAnimeProvider } from "./providers/reanime.js";
+import { getEpisodes as fetchAnimeOnsenEpisodes, getStreams as fetchAnimeOnsenStreams } from "./providers/animeonsen.js";
 
 async function legacyWatch(
   provider: { fetch(request: Request): Promise<Response> },
   path: string,
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const response = await provider.fetch(new Request(`https://samren-provider.internal${path}`));
   if (!response.ok) throw new Error(`Provider watch adapter returned HTTP ${response.status}`);
   const payload = await response.json() as Record<string, unknown>;
@@ -15,7 +15,7 @@ async function legacyWatch(
 }
 
 export async function getAniWavesEpisodes(anilistId: number): Promise<unknown> {
-  return getAniWavesEpisodes(anilistId);
+  return fetchAniWavesEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
 export async function getAniWavesStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
@@ -23,7 +23,7 @@ export async function getAniWavesStreams(anilistId: number, episode: number, aud
 }
 
 export async function getReAnimeEpisodes(anilistId: number): Promise<unknown> {
-  return getReAnimeEpisodes(anilistId);
+  return fetchReAnimeEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
 export async function getReAnimeStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
@@ -31,15 +31,15 @@ export async function getReAnimeStreams(anilistId: number, episode: number, audi
 }
 
 export async function getAnimeOnsenEpisodes(anilistId: number): Promise<unknown> {
-  return getAnimeOnsenEpisodes(anilistId);
+  return fetchAnimeOnsenEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
 export async function getAnimeOnsenStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
-  return getAnimeOnsenStreams(anilistId, episode, audio);
+  return fetchAnimeOnsenStreams(anilistId, episode, audio) as Promise<Record<string, unknown>>;
 }
 
 export async function getAnimeNoSubEpisodes(anilistId: number): Promise<unknown> {
-  return getAnimeNoSubEpisodes(anilistId);
+  return fetchAnimeNoSubEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
 export async function getAnimeNoSubStreams(anilistId: number, episode: number, audio: "sub" | "dub"): Promise<unknown> {
