@@ -14,7 +14,7 @@ async function legacyWatch(
   return payload;
 }
 
-export async function getAniWavesEpisodes(anilistId: number): Promise<unknown> {
+export async function getAniWavesEpisodes(anilistId: number): Promise<Record<string, unknown>> {
   return fetchAniWavesEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
@@ -22,7 +22,7 @@ export async function getAniWavesStreams(anilistId: number, episode: number, aud
   return legacyWatch(aniWavesProvider, `/watch/aniwaves/${anilistId}/${audio}/aniwaves-${episode}`);
 }
 
-export async function getReAnimeEpisodes(anilistId: number): Promise<unknown> {
+export async function getReAnimeEpisodes(anilistId: number): Promise<Record<string, unknown>> {
   return fetchReAnimeEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
@@ -30,7 +30,7 @@ export async function getReAnimeStreams(anilistId: number, episode: number, audi
   return legacyWatch(reAnimeProvider, `/watch/${anilistId}/${audio}/${episode}`);
 }
 
-export async function getAnimeOnsenEpisodes(anilistId: number): Promise<unknown> {
+export async function getAnimeOnsenEpisodes(anilistId: number): Promise<Record<string, unknown>> {
   return fetchAnimeOnsenEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
@@ -38,7 +38,7 @@ export async function getAnimeOnsenStreams(anilistId: number, episode: number, a
   return fetchAnimeOnsenStreams(anilistId, episode, audio) as Promise<Record<string, unknown>>;
 }
 
-export async function getAnimeNoSubEpisodes(anilistId: number): Promise<unknown> {
+export async function getAnimeNoSubEpisodes(anilistId: number): Promise<Record<string, unknown>> {
   return fetchAnimeNoSubEpisodes(anilistId) as Promise<Record<string, unknown>>;
 }
 
