@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `26fa577044bef606f00020d6c9727ba35311b683`  
+**Latest code checkpoint:** `9eb6b03d019b658a22c3b17901b35ae2b902eb5c`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -49,8 +49,15 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - The aggregator uses wildcard CORS.
 - No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
 - The product owner explicitly approved adapting/copying Anivexa into Samren, with the hard boundary that `Anime-streaming` remains read-only. The integration is being ported natively into Samren rather than running the standalone Anivexa service.
-- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery plus sub/dub watch extraction. AniKoto resolves the selected server, accepts direct allowlisted HLS/MP4 URLs, supports the Vidplay `getSources` JSON endpoint, and supports MegaPlay plaintext sources or AES-CBC payloads when the key/IV are recoverable from static script literals. Embed pages and scripts must pass the configured upstream HTTPS allowlist; resulting media URLs must pass the separate stream-host allowlist. The adapter never executes provider JavaScript. MegaPlay sources requiring a runtime-derived HMAC signing key are deliberately skipped; those servers remain unsupported until a safe, non-executing signing implementation is available. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
+- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery plus watch extraction, and AniKoto episode discovery plus sub/dub watch extraction. AniZone resolves the selected series/episode using the existing AniList matcher and episode catalogue, parses the static Vidstack `vidstackPlayer(JSON.parse(...))` payload without executing scripts, and returns only allowlisted HTTPS HLS/MP4 sources and allowlisted subtitle URLs. AniZone currently exposes subbed sources only; dub requests fail closed. AniKoto resolves the selected server, accepts direct allowlisted HLS/MP4 URLs, supports the Vidplay `getSources` JSON endpoint, and supports MegaPlay plaintext sources or AES-CBC payloads when the key/IV are recoverable from static script literals. Embed pages and scripts must pass the configured upstream HTTPS allowlist; resulting media URLs must pass the separate stream-host allowlist. The adapters never execute provider JavaScript. MegaPlay sources requiring a runtime-derived HMAC signing key are deliberately skipped; those servers remain unsupported until a safe, non-executing signing implementation is available. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
 - The upstream source contains unsafe or unsuitable patterns that remain excluded: shell-command execution, embedded bearer credentials, unsafe dynamic-code evaluation, raw upstream diagnostics/cookies, and wildcard CORS. Any additional provider/extractor must use Samren's HTTPS allowlist, redirect revalidation, response limits and stream-host policy. Do not copy secrets or execute provider-supplied code.
+
+### Anivexa provider extraction checkpoint
+
+- Added AniZone watch extraction through `GET /api/v1/anivexa/extract/:anilistId/:episode?provider=anizone&audio=sub`.
+- Added safe Vidstack player-payload parsing tests, including missing/malformed source rejection.
+- CI run [43910499307](https://github.com/diabolicalG/samren/actions/runs/43910499307) passed lint, typecheck, backend tests, frontend smoke/accessibility tests, Python API tests and production builds on `9eb6b03d019b658a22c3b17901b35ae2b902eb5c`.
+- No live AniZone stream or browser playback has been verified. AniZone's provider response currently exposes sub only; dub extraction is explicitly unsupported. Subtitle formats are passed through as metadata after URL allowlisting; actual browser subtitle compatibility still needs end-to-end testing.
 
 ## 4. Implemented first-party media work
 
