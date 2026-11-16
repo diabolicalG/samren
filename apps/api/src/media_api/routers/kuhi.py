@@ -134,7 +134,7 @@ async def search_anime(
             "page": (page_data.get("pageInfo") or {}).get("currentPage", page),
             "total": (page_data.get("pageInfo") or {}).get("total", 0),
             "hasNextPage": (page_data.get("pageInfo") or {}).get("hasNextPage", False),
-            "results": page_data.get("media") or [],
+            "results": [\n                {\n                    "id": item.get("id"),\n                    "title": (item.get("title") or {}).get("english") or (item.get("title") or {}).get("romaji") or (item.get("title") or {}).get("native"),\n                    "format": item.get("format"),\n                    "status": item.get("status"),\n                    "year": item.get("seasonYear"),\n                    "episodes": item.get("episodes"),\n                }\n                for item in (page_data.get("media") or []) if isinstance(item, dict)\n            ],
         }
     except Exception:
         raise HTTPException(status_code=502, detail="Kuhi catalogue search is temporarily unavailable") from None
