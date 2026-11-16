@@ -278,14 +278,14 @@ describe("Anivexa API", () => {
 
 describe("KickAssAnime stream URL policy", () => {
   it("extracts only bounded IDs from HTTPS KickAssAnime server URLs", () => {
-    expect(parseKaaServerId("https://kaa.lt/embed?id=abc_123-xyz")).toBe("abc_123-xyz");
-    expect(parseKaaServerId("https://www.kaa.lt/player?id=0123456789abcdef")).toBe("0123456789abcdef");
-    expect(parseKaaServerId("http://kaa.lt/embed?id=abc")).toBeNull();
-    expect(parseKaaServerId("https://kaa.lt.attacker.invalid/embed?id=abc")).toBeNull();
-    expect(parseKaaServerId("https://user:pass@kaa.lt/embed?id=abc")).toBeNull();
-    expect(parseKaaServerId("https://kaa.lt:8443/embed?id=abc")).toBeNull();
-    expect(parseKaaServerId("https://kaa.lt/embed?id=../private")).toBeNull();
-    expect(parseKaaServerId("https://player.invalid/embed?id=abc")).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt/embed?id=abc_123-xyz", new Set(["kaa.lt"]))).toBe("abc_123-xyz");
+    expect(parseKaaServerId("https://www.kaa.lt/player?id=0123456789abcdef", new Set(["kaa.lt"]))).toBe("0123456789abcdef");
+    expect(parseKaaServerId("http://kaa.lt/embed?id=abc", new Set(["kaa.lt"]))).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt.attacker.invalid/embed?id=abc", new Set(["kaa.lt"]))).toBeNull();
+    expect(parseKaaServerId("https://user:pass@kaa.lt/embed?id=abc", new Set(["kaa.lt"]))).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt:8443/embed?id=abc", new Set(["kaa.lt"]))).toBeNull();
+    expect(parseKaaServerId("https://kaa.lt/embed?id=../private", new Set(["kaa.lt"]))).toBeNull();
+    expect(parseKaaServerId("https://player.invalid/embed?id=abc", new Set(["kaa.lt"]))).toBeNull();
   });
 
   it("constructs the fixed HLS CDN URL only when its host is allowlisted", () => {
