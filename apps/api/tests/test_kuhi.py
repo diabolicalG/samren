@@ -1,3 +1,5 @@
+import pytest
+
 from src.main import app
 from src.media_api.config import settings
 from src.media_api.routers import kuhi
