@@ -55,23 +55,23 @@ async function mediaFor(anilistId: number): Promise<Media> {
 }
 
 function attribute(tag: string, name: string): string {
-  return tag.match(new RegExp("\\\\b" + name + "\\\\s*=\\\\s*[\\\"']([^\\\"']*)[\\\"']", "i"))?.[1] ?? "";
+  return tag.match(new RegExp("\\b" + name + "\\s*=\\s*[\"']([^\"']*)[\"']", "i"))?.[1] ?? "";
 }
 
 export function parseAniKotoSearchResults(html: string): Candidate[] {
   const found = new Map<string, Candidate>();
-  for (const match of html.matchAll(/<a\\b[^>]*>([\\s\\S]*?)<\\/a>/gi)) {
-    const tag = match[0].match(/<a\\b[^>]*>/i)?.[0] ?? "";
-    const classNames = attribute(tag, "class").split(/\\s+/);
+  for (const match of html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
+    const tag = match[0].match(/<a\b[^>]*>/i)?.[0] ?? "";
+    const classNames = attribute(tag, "class").split(/\s+/);
     if (!classNames.includes("name") || !classNames.includes("d-title")) continue;
     const href = attribute(tag, "href");
     let url: URL;
     try { url = new URL(href, BASE); } catch { continue; }
     if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "anikototv.to") continue;
-    const slug = url.pathname.match(/^\\/watch\\/([a-z0-9-]+)(?:\\/ep-\\d+)?\\/?$/i)?.[1];
+    const slug = url.pathname.match(/^\/watch\/([a-z0-9-]+)(?:\/ep-\d+)?\/?$/i)?.[1];
     if (!slug || found.has(slug)) continue;
     const japanese = decode(attribute(tag, "data-jp"));
-    const name = decode(match[1].replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim());
+    const name = decode(match[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
     if (!name) continue;
     found.set(slug, { slug, japanese, name });
   }
@@ -79,7 +79,7 @@ export function parseAniKotoSearchResults(html: string): Candidate[] {
 }
 
 async function search(query: string): Promise<Candidate[]> {
-  const html = await anivexaText(`${BASE}/filter?keyword=${encodeURIComponent(query)}`, { "User-Agent": UA, Accept: "text/html", Referer: `${BASE}/` });
+  const html = await anivexaText(\`\${BASE}/filter?keyword=\${encodeURIComponent(query)}\`, { "User-Agent": UA, Accept: "text/html", Referer: \`\${BASE}/\` });
   return parseAniKotoSearchResults(html);
 }
 function parseEpisodes(html: string): Episode[] {
