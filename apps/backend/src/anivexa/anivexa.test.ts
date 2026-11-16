@@ -42,7 +42,7 @@ describe("AniZone episode payload parsing", () => {
 
 describe("AniZone player payload parsing", () => {
   it("extracts the static Vidstack HLS source and subtitle metadata", () => {
-    const html = String.raw\`<script>vidstackPlayer(JSON.parse('{"src":"https://cdn.example-stream.net/episode.m3u8","subtitles":[{"file":"https://cdn.example-stream.net/en.vtt","title":"English","language":"en","format":"vtt","default":true}]}'));</script>\`;
+    const html = String.raw`<script>vidstackPlayer(JSON.parse('{"src":"https://cdn.example-stream.net/episode.m3u8","subtitles":[{"file":"https://cdn.example-stream.net/en.vtt","title":"English","language":"en","format":"vtt","default":true}]}'));</script>`;
     expect(parseAniZonePlayerData(html)).toEqual({
       src: "https://cdn.example-stream.net/episode.m3u8",
       subtitles: [{
@@ -58,7 +58,7 @@ describe("AniZone player payload parsing", () => {
   it("rejects missing, malformed and non-string player sources", () => {
     expect(parseAniZonePlayerData("<html>no player</html>")).toBeNull();
     expect(parseAniZonePlayerData("vidstackPlayer(JSON.parse('not-json'))")).toBeNull();
-    expect(parseAniZonePlayerData(String.raw\`vidstackPlayer(JSON.parse('{"src":42}'))\`)).toBeNull();
+    expect(parseAniZonePlayerData(String.raw`vidstackPlayer(JSON.parse('{"src":42}'))`)).toBeNull();
   });
 });
 
