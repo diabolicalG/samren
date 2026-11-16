@@ -1,7 +1,7 @@
-import { Router, type Response } from "express";
+import { Router, type Response } from "express";\nimport { z } from "zod";
 import { catalogListQuerySchema, catalogSlugSchema } from "./catalog.schemas.js";
 import {
-  findPublishedAnimeBySlug,
+  findPublishedAnimeBySlug,\n  findPublishedEpisodePlayback,
   listPublishedAnime,
   listPublishedEpisodes,
   listPublishedGenres,
@@ -24,6 +24,25 @@ function sendFailure(response: Response, error: unknown) {
     error: { code: "INTERNAL_ERROR", message: "The catalogue request could not be completed" },
   });
 }
+
+
+catalogRouter.get("/episodes/:id/playback", async (request, response) => {
+  const parsedId = z.string().cuid().safeParse(request.params.id);
+  if (!parsedId.success) {
+    response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Episode not found" } });
+    return;
+  }
+  try {
+    const playback = await findPublishedEpisodePlayback(parsedId.data);
+    if (!playback) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Episode not found" } });
+      return;
+    }
+    response.set("Cache-Control", "no-store").json({ data: playback, error: null });
+  } catch (error) {
+    sendFailure(response, error);
+  }
+});
 
 catalogRouter.get("/anime", async (request, response) => {
   const parsed = catalogListQuerySchema.safeParse(request.query);
