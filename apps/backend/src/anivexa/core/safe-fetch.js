@@ -43,7 +43,7 @@ function assertAllowedUrl(url, allowed = configuredHosts()) {
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) {
     throw new Error("Anivexa outbound URL is not permitted");
   }
-  const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
   if (!allowed.some((item) => host === item || host.endsWith("." + item))) {
     throw new Error("Anivexa outbound host is not allowlisted");
   }
