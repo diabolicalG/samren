@@ -321,6 +321,17 @@ export async function getAniZoneEpisodes(anilistId: number) {
 }
 
 
+export function aniZoneStreamType(value: string): "hls" | "mp4" | null {
+  try {
+    const path = new URL(value).pathname;
+    if (/\.m3u8$/i.test(path)) return "hls";
+    if (/\.(mp4|m4v)$/i.test(path)) return "mp4";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAniZoneStreams(anilistId: number, episodeNumber: number, audio: "sub" | "dub") {
   if (audio !== "sub") throw new Error("AniZone currently exposes subbed streams only");
   const catalogue = await getAniZoneEpisodes(anilistId);
@@ -336,8 +347,7 @@ export async function getAniZoneStreams(anilistId: number, episodeNumber: number
   let streamUrl: string;
   try { streamUrl = new URL(player.src, BASE).href; } catch { throw new Error("AniZone player returned an invalid stream URL"); }
   if (!isAnivexaUrlAllowed(streamUrl, allowedStreams)) throw new Error("AniZone stream host is not allowlisted");
-  const streamPath = new URL(streamUrl).pathname;
-  const streamType = /\\.m3u8$/i.test(streamPath) ? "hls" : /\\.(mp4|m4v)$/i.test(streamPath) ? "mp4" : null;
+  const streamType = aniZoneStreamType(streamUrl);
   if (!streamType) throw new Error("AniZone returned an unsupported media format");
   const subtitles = player.subtitles.flatMap((subtitle) => {
     let url: string;
@@ -357,7 +367,7 @@ export async function getAniZoneStreams(anilistId: number, episodeNumber: number
     audio,
     streams: [{
       url: streamUrl,
-      type: /\.m3u8(?:$|[?#])/i.test(streamUrl) ? "hls" : "mp4",
+      type: streamType,
       quality: "auto",
       provider: "AniZone",
       audio,
