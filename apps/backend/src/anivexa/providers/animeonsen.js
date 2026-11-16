@@ -132,7 +132,7 @@ async function responseJson(response, label) {
 
 async function apiJson(path, retry = true) {
   const current = await getSession();
-  validateAnimeOnsenOrigin(current.apiOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_API_HOSTS"));\n  const response = await fetch(`${current.apiOrigin}${path}`, {
+  validateAnimeOnsenOrigin(current.apiOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_API_HOSTS"));
     headers: {
       Authorization: `Bearer ${current.token}`,
       Accept: "application/json, text/plain, */*",
@@ -150,7 +150,7 @@ async function apiJson(path, retry = true) {
 
 async function search(query, retry = true) {
   const current = await getSession();
-  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));\n  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));
+  validateAnimeOnsenOrigin(current.searchOrigin, configuredHosts("ANIVEXA_ANIMEONSEN_SEARCH_HOSTS"));
   const response = await fetch(`${current.searchOrigin}/multi-search`, {
     method: "POST",
     headers: {
@@ -384,15 +384,16 @@ function skipRange(start, end) {
   return Number.isFinite(from) && Number.isFinite(to) && to > from ? { start: from, end: to } : null;
 }
 
-function videoSubtitles(video, headers) {
+export function videoSubtitles(video) {
   const labels = video?.metadata?.subtitles ?? {};
-  return Object.entries(video?.uri?.subtitles ?? {}).map(([language, url]) => ({
+  const allowedHosts = configuredHosts("ANIVEXA_STREAM_ALLOWED_HOSTS");
+  return Object.entries(video?.uri?.subtitles ?? {}).filter(([, url]) => isAnimeOnsenMediaUrlAllowed(url, allowedHosts)).map(([language, url]) => ({
     url,
     label: labels[language] || language,
     srclang: language,
     default: language === "en-US",
-    headers,
   }));
+}
 }
 
 async function handleWatch(anilistId, audio, epNum, ctx = {}) {
@@ -423,8 +424,7 @@ async function handleWatch(anilistId, audio, epNum, ctx = {}) {
       type: "dash",
       server: "AnimeOnsen",
       referer: `${SITE}/`,
-      headers,
-      subtitles: videoSubtitles(video, headers),
+      subtitles: videoSubtitles(video),
       priority: 5,
       isActive: true,
     }],
