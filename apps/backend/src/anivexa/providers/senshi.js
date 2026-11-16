@@ -1,3 +1,4 @@
+import { safeFetch as fetch } from "../core/safe-fetch.js";
 import { json, episodeMeta }                                  from "../core/new-provider-utils.js";
 import { getMedia }                                        from "../core/anilist.js";
 import { get as cacheGet, set as cacheSet, isFresh,
