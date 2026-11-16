@@ -279,7 +279,7 @@ adminCatalogRouter.post("/assets/upload", requireTrustedOrigin, async (request, 
   }
 
   const filenameHeader = request.get("x-original-filename") ?? "upload";
-  const normalizedFilename = filenameHeader.replace(/\\/g, "/").split("/").pop()?.replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, 255);
+  const normalizedFilename = filenameHeader.replace(/\\/g, "/").split("/").pop()?.split("").filter((character) => { const code = character.charCodeAt(0); return code >= 32 && code !== 127; }).join("").trim().slice(0, 255);
   if (!normalizedFilename) {
     response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "A valid original filename is required" } });
     return;
