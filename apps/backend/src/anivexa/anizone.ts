@@ -98,7 +98,7 @@ function responseCookies(headers: Headers): string[] {
 function mergeCookies(current: Map<string, string>, values: string[]): Map<string, string> {
   const merged = new Map(current);
   for (const value of values) {
-    const match = String(value).match(/^\\s*([^=;\\s]+)=([^;]*)/);
+    const match = String(value).match(/^\s*([^=;\s]+)=([^;]*)/);
     if (match) merged.set(match[1], match[2]);
   }
   return merged;
@@ -137,15 +137,15 @@ function snapshot(html: string): string {
 }
 
 function cursor(html: string): string | null {
-  return html.match(/nextCursor:\\s*'([^']+)'/i)?.[1] ?? null;
+  return html.match(/nextCursor:\s*'([^']+)'/i)?.[1] ?? null;
 }
 
 function hasMore(html: string): boolean {
-  return /hasMore:\\s*true/i.test(html);
+  return /hasMore:\s*true/i.test(html);
 }
 
 function csrf(html: string): string {
-  return html.match(/csrf-token"\\s+content="([^"]+)"/i)?.[1] ?? "";
+  return html.match(/csrf-token"\s+content="([^"]+)"/i)?.[1] ?? "";
 }
 
 function initialPage(html: string, cookies: string[]): PageState {
