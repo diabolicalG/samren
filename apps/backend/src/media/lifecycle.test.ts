@@ -37,6 +37,26 @@ describe("pending media reconciliation", () => {
     expect(deleteStoredMedia).toHaveBeenCalledWith("ab/0123456789abcdef0123456789abcdef");
   });
 
+  it("continues past a full batch of legacy metadata assets", async () => {
+    const legacyBatch = Array.from({ length: 500 }, (_, index) => ({
+      id: `legacy-${String(index).padStart(3, "0")}`,
+      storageKey: `legacy/catalogue/${index}.webp`,
+    }));
+    vi.mocked(prisma.mediaAsset.findMany)
+      .mockResolvedValueOnce(legacyBatch as never)
+      .mockResolvedValueOnce([{ id: "managed-after-legacy", storageKey: "ab/0123456789abcdef0123456789abcdef" }] as never);
+    vi.mocked(prisma.mediaAsset.updateMany).mockResolvedValue({ count: 1 } as never);
+
+    expect(await reconcileStalePendingMediaAssets(60_000, 1_800_000)).toBe(1);
+    expect(prisma.mediaAsset.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.mediaAsset.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      cursor: { id: "legacy-499" },
+      skip: 1,
+      take: 500,
+    }));
+    expect(deleteStoredMedia).toHaveBeenCalledWith("ab/0123456789abcdef0123456789abcdef");
+  });
+
   it("does not delete a file if another worker already changed the state", async () => {
     vi.mocked(prisma.mediaAsset.findMany).mockResolvedValue([
       { id: "raced-asset", storageKey: "ab/0123456789abcdef0123456789abcdef" },
