@@ -2,19 +2,19 @@ import { env } from "../config/env.js";
 import { safeFetch } from "./core/safe-fetch.js";
 
 export function anivexaAllowedHosts(): Set<string> {
-  return new Set(env.ANIVEXA_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\\.+|\\.+$/g, "")).filter(Boolean));
+  return new Set(env.ANIVEXA_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\.+|\.+$/g, "")).filter(Boolean));
 }
 
 export function anivexaStreamAllowedHosts(): Set<string> {
-  return new Set(env.ANIVEXA_STREAM_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\\.+|\\.+$/g, "")).filter(Boolean));
+  return new Set(env.ANIVEXA_STREAM_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase().replace(/^\.+|\.+$/g, "")).filter(Boolean));
 }
 
 export function isAnivexaUrlAllowed(value: string, allowed = anivexaAllowedHosts()): boolean {
   try {
     const url = new URL(value);
-    const host = url.hostname.toLowerCase().replace(/\\.$/, "");
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
     if (url.protocol !== "https:" || !host || url.username || url.password || !allowed.size) return false;
-    if (host === "localhost" || host.endsWith(".localhost") || /^\\d+(?:\\.\\d+){3}$/.test(host) || host.includes(":")) return false;
+    if (host === "localhost" || host.endsWith(".localhost") || /^\d+(?:\.\d+){3}$/.test(host) || host.includes(":")) return false;
     return [...allowed].some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
   } catch {
     return false;
