@@ -48,7 +48,7 @@ function scriptStrings(script: string): string[] {
       index = end + 2;
       continue;
     }
-    if (char === "/" && /[=(:,[!&|?{};]/.test(previous)) {
+    if (char === "/" && /[=(:,\[!&|?{};]/.test(previous)) {
       index += 1;
       let inClass = false;
       while (index < script.length) {
