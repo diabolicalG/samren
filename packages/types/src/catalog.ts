@@ -8,6 +8,7 @@ export type CatalogAssetPreview = {
   mimeType: string;
   width: number | null;
   height: number | null;
+  url?: string;
 };
 
 export type CatalogTaxonomyItem = {
