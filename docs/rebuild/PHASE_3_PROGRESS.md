@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `4dd5f77a8f9488cc00606f8b7b0828a9c80e1626`  
+**Latest code checkpoint:** `1ecde28dbbf3a9827cfec7bc69147a51039b0450`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -59,6 +59,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added generated opaque storage keys with strict format validation.
 - Added root/parent canonicalization and path containment checks.
 - Added atomic temporary-file writes, restrictive file permissions, SHA-256 checksums and cleanup on failure.
+- Added conservative API-startup cleanup for abandoned generated temp files older than 24 hours. It scans only canonical shard directories and generated temp-file names, preserves symlinks and unrelated files, and is best-effort so cleanup failures do not prevent API startup.
 - Added conservative startup cleanup for abandoned generated temp files older than 24 hours. It scans only canonical two-character shard directories and generated temp-file names, preserves symlinks/unrelated files, and is best-effort so cleanup failure does not block API startup.
 - Added bounded streaming writes with incremental hashing and size enforcement.
 - Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT and ASS.
@@ -84,6 +85,8 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 **Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`, and a frontend regression test now verifies switching between available sources. CI run `43890218066` passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`. An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
 
 ### Latest hardening and test checkpoint
+
+- Added `cleanupStaleMediaTempFiles` with a conservative 24-hour default, strict generated-name/shard matching, symlink avoidance and deterministic unit coverage for stale, fresh, unrelated and symlink entries. The API invokes it at startup; cleanup failure is logged without blocking startup. CI run `43893703065` on code checkpoint `1ecde28dbbf3a9827cfec7bc69147a51039b0450` was in progress when this progress note was prepared.
 
 - Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
 - Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
@@ -127,7 +130,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Complete the approved native Anivexa provider/extractor integration with a safe implementation; preserve the Anime-streaming repository as read-only, and do not reproduce embedded credentials or unsafe shell execution.
+1. Resolve the Anivexa source-reuse rights question: the user has authorized copying from the read-only Anime-streaming reference into Samren, but the referenced Anivexa project still has no declared licence and credits a separate upstream. Obtain upstream reuse permission or use an independently implemented adapter based on documented behavior. Preserve Anime-streaming as read-only and do not reproduce embedded credentials or unsafe shell execution.
 2. Reconcile the upload endpoint with the approved multipart requirement and document/test the PENDING/READY/FAILED lifecycle and database/filesystem failure behavior.
 3. Broaden storage failure/race tests and verify startup cleanup under deployment conditions.
 5. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
