@@ -6,6 +6,7 @@ import { catalogRouter } from "./catalog/catalog.routes.js";
 import { authRouter } from "./auth/auth.routes.js";
 import { authenticateSession } from "./auth/session.js";
 import { adminCatalogRouter } from "./catalog/admin.routes.js";
+import { adminMediaRouter } from "./media/admin.routes.js";
 import { mediaRouter } from "./media/media.routes.js";
 
 export const app = express();
@@ -18,6 +19,7 @@ app.use(authenticateSession);
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin/catalog", adminCatalogRouter);
+app.use("/api/v1/admin/media", adminMediaRouter);
 app.use("/api/v1/catalog", catalogRouter);
 app.use("/api/v1/media", mediaRouter);
 
