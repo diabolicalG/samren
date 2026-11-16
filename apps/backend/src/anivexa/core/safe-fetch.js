@@ -54,8 +54,15 @@ export function createPinnedLookup(addresses) {
   if (!Array.isArray(addresses) || !addresses.length) throw new Error("Anivexa outbound host has no validated addresses");
   const pinned = addresses.map(({ address, family }) => ({ address, family: family || isIP(address) }));
   return (_hostname, options, callback) => {
-    if (options?.all) callback(null, pinned);
-    else callback(null, pinned[0].address, pinned[0].family);
+    const matching = options?.family ? pinned.filter((item) => item.family === options.family) : pinned;
+    if (!matching.length) {
+      const error = new Error("No validated DNS address matches the requested IP family");
+      error.code = "ENOTFOUND";
+      callback(error);
+      return;
+    }
+    if (options?.all) callback(null, matching);
+    else callback(null, matching[0].address, matching[0].family);
   };
 }
 
