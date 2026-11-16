@@ -2,7 +2,7 @@ import ipaddress
 import os
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from src.extractor import anilist_query
 from src.media_api.config import settings
@@ -79,7 +79,7 @@ def _safe_episode_data(data: dict) -> dict:
             continue
         episodes = {}
         for audio in ("sub", "dub"):
-            items = provider.get("episodes", {}).get(audio, [])
+            items = (provider.get("episodes") or {}).get(audio, [])
             safe_items = []
             for item in items if isinstance(items, list) else []:
                 if not isinstance(item, dict):
@@ -148,7 +148,7 @@ async def provider_status():
 
 
 @router.get("/episodes/{anilist_id}")
-async def get_episodes(anilist_id: int = Query(..., ge=1)):
+async def get_episodes(anilist_id: int = Path(..., ge=1)):
     if not getattr(settings, "kuhi_enabled", True):
         raise HTTPException(status_code=503, detail="Kuhi integration is disabled")
     try:
