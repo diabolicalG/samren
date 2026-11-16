@@ -5,7 +5,7 @@ vi.mock("../db/prisma.js", () => ({
 }));
 vi.mock("./storage.js", () => ({
   isManagedStorageKey: (storageKey: string) => /^[a-f0-9]{2}\/[a-f0-9]{32}$/.test(storageKey),
-  deleteStoredMedia: vi.fn(),
+  deleteStoredMedia: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { prisma } from "../db/prisma.js";
