@@ -151,7 +151,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Continue the user-authorized Anivexa port into Samren only. Audit and port only providers whose upstream behavior can be adapted with fixed HTTPS origins, explicit host allowlists, bounded requests and no embedded credentials or shell execution. AnimeOnsen's dynamic API/search origins and session bearer tokens require origin validation before use; AnimeDunya's shell-command execution and Mkissa's embedded bearer token are excluded as-is. Keep MegaPlay runtime-HMAC servers fail-closed until a safe, testable non-executing signer exists. Do not modify Anime-streaming.
+1. Continue the user-authorized Anivexa port into Samren only. Keep all integrated providers behind explicit host allowlists and bounded safe transport. AnimeDunya has been rewritten to remove shell execution; MKissa remains excluded because its upstream source contains an embedded bearer credential. Ani.pm and Senshi use ordinary safe HTTPS without browser/TLS impersonation, so anti-bot failures are expected to fail over. Keep MegaPlay runtime-HMAC servers fail-closed; do not execute provider JavaScript. Do not modify Anime-streaming.
 2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
@@ -190,3 +190,18 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added unit coverage for HTTPS/host/credential/port validation, server-ID character bounds, fixed CDN URL construction and stream allowlist rejection.
 - CI run [43924461342](https://github.com/diabolicalG/samren/actions/runs/43924461342) passed on `640a861c3c322d7ec4c40f26fc26c459e1ae7c5b`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds. Live provider availability, browser playback, seeking and subtitle behavior have not been verified.
 - DNS-pinning expansion is deferred from the next provider milestones. Existing code is left unchanged; no additional DNS-related work is included in this checkpoint.
+
+
+## 12. Multi-provider aggregation and worker checkpoint (2026-11-16)
+
+- Added a provider registry for 11 integrations: AnimeGG, AniZone, AniKoto, KickAssAnime, AniWaves, ReAnime, AnimeOnsen, AnimeNoSub, Ani.pm, Senshi and AnimeDunya. MKissa remains deliberately excluded because its upstream implementation contains an embedded bearer credential that must not be copied or used.
+- Ported AnimeNoSub's static HTML/AJAX adapter and exposed its direct safe extractors. Embed-only results are not treated as playable sources.
+- Exposed the existing AniWaves, ReAnime and AnimeOnsen modules through typed internal adapters. AnimeOnsen's DASH and subtitle URLs remain allowlist-checked and no bearer header is sent to the browser.
+- Added Ani.pm and Senshi adapters using a compatibility transport backed by ordinary safe HTTPS. The old browser/request-impersonation options are ignored; if a provider requires fingerprint impersonation it fails and the aggregator moves to another provider.
+- Rewrote AnimeDunya's upstream shell/curl transport to use the existing safe HTTPS client restricted to the fixed `anime-dunya.com` host. No shell command is executed.
+- Added a safe extractor registry for Byse, DataSV, Nova, Vidplay, Vidmoly and Flixcloud. The upstream MegaPlay VM-based runtime-HMAC extractor is not registered; the static MegaPlay parser in AniKoto remains available where statically derivable.
+- Added `BoundedWorkerPool` with configurable concurrency and queue capacity, plus per-provider circuit breakers with failure thresholds and cooldowns. All provider extraction tasks start concurrently; the first validated, allowlisted HTTPS HLS/MP4/DASH stream wins. Other provider tasks continue and can supply a fallback.
+- Added short-lived playback sessions and API routes: `GET /api/v1/anivexa/aggregate/:anilistId/:episode?audio=sub|dub`, `POST /api/v1/anivexa/aggregate/:sessionId/fallback`, `DELETE /api/v1/anivexa/aggregate/:sessionId`, and `GET /api/v1/anivexa/aggregate/providers`.
+- Added API-client methods and the frontend `useProviderPlayback` hook. A watch/player route does not yet exist in Samren, so the hook exposes `reportPlaybackError()` for the player to call on media errors; automatic browser switching is not yet end-to-end wired to a video element.
+- Worker queues, circuit state and playback sessions are currently bounded in-process memory. This is not a distributed Redis/BullMQ worker service; multi-instance deployment requires shared session/circuit storage and coordinated workers.
+- Live provider availability and browser playback remain unverified. Anivexa remains disabled by default; configure exact upstream and media hosts before enabling. DNS-pinning expansion remains deferred.
