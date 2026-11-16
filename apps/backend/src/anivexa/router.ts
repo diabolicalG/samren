@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
 import { getAniZoneEpisodes } from "./anizone.js";
-import { getAniKotoEpisodes } from "./anikoto.js";
+import { getAniKotoEpisodes, getAniKotoStreams } from "./anikoto.js";
 
 export const anivexaRouter = Router();
 
@@ -59,8 +59,9 @@ anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
   }
   const params = extractParamsSchema.safeParse(request.params);
   const audio = audioSchema.safeParse(request.query.audio ?? "sub");
-  if (!params.success || !audio.success) {
-    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number and audio type are required" } });
+  const extractor = z.enum(["animegg", "anikoto"]).safeParse(request.query.provider ?? "animegg");
+  if (!params.success || !audio.success || !extractor.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number, provider and audio type are required" } });
     return;
   }
   if (!env.ANIVEXA_ALLOWED_HOSTS.trim() || !env.ANIVEXA_STREAM_ALLOWED_HOSTS.trim()) {
@@ -68,7 +69,9 @@ anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
     return;
   }
   try {
-    const result = await getAnimeGGStreams(params.data.anilistId, params.data.episode, audio.data);
+    const result = extractor.data === "animegg"
+      ? await getAnimeGGStreams(params.data.anilistId, params.data.episode, audio.data)
+      : await getAniKotoStreams(params.data.anilistId, params.data.episode, audio.data);
     response.setHeader("Cache-Control", "private, no-store");
     response.status(200).json({ data: result, error: null });
   } catch {
