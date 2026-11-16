@@ -4,7 +4,7 @@
 **Branch:** `phase-3-media-providers`
 **Scope authorization:** Product-owner revision dated 2026-11-15
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`
-**Latest checkpoint:** `4149993cf0725cbcd3af79bc8b28351429ee8518` (storage test correction)
+**Latest checkpoint:** `6b32d293e4a57904d9f45f857ee245adef8de799` (upload sanitization fix; later CI validation pending)
 
 ## 1. Repository verification
 
@@ -102,3 +102,32 @@ Implemented on `phase-3-media-providers`:
 ## 9. Next checkpoint
 
 Implement streaming writes with byte limits and file-signature validation, then add the authenticated admin upload route and a database-backed asset lifecycle with rollback/cleanup. Follow with safe media delivery and byte-range handling.
+
+
+## 10. Implementation checkpoint — upload, signatures, delivery
+
+Additional implementation now present on this branch:
+
+- Added streaming storage using a Node readable pipeline, incremental SHA-256, first-64-byte signature capture, byte-limit enforcement (up to a 2 GiB configured ceiling), temporary-file cleanup, and atomic rename.
+- Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT, and ASS.
+- Added an ADMIN-protected, trusted-Origin upload endpoint at `POST /api/v1/admin/catalog/assets/upload`. It accepts raw request bodies with `x-media-kind` and `x-original-filename` headers; it does not accept multipart form data.
+- Upload limits are 15 MiB for images, 2 MiB for subtitles, and 2 GiB for video.
+- The upload endpoint stores validated files, computes checksums, and creates READY MediaAsset records; failed database writes trigger file cleanup.
+- Added publication-aware public GET/HEAD delivery at `/api/v1/media/:id`, including single byte-range responses and 416 handling for invalid ranges.
+- Public media delivery only resolves READY assets associated with published anime/episodes.
+- Public catalogue responses now include first-party poster/banner delivery URLs.
+- Added `.data/` to `.gitignore`.
+
+**Current limitations:**
+
+- The upload endpoint accepts raw binary request bodies, not multipart/form-data.
+- The upload route currently creates the asset record but does not attach it to an anime or episode; existing admin association endpoints must be used separately.
+- No frontend upload UI, player/watch route, subtitle selection UI, or playback progress integration has been completed.
+- No runtime tests have yet been confirmed green for the latest code. Earlier CI runs failed at lint because of a missing closing brace in the new publication filter and an oxlint control-regex warning; both were corrected in later commits. A newer CI run is pending.
+- This checkpoint does not complete the provider work. Kuhi remains blocked on locating the submodule origin; Anivexa porting has not started.
+
+## 11. Current CI observations
+
+- CI on the earlier upload-only checkpoint `a9fa1b2` completed successfully.
+- Subsequent delivery changes exposed lint errors in an intermediate checkpoint. These were fixed in later commits.
+- CI is being re-run against the latest branch head. Treat the result as pending until GitHub Actions reports completion.
