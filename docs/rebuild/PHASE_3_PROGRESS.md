@@ -134,8 +134,8 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG and AniZone episode discovery/watch extraction plus AniKoto episode discovery and direct/Vidplay/static-MegaPlay extraction are implemented; runtime-HMAC MegaPlay, additional provider ports, mapping/cache parity and live playback remain outstanding |
-| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist, disabled-route tests and MegaPlay static-lexer regression tests pass; DNS pinning review, provider fixture coverage and live tests remain |
+| Anivexa providers/extractors | PARTIAL — THREE ROUTED PROVIDERS | AnimeGG and AniZone episode discovery/watch extraction plus AniKoto episode discovery and direct/Vidplay/static-MegaPlay extraction are implemented. AnimeOnsen is not routed; its dynamic API/search origin checks and stream/subtitle URL filtering are hardened, but it remains disabled/unavailable until separately integrated and live-tested. Runtime-HMAC MegaPlay, additional safe provider ports, mapping/cache parity and live playback remain outstanding |
+| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist, disabled-route tests, MegaPlay static-lexer tests and AnimeOnsen dynamic-origin/stream/subtitle allowlist tests pass. AnimeOnsen bearer headers are no longer returned in stream metadata. DNS pinning review, provider fixture coverage and live tests remain |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
 ## 7. Security requirements retained
@@ -155,3 +155,14 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
 5. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
+
+
+## 9. AnimeOnsen security hardening checkpoint (2026-11-16)
+
+- The dormant AnimeOnsen adapter was audited before any route integration. Its bootstrap page supplies API/search origins dynamically; these origins are now rejected unless their exact HTTPS hostnames are explicitly configured through `ANIVEXA_ANIMEONSEN_API_HOSTS` and `ANIVEXA_ANIMEONSEN_SEARCH_HOSTS`. The generic `ANIVEXA_ALLOWED_HOSTS` policy still applies to outbound requests.
+- The adapter revalidates the configured origins immediately before sending bearer-authenticated API/search requests.
+- Returned DASH stream URLs and subtitle URLs must pass the separate `ANIVEXA_STREAM_ALLOWED_HOSTS` allowlist. Subtitle URLs from other hosts are filtered out.
+- The provider response no longer includes the AnimeOnsen bearer token in stream or subtitle `headers`; no provider authorization header is sent to the browser.
+- Added tests for hostile origin suffixes, HTTP, userinfo, non-default ports, origin paths, stream allowlist boundaries and subtitle filtering/credential isolation.
+- CI run `43916398893` passed all workflow steps on `2d39c2e701041bc5bb18654c413303a8cab986c9`, including lint, typecheck, backend/frontend/Python tests and production builds.
+- This is security hardening only. AnimeOnsen is not added to the public provider route and is not claimed as a working playback provider. Its stream may require server-side authorization; browser playback must not be enabled until the required transport is implemented without exposing credentials.
