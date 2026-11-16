@@ -3,8 +3,8 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `828df8ad1c4382084d84556c95f9dc936efd7de8`  
-**Pull request:** https://github.com/diabolicalG/samren/pull/5 (draft; not merged)
+**Latest code checkpoint:** `18138781cb77303c87cab9c1c022ebdf7be34549`  
+**Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
 
@@ -48,7 +48,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - Some handlers expose raw upstream error details, cookies, request headers or diagnostic data.
   - The aggregator uses wildcard CORS.
 - No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
-- **NOT STARTED:** no Anivexa provider/extractor source has been copied into Samren. Its tree has no project LICENSE/NOTICE, its README points to a separate upstream Anivexa API project, and source contains shell execution and embedded credentials. The user-approved copy must not proceed until reuse rights are confirmed; unsafe code must be rewritten or excluded.
+- **NOT STARTED:** no Anivexa provider/extractor source has been copied into Samren. Its tree has no project LICENSE/NOTICE, and its README attributes the implementation to the separate upstream `walterwhite-69/Anivexa-API` repository. GitHub reports no declared licence for that upstream repository. The product owner approved the integration scope, but that does not establish third-party copyright permission. Obtain permission or a clear licence from the upstream rights holder before adapting source. Once rights are established, rewrite/exclude shell execution, embedded credentials, unsafe diagnostics and wildcard CORS; do not bring the standalone service into Samren.
 
 ## 4. Implemented first-party media work
 
@@ -80,13 +80,14 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added published episode playback metadata at `/api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`.
 - Added a first-party watch page at `/watch/:slug/:episodeNumber` with native video controls and WebVTT subtitle tracks.
 
-**Remaining frontend work:** previous/next episode navigation, local playback progress, quality selection, and an end-to-end browser playback test are not yet complete. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
+**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`; its CI run is pending at the time of this update. An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
 
 ## 5. Verification
 
 - CI run `43832779866` passed all workflow steps for checkpoint `843582214b5cd32d1c4d4d9a7d5d0a223e686a05`: Prisma validation/generation/migration, seed/idempotence, lint, typecheck, backend tests, frontend tests and production build.
 - A later CI run `43832904848` failed one existing admin asset deletion test because newly added file cleanup rejected a legacy metadata-only storage key. The cleanup now checks `isManagedStorageKey` and only unlinks generated keys.
-- CI run `43887063532` is running against `828df8ad1c4382084d84556c95f9dc936efd7de8`; its outcome must be checked before claiming the Python integration passes.
+- CI run `43887614667` passed all workflow steps for `f7c698f4c4fe284670df529e9916694de5607ffb`, including Python API tests and frontend/backend builds.
+- CI run `43888383356` is running against `18138781cb77303c87cab9c1c022ebdf7be34549`; its outcome must be checked before claiming the quality-selector change passes.
 - No local runtime is available in this session; GitHub Actions is the executable validation environment.
 
 ## 6. Current completion matrix
@@ -101,7 +102,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add playback integration tests and episode navigation/progress |
 | Frontend player | PARTIAL | Add previous/next, quality selection and browser playback verification |
 | Kuhi providers/API | IMPLEMENTED; CI VERIFICATION PENDING | Run Python tests; configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | NOT STARTED | Resolve reuse rights, then port safe provider subset and required extractors |
+| Anivexa providers/extractors | BLOCKED / NOT STARTED | Obtain upstream reuse permission or licence; then port safe provider subset and required extractors |
 | Provider security tests | NOT STARTED | URL validation, SSRF, timeouts, response limits, secrets and error redaction |
 | Final Phase 3 audit | NOT STARTED | Complete only after all acceptance gates pass |
 
@@ -117,10 +118,10 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Verify current CI after the legacy asset deletion compatibility fix.
-2. Add tests for upload endpoint, publication-aware delivery, byte ranges and playback metadata.
-3. Complete frontend previous/next navigation and local progress.
-4. Resolve Kuhi submodule source and adapt the client/service.
-5. Confirm Anivexa reuse rights and port safe provider/extractor functionality into Samren without shell execution or embedded credentials.
-6. Run provider failure/security tests, Phase 2 regressions and full CI.
+1. Confirm CI run `43888383356` for the quality-selector checkpoint.
+2. Add endpoint/integration tests for upload authorization, publication-aware delivery, HEAD and byte ranges; add browser playback verification.
+3. Complete the multipart upload requirement and reconcile the PENDING/READY/FAILED lifecycle with storage/database failure cases.
+4. Complete operational storage cleanup and verify persistent-root deployment configuration.
+5. Obtain upstream rights-holder permission/licence for Anivexa source reuse, then port the safe provider/extractor subset into Samren without shell execution, embedded credentials or a separate runtime.
+6. Complete provider failure/SSRF/security tests, Phase 2 regression tests and full CI.
 7. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
