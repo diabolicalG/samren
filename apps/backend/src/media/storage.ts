@@ -196,3 +196,38 @@ export async function cleanupStaleMediaTempFiles(olderThanMs = 24 * 60 * 60 * 10
 
   return removed;
 }
+
+
+/**
+ * List old, regular files that match Samren's generated managed-storage layout.
+ * The database reconciliation layer decides whether each candidate is still referenced.
+ */
+export async function listStaleManagedMediaKeys(olderThanMs = 24 * 60 * 60 * 1000, now = Date.now()) {
+  if (!Number.isSafeInteger(olderThanMs) || olderThanMs < 60_000 || !Number.isFinite(now)) {
+    throw new Error("Invalid orphan media scan parameters");
+  }
+
+  const root = await canonicalRoot();
+  const cutoff = now - olderThanMs;
+  const keys: string[] = [];
+  const shards = await readdir(root, { withFileTypes: true });
+
+  for (const shard of shards) {
+    if (!shard.isDirectory() || !/^[a-f0-9]{2}$/.test(shard.name)) continue;
+    const shardPath = path.join(root, shard.name);
+    const canonicalShard = await realpath(shardPath);
+    if (path.dirname(canonicalShard) !== root) continue;
+
+    const entries = await readdir(canonicalShard, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !/^[a-f0-9]{32}$/.test(entry.name)) continue;
+      if (entry.name.slice(0, 2) !== shard.name) continue;
+      const candidate = path.join(canonicalShard, entry.name);
+      const details = await lstat(candidate);
+      if (!details.isFile() || details.isSymbolicLink() || details.mtimeMs > cutoff) continue;
+      keys.push(`${shard.name}/${entry.name}`);
+    }
+  }
+
+  return keys;
+}
