@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `a54e19dffccc595114654827afae0798837578bb`  
+**Latest code checkpoint:** `3b45fbe0869d72e492483b1d5db66ab8042526b8`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -80,38 +80,38 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added published episode playback metadata at `/api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`.
 - Added a first-party watch page at `/watch/:slug/:episodeNumber` with native video controls and WebVTT subtitle tracks.
 
-**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`; its CI run passed (`43888383356`). An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
+**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`, and a frontend regression test now verifies switching between available sources. CI run `43890218066` passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`. An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
 
 ### Latest hardening and test checkpoint
 
 - Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
 - Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
 - Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
-- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. The CI run for the corrected delivery tests (`43889715112`) completed successfully on `a54e19dffccc595114654827afae0798837578bb`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds all passed. [Workflow run](https://github.com/diabolicalG/samren/actions/runs/43889715112).
+- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. CI run `43889715112` passed the storage/delivery regression suite and all workflow steps. The subsequent quality-selector test run `43890218066` also passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds. [Latest workflow run](https://github.com/diabolicalG/samren/actions/runs/43890218066).
 
 ## 5. Verification
 
-- CI run `43832779866` passed all workflow steps for checkpoint `843582214b5cd32d1c4d4d9a7d5d0a223e686a05`: Prisma validation/generation/migration, seed/idempotence, lint, typecheck, backend tests, frontend tests and production build.
-- A later CI run `43832904848` failed one existing admin asset deletion test because newly added file cleanup rejected a legacy metadata-only storage key. The cleanup now checks `isManagedStorageKey` and only unlinks generated keys.
-- CI run `43887614667` passed all workflow steps for `f7c698f4c4fe284670df529e9916694de5607ffb`, including Python API tests and frontend/backend builds.
-- CI run `43888383356` is running against `18138781cb77303c87cab9c1c022ebdf7be34549`; its outcome must be checked before claiming the quality-selector change passes.
-- No local runtime is available in this session; GitHub Actions is the executable validation environment.
+- CI run `43889715112` passed on `a54e19dffccc595114654827afae0798837578bb`, including the new storage permission and public media-delivery tests.
+- CI run `43890218066` passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`, including the playback quality-selection regression test.
+- Both runs passed Prisma validation/generation/migrations, deterministic seed/idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds.
+- The earlier Kuhi security and provider test checkpoints also passed CI, including private-DNS rejection.
+- GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
 
 | Area | Status | Remaining work |
 |---|---|---|
-| Local storage primitives | PARTIAL | Streaming path exists; add broader failure/race tests and operational cleanup |
-| Admin raw-binary upload | PARTIAL | Multipart support not implemented; attach associations remains separate |
-| Signature validation/checksum | PARTIAL | Unit tests exist; broaden malformed/large-input cases |
-| Public media delivery | PARTIAL | Add integration tests for access rules, HEAD and byte ranges |
-| Artwork URLs/rendering | PARTIAL | Verify on real uploaded assets and responsive layouts |
-| Episode playback metadata | PARTIAL | Add playback integration tests and episode navigation/progress |
-| Frontend player | PARTIAL | Add previous/next, quality selection and browser playback verification |
-| Kuhi providers/API | IMPLEMENTED; CI VERIFICATION PENDING | Run Python tests; configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | BLOCKED / NOT STARTED | Obtain upstream reuse permission or licence; then port safe provider subset and required extractors |
-| Provider security tests | NOT STARTED | URL validation, SSRF, timeouts, response limits, secrets and error redaction |
-| Final Phase 3 audit | NOT STARTED | Complete only after all acceptance gates pass |
+| Local storage primitives | PARTIAL — HARDENED | Operational stale-file cleanup; broader failure/race and deployment tests |
+| Admin upload | PARTIAL | Current endpoint is bounded raw-binary, not multipart; upload/association workflow remains separate; complete lifecycle/failure reconciliation |
+| Signature validation/checksum | PARTIAL | Unit tests pass; broaden malformed/large-input cases |
+| Public media delivery | PARTIAL — TESTED | GET/HEAD/range tests pass; add more publication and failure-path coverage |
+| Artwork URLs/rendering | PARTIAL | Verify with real uploaded assets and responsive layouts |
+| Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
+| Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
+| Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
+| Anivexa providers/extractors | BLOCKED / NOT STARTED | Obtain upstream reuse permission or a clear licence; then port a safe subset |
+| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa-specific tests cannot start until reuse path is cleared |
+| Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
 ## 7. Security requirements retained
 
@@ -125,10 +125,10 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Confirm CI run `43888383356` for the quality-selector checkpoint.
-2. Add endpoint/integration tests for upload authorization, publication-aware delivery, HEAD and byte ranges; add browser playback verification.
-3. Complete the multipart upload requirement and reconcile the PENDING/READY/FAILED lifecycle with storage/database failure cases.
-4. Complete operational storage cleanup and verify persistent-root deployment configuration.
-5. Obtain upstream rights-holder permission/licence for Anivexa source reuse, then port the safe provider/extractor subset into Samren without shell execution, embedded credentials or a separate runtime.
-6. Complete provider failure/SSRF/security tests, Phase 2 regression tests and full CI.
+1. Obtain written reuse permission or a clear licence from the Anivexa upstream rights holder; the upstream repository currently declares no licence. Do not copy its source until this is resolved.
+2. Complete the approved native Anivexa provider/extractor integration after the rights gate, replacing unsafe shell execution, hard-coded credentials, unsafe diagnostics and wildcard CORS.
+3. Reconcile the upload endpoint with the approved multipart requirement and document/test the PENDING/READY/FAILED lifecycle and database/filesystem failure behavior.
+4. Add operational stale-temporary-file cleanup and broader storage failure/race tests.
+5. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
+6. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
 7. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
