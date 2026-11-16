@@ -1,4 +1,5 @@
-import { Router, type Response } from "express";\nimport { z } from "zod";
+import { Router, type Response } from "express";
+import { prisma } from "../db/prisma.js";\nimport { z } from "zod";
 import { catalogListQuerySchema, catalogSlugSchema } from "./catalog.schemas.js";
 import {
   findPublishedAnimeBySlug,\n  findPublishedEpisodePlayback,
@@ -70,6 +71,57 @@ catalogRouter.get("/anime/:slug/episodes", async (request, response) => {
       return;
     }
     response.json({ data: episodes, error: null });
+  } catch (error) {
+    sendFailure(response, error);
+  }
+});
+
+catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (request, response) => {
+  const parsedSlug = catalogSlugSchema.safeParse(request.params.slug);
+  const episodeNumber = Number(request.params.episodeNumber);
+  if (!parsedSlug.success || !Number.isSafeInteger(episodeNumber) || episodeNumber < 1) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "The playback request is invalid" } });
+    return;
+  }
+
+  try {
+    const episode = await prisma.episode.findFirst({
+      where: {
+        episodeNumber,
+        publicationStatus: "PUBLISHED",
+        anime: { slug: parsedSlug.data, publicationStatus: "PUBLISHED" },
+      },
+      select: {
+        id: true,
+        episodeNumber: true,
+        title: true,
+        synopsis: true,
+        durationSeconds: true,
+        media: {
+          where: { asset: { processingState: "READY" } },
+          orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+          select: { id: true, qualityLabel: true, isDefault: true, asset: { select: { id: true, mimeType: true } } },
+        },
+        subtitles: {
+          where: { format: "VTT", asset: { processingState: "READY" } },
+          orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+          select: { id: true, languageCode: true, label: true, isDefault: true, asset: { select: { id: true } } },
+        },
+      },
+    });
+    if (!episode) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Episode not found" } });
+      return;
+    }
+
+    response.set("Cache-Control", "no-store").json({
+      data: {
+        episode: { id: episode.id, episodeNumber: episode.episodeNumber, title: episode.title, synopsis: episode.synopsis, durationSeconds: episode.durationSeconds },
+        sources: episode.media.map((item) => ({ id: item.id, qualityLabel: item.qualityLabel, isDefault: item.isDefault, mimeType: item.asset.mimeType, url: `/api/v1/media/${item.asset.id}` })),
+        subtitles: episode.subtitles.map((item) => ({ id: item.id, languageCode: item.languageCode, label: item.label, isDefault: item.isDefault, format: "VTT" as const, url: `/api/v1/media/${item.asset.id}` })),
+      },
+      error: null,
+    });
   } catch (error) {
     sendFailure(response, error);
   }
