@@ -19,7 +19,7 @@ app.use(authenticateSession);
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin/catalog", adminCatalogRouter);
-app.use("/api/v1/admin/media", adminMediaRouter);
+app.use("/api/v1/admin/catalog", adminMediaRouter);
 app.use("/api/v1/catalog", catalogRouter);
 app.use("/api/v1/media", mediaRouter);
 
