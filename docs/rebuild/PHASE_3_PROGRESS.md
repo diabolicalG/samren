@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
 **Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `fa7153149ff64d67cf6c948f68f98d2775ad14e7`  
+**Latest code checkpoint:** `26fa577044bef606f00020d6c9727ba35311b683`  
 **Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
 
 ## 1. Repository boundaries
@@ -49,7 +49,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
   - The aggregator uses wildcard CORS.
 - No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
 - The product owner explicitly approved adapting/copying Anivexa into Samren, with the hard boundary that `Anime-streaming` remains read-only. The integration is being ported natively into Samren rather than running the standalone Anivexa service.
-- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery and watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery with AniList title matching and sub/dub classification. AniKoto now also has a fail-closed direct-stream extraction path: it resolves the selected sub/dub server and returns only allowlisted direct HLS/MP4 URLs. Embed-only sources requiring dynamic JavaScript decryption/signing are deliberately unsupported until a safe static/cryptographic implementation is available; no VM or eval-based execution is used. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
+- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery plus sub/dub watch extraction. AniKoto resolves the selected server, accepts direct allowlisted HLS/MP4 URLs, supports the Vidplay `getSources` JSON endpoint, and supports MegaPlay plaintext sources or AES-CBC payloads when the key/IV are recoverable from static script literals. Embed pages and scripts must pass the configured upstream HTTPS allowlist; resulting media URLs must pass the separate stream-host allowlist. The adapter never executes provider JavaScript. MegaPlay sources requiring a runtime-derived HMAC signing key are deliberately skipped; those servers remain unsupported until a safe, non-executing signing implementation is available. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
 - The upstream source contains unsafe or unsuitable patterns that remain excluded: shell-command execution, embedded bearer credentials, unsafe dynamic-code evaluation, raw upstream diagnostics/cookies, and wildcard CORS. Any additional provider/extractor must use Samren's HTTPS allowlist, redirect revalidation, response limits and stream-host policy. Do not copy secrets or execute provider-supplied code.
 
 ## 4. Implemented first-party media work
@@ -112,7 +112,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - AnimeGG watch extraction CI run `43900588919` passed all workflow steps. It verifies the added extraction route, stream-host allowlist policy, lint, typecheck, backend/frontend tests, Python tests and production builds. [AnimeGG extraction CI](https://github.com/diabolicalG/samren/actions/runs/43900588919).
 - AniZone provider CI run `43901242289` passed all workflow steps. [AniZone initial provider CI](https://github.com/diabolicalG/samren/actions/runs/43901242289).
 - AniZone Livewire pagination and AniKoto episode-discovery changes are covered by CI run `43902567326` (pagination) and `43902891845` (AniKoto and final fixture correction); both passed all workflow steps, including typecheck, backend/frontend/Python tests and production builds. [AniKoto provider CI](https://github.com/diabolicalG/samren/actions/runs/43902891845).
-- AniKoto direct extraction CI run `43907502476` passed all workflow steps on `fa7153149ff64d67cf6c948f68f98d2775ad14e7`, including lint, typecheck, backend/frontend tests, Python API tests and production builds. It covers server-list parsing and the direct-source extraction route; live provider playback and embed-only MegaPlay extraction remain unverified.
+- AniKoto direct extraction CI run `43907502476` passed all workflow steps on `fa7153149ff64d67cf6c948f68f98d2775ad14e7`. Follow-up safe embed extraction CI run `43908912162` passed all workflow steps on `26fa577044bef606f00020d6c9727ba35311b683`, including lint, typecheck, backend/frontend tests, Python API tests and production builds. The new tests cover static MegaPlay route parsing, AES-CBC payload decryption, malformed encrypted payload rejection, direct URL/fragment parsing and embed-host rejection. Live provider playback and MegaPlay dynamic-HMAC server compatibility remain unverified.
 - GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
 
 ## 6. Current completion matrix
@@ -127,7 +127,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery plus allowlisted direct HLS/MP4 extraction are ported; AniKoto embed-only MegaPlay extraction, AniZone watch extraction, remaining providers, mapping/cache parity and live playback tests remain |
+| Anivexa providers/extractors | PARTIAL — THREE PROVIDERS | AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery, and AniKoto episode discovery plus direct/Vidplay/static-MegaPlay extraction are implemented; MegaPlay dynamic-HMAC servers, AniZone watch extraction, remaining providers, mapping/cache parity and live playback tests remain |
 | Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist and disabled-route tests pass; add AniKoto live fixture tests, DNS pinning review and broader provider tests |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
@@ -143,7 +143,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 
 ## 8. Next checkpoints
 
-1. Continue the user-authorized Anivexa copy/port into Samren only. Add AniZone watch extraction, safe AniKoto embed extraction (without executing provider JavaScript), and remaining approved providers in controlled increments; do not modify Anime-streaming. Do not carry embedded credentials, shell-command execution, or unsafe dynamic-code evaluation into Samren.
+1. Continue the user-authorized Anivexa port into Samren only. Implement AniZone watch extraction and the remaining approved providers in controlled increments; do not modify Anime-streaming. Keep MegaPlay dynamic-HMAC servers explicitly unsupported until a safe non-executing implementation exists. Do not carry embedded credentials, shell-command execution, or unsafe dynamic-code evaluation into Samren.
 2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
 3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
 4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
