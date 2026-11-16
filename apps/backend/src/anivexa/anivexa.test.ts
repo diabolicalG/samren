@@ -7,7 +7,7 @@ import { parseAniKotoEpisodes, parseAniKotoSearchResults, parseAniKotoServerItem
 import { parseAniKotoDirectSource, extractAniKotoEmbed, parseMegaPlayRoutes, decryptStaticMegaPlay } from "./anikoto-embed.js";
 import { validateAnimeOnsenOrigin, isAnimeOnsenMediaUrlAllowed, videoSubtitles } from "./providers/animeonsen.js";
 import { createCipheriv } from "node:crypto";
-import { createPinnedLookup } from "./core/safe-fetch.js";
+import { createPinnedLookup, isPublicAddress, validatePublicAddresses } from "./core/safe-fetch.js";
 
 
 describe("Anivexa DNS-pinned transport", () => {
@@ -23,6 +23,16 @@ describe("Anivexa DNS-pinned transport", () => {
     const single = vi.fn();
     lookup("provider.example", {}, single);
     expect(single).toHaveBeenCalledWith(null, pinned[0].address, 4);
+  });
+  it("rejects private, loopback, link-local and documentation DNS answers, including mixed sets", () => {
+    expect(isPublicAddress("127.0.0.1")).toBe(false);
+    expect(isPublicAddress("10.1.2.3")).toBe(false);
+    expect(isPublicAddress("169.254.10.20")).toBe(false);
+    expect(isPublicAddress("::1")).toBe(false);
+    expect(isPublicAddress("fe80::1")).toBe(false);
+    expect(isPublicAddress("2001:db8::1")).toBe(false);
+    expect(() => validatePublicAddresses([{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }])).toThrow(/non-public/);
+    expect(validatePublicAddresses([{ address: "93.184.216.34", family: 4 }])).toHaveLength(1);
   });
   it("rejects an empty pin set instead of falling back to system DNS", () => {
     expect(() => createPinnedLookup([])).toThrow(/validated addresses/);
