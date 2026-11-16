@@ -1,4 +1,4 @@
-import { anivexaJson, anivexaText } from "./http.js";
+import { anivexaJson, anivexaText, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 
 type AniListMedia = {
   id: number;
@@ -162,4 +162,60 @@ export async function getAnimeGGEpisodes(anilistId: number) {
     meta: { id: selected.slug, title: selected.title, source: "animegg", matchScore: Number(selected.score.toFixed(3)), numbering: "local", episodeOffset: 0 },
     episodes: { sub, dub },
   };
+}
+
+
+export async function getAnimeGGStreams(anilistId: number, episodeNumber: number, audio: "sub" | "dub") {
+  const catalogue = await getAnimeGGEpisodes(anilistId);
+  const sourceEpisodes = await scrapeSeries(String(catalogue.meta.id));
+  const episode = sourceEpisodes.find((item) => item.number === episodeNumber);
+  if (!episode || (audio === "sub" && !episode.hasSub) || (audio === "dub" && !episode.hasDub)) {
+    throw new Error("AnimeGG episode or audio version was not found");
+  }
+
+  const pageUrl = new URL(`/${episode.slug.replace(/^\/+/, "")}`, ANIMEGG).href;
+  const page = await anivexaText(pageUrl, { "User-Agent": USER_AGENT, Referer: ANIMEGG });
+  const tabs: Array<{ embedId: string; server: string }> = [];
+  for (const match of page.matchAll(/<a\b[^>]*data-toggle=["']tab["'][^>]*>/gi)) {
+    const tag = match[0];
+    const embedId = attribute(tag, "data-id");
+    const version = attribute(tag, "data-version") || "subbed";
+    if (!embedId || (version.startsWith("dub") ? "dub" : "sub") !== audio) continue;
+    tabs.push({ embedId, server: attribute(tag, "data-mirror") || "AnimeGG" });
+  }
+
+  const streamHosts = anivexaStreamAllowedHosts();
+  if (!streamHosts.size) throw new Error("Anivexa stream hosts have not been allowlisted");
+  const results = await Promise.all(tabs.map(async (tab) => {
+    const embedUrl = new URL(`/embed/${encodeURIComponent(tab.embedId)}`, ANIMEGG).href;
+    const html = await anivexaText(embedUrl, { "User-Agent": USER_AGENT, Referer: ANIMEGG });
+    const sourceBlock = html.match(/var\s+videoSources\s*=\s*(\[[\s\S]*?\]);/);
+    if (!sourceBlock) return [];
+    let parsed: Array<{ file?: string; label?: string }> = [];
+    try {
+      const json = sourceBlock[1]
+        .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+        .replace(/:\s*'([^']*)'/g, ': "$1"');
+      const value: unknown = JSON.parse(json);
+      if (Array.isArray(value)) parsed = value.filter((item): item is { file?: string; label?: string } => Boolean(item) && typeof item === "object");
+    } catch {
+      return [];
+    }
+    return parsed.flatMap((source) => {
+      if (typeof source.file !== "string" || !source.file) return [];
+      let url: string;
+      try { url = new URL(source.file, ANIMEGG).href; } catch { return []; }
+      if (!isAnivexaUrlAllowed(url, streamHosts)) return [];
+      return [{
+        url,
+        type: url.includes(".m3u8") ? "hls" : "mp4",
+        quality: String(source.label || "auto").slice(0, 32),
+        provider: String(tab.server).slice(0, 64),
+        audio,
+      }];
+    });
+  }));
+  const streams = results.flat();
+  if (!streams.length) throw new Error("AnimeGG returned no stream URLs allowed by the configured policy");
+  return { anilistId, episode: episodeNumber, audio, streams };
 }
