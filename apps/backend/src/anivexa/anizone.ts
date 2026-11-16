@@ -183,7 +183,8 @@ async function loadPage(state: PageState, slug: string): Promise<PageState> {
       }],
     }),
   });
-  let payload: { components?: Array<{ snapshot?: string; effects?: { dispatches?: Array<{ name?: string; params?: { items?: unknown[]; nextCursor?: string; hasMore?: boolean } }> }> }> };
+  type LivewirePayload = { components?: Array<{ snapshot?: string; effects?: { dispatches?: Array<{ name?: string; params?: { items?: unknown[]; nextCursor?: string; hasMore?: boolean } }> } }> };
+  let payload: LivewirePayload;
   try { payload = JSON.parse(response.raw) as typeof payload; } catch { throw new Error("AniZone returned invalid pagination JSON"); }
   const component = payload.components?.[0];
   const dispatch = component?.effects?.dispatches?.find((item) => item.name === "items-loaded");
