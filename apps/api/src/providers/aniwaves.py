@@ -3,7 +3,7 @@ import json
 import re
 from urllib.parse import quote, urljoin, urlparse
 
-import httpx
+from src.providers import _safe_http as httpx
 
 from src.providers import _cache
 from src.providers._http import UA, fetch_json, fetch_text
