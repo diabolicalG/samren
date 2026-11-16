@@ -279,7 +279,7 @@ adminCatalogRouter.post("/assets/upload", requireTrustedOrigin, async (request, 
   }
 
   const filenameHeader = request.get("x-original-filename") ?? "upload";
-  const normalizedFilename = filenameHeader.replace(/\\/g, "/").split("/").pop()?.replace(/[\\u0000-\\u001f\\u007f]/g, "").trim().slice(0, 255);
+  const normalizedFilename = filenameHeader.replace(/\\/g, "/").split("/").pop()?.replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, 255);
   if (!normalizedFilename) {
     response.status(400).json({ data: null, error: { code: "INVALID_FILENAME", message: "A valid original filename is required" } });
     return;
@@ -320,7 +320,7 @@ adminCatalogRouter.post("/assets/upload", requireTrustedOrigin, async (request, 
   } catch (error) {
     if (stored) await deleteStoredMedia(stored.storageKey).catch(() => undefined);
     const message = error instanceof Error ? error.message : "";
-    if (message.includes("size limit") || message.includes("size limit")) {
+    if (message.includes("size limit")) {
       response.status(413).json({ data: null, error: { code: "UPLOAD_TOO_LARGE", message: "The upload exceeds the permitted size" } });
       return;
     }
