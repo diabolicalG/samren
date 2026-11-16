@@ -88,13 +88,17 @@ export async function storeMediaBuffer(input: Buffer): Promise<StoredMedia> {
 }
 
 
-export async function storeMediaStream(source: Readable, maxBytes: number) {
+export function createMediaStorageKey() {
+  const id = randomUUID().replace(/-/g, "");
+  return `${id.slice(0, 2)}/${id}`;
+}
+
+export async function storeMediaStream(source: Readable, maxBytes: number, storageKey = createMediaStorageKey()) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 2 * 1024 * 1024 * 1024) {
     throw new Error("Invalid media stream size limit");
   }
 
-  const id = randomUUID().replace(/-/g, "");
-  const storageKey = `${id.slice(0, 2)}/${id}`;
+  assertStorageKey(storageKey);
   const destination = await resolveStoredMediaPath(storageKey);
   const temporary = `${destination}.${randomUUID()}.tmp`;
   const hash = createHash("sha256");
