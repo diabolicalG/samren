@@ -104,7 +104,7 @@ describe("AniKoto direct and embed source policy", () => {
 
 describe("AniKoto safe embed extraction primitives", () => {
   it("identifies legacy and modern MegaPlay source routes without evaluating JavaScript", () => {
-    expect(parseMegaPlayRoutes(String.raw\`const a = "stream/getSources"; const b = "stream/getSources2";\`)).toEqual({
+    expect(parseMegaPlayRoutes(String.raw`const a = "stream/getSources"; const b = "stream/getSources2";\`)).toEqual({
       legacy: "stream/getSources",
       modern: "stream/getSources2",
     });
