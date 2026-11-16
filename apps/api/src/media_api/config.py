@@ -16,6 +16,7 @@ class Settings:
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     kuhi_enabled: bool = os.getenv("KUHI_ENABLED", "true").lower() in ("1", "true", "yes", "on")
     kuhi_stream_allowed_hosts: str = os.getenv("KUHI_STREAM_ALLOWED_HOSTS", "")
+    kuhi_provider_allowed_hosts: str = os.getenv("KUHI_PROVIDER_ALLOWED_HOSTS", "")
 
 
 settings = Settings()
