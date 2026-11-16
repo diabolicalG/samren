@@ -135,7 +135,7 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 | Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
 | Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
 | Anivexa providers/extractors | PARTIAL — THREE ROUTED PROVIDERS | AnimeGG and AniZone episode discovery/watch extraction plus AniKoto episode discovery and direct/Vidplay/static-MegaPlay extraction are implemented. AnimeOnsen is not routed; its dynamic API/search origin checks and stream/subtitle URL filtering are hardened, but it remains disabled/unavailable until separately integrated and live-tested. Runtime-HMAC MegaPlay, additional safe provider ports, mapping/cache parity and live playback remain outstanding |
-| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist, disabled-route tests, MegaPlay static-lexer tests and AnimeOnsen dynamic-origin/stream/subtitle allowlist tests pass. AnimeOnsen bearer headers are no longer returned in stream metadata. DNS pinning review, provider fixture coverage and live tests remain |
+| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist, disabled-route tests, MegaPlay static-lexer tests and AnimeOnsen dynamic-origin/stream/subtitle allowlist tests pass. AnimeOnsen bearer headers are no longer returned in stream metadata. pinned DNS transport regression tests now cover lookup pinning and private/mixed DNS answers; live provider tests remain |
 | Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
 
 ## 7. Security requirements retained
@@ -166,3 +166,14 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Added tests for hostile origin suffixes, HTTP, userinfo, non-default ports, origin paths, stream allowlist boundaries and subtitle filtering/credential isolation.
 - CI run `43916398893` passed all workflow steps on `2d39c2e701041bc5bb18654c413303a8cab986c9`, including lint, typecheck, backend/frontend/Python tests and production builds.
 - This is security hardening only. AnimeOnsen is not added to the public provider route and is not claimed as a working playback provider. Its stream may require server-side authorization; browser playback must not be enabled until the required transport is implemented without exposing credentials.
+
+
+## 10. DNS-rebinding hardening checkpoint (2026-11-16)
+
+- Replaced the Anivexa core client's check-then-fetch sequence with a pinned HTTPS transport. Each request resolves its hostname once, rejects the entire answer set if any address is non-public, and supplies those validated addresses to Node's HTTPS lookup callback. The TLS request still uses the original hostname, preserving hostname-based certificate validation and SNI.
+- Every redirect is handled manually and independently revalidated, re-resolved and pinned. The transport retains HTTPS-only and host-suffix allowlisting, a 10-second abort timeout, a four-redirect limit and a 5 MiB response cap.
+- The separate TypeScript Anivexa HTTP client now delegates to this same pinned transport, so provider requests do not bypass DNS pinning.
+- Expanded address filtering to reject private, loopback, link-local, carrier-grade NAT, multicast/reserved IPv4, non-global IPv6, IPv4-mapped private IPv6 and IPv6 documentation/special-use ranges. Mixed public/private DNS answer sets fail closed.
+- Added regression tests for pinned IPv4/IPv6 lookup callbacks, empty pin sets, private/loopback/link-local/documentation addresses and mixed DNS answer sets.
+- Request bodies are buffered before transmission; unsupported streaming bodies fail closed rather than silently falling back to native fetch.
+- This checkpoint is implementation-complete pending CI verification. It does not establish live provider availability or browser playback.
