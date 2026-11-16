@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
+import { deleteStoredMedia } from "../media/storage.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
 import {
@@ -343,7 +344,16 @@ adminCatalogRouter.delete("/assets/:id", requireTrustedOrigin, async (request, r
       response.status(409).json({ data: null, error: { code: "IN_USE", message: "This asset is attached to catalogue content and cannot be deleted" } });
       return;
     }
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: id.data },
+      select: { storageKey: true },
+    });
+    if (!asset) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The media asset was not found" } });
+      return;
+    }
     await prisma.mediaAsset.delete({ where: { id: id.data } });
+    await deleteStoredMedia(asset.storageKey);
     response.status(204).end();
   } catch (error) {
     sendError(response, error);
