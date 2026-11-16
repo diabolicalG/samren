@@ -1,4 +1,4 @@
-import { anivexaFetch, anivexaJson, anivexaReadText, anivexaText } from "./http.js";
+import { anivexaFetch, anivexaJson, anivexaReadText } from "./http.js";
 
 type Media = {
   id: number;
