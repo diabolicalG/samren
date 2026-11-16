@@ -4,11 +4,12 @@ import { prisma } from "../db/prisma.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
 import { deleteStoredMedia, storeMediaStream } from "./storage.js";
+import { detectMediaSignature, type UploadMediaKind } from "./signature.js";
 
 export const adminMediaRouter = Router();
 adminMediaRouter.use(requireRole("ADMIN"));
 
-const MAX_UPLOAD_BYTES: Record<string, number> = { POSTER: 15 * 1024 * 1024, BANNER: 15 * 1024 * 1024, VIDEO: 2 * 1024 * 1024 * 1024, SUBTITLE: 2 * 1024 * 1024 };
+const MAX_UPLOAD_BYTES: Record<UploadMediaKind, number> = { POSTER: 15 * 1024 * 1024, BANNER: 15 * 1024 * 1024, VIDEO: 2 * 1024 * 1024 * 1024, SUBTITLE: 2 * 1024 * 1024 };
 const allowedMime: Record<string, string[]> = {
   POSTER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
   BANNER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
@@ -37,7 +38,7 @@ function signatureMatches(kind: string, mime: string, bytes: Buffer) {
 }
 
 adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
-  const kind = String(request.get("x-media-kind") ?? "").toUpperCase();
+  const kind = String(request.get("x-media-kind") ?? "").toUpperCase() as UploadMediaKind;
   const mime = String(request.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   const filename = String(request.get("x-original-filename") ?? "upload").trim();
   const declaredLength = Number(request.get("content-length") ?? 0);
@@ -58,7 +59,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
   try {
     stored = await storeMediaStream(request, maxBytes);
-    if (!signatureMatches(kind, mime, stored.signature)) {
+    const detected = detectMediaSignature(kind, stored.signature);\n    if (!detected || detected.mimeType !== mime) {
       await deleteStoredMedia(stored.storageKey);
       response.status(415).json({ data: null, error: { code: "FILE_SIGNATURE_MISMATCH", message: "The uploaded file content does not match its declared media type" } });
       return;
