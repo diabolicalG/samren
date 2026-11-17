@@ -1,4 +1,5 @@
 import { useDeferredValue, useState } from "react";
+import { useProviderPlayback } from "./hooks/useProviderPlayback";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
@@ -241,6 +242,10 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
 function WatchPage() {
   const { slug = "", episodeNumber = "" } = useParams();
   const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [anilistIdInput, setAnilistIdInput] = useState("");
+  const [providerAudio, setProviderAudio] = useState<"sub" | "dub">("sub");
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const providerPlayback = useProviderPlayback();
   const number = Number(episodeNumber);
   const playbackQuery = useQuery({
     queryKey: ["catalog", "playback", slug, number],
@@ -260,11 +265,33 @@ function WatchPage() {
   const source = playback.sources.find((item) => item.id === selectedSourceId)
     ?? playback.sources.find((item) => item.isDefault)
     ?? playback.sources[0];
+  const providerStream = providerPlayback.stream;
+  const activeUrl = providerStream?.url ?? source?.url;
   const episodes = animeQuery.data?.episodes ?? [];
   const episodeIndex = episodes.findIndex((item) => item.episodeNumber === playback.episode.episodeNumber);
   const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
   const nextEpisode = episodeIndex >= 0 && episodeIndex < episodes.length - 1 ? episodes[episodeIndex + 1] : null;
   const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
+
+  async function handleMediaError() {
+    setProviderError(null);
+    if (providerStream) {
+      const replacement = await providerPlayback.reportPlaybackError();
+      if (!replacement) setProviderError(providerPlayback.error ?? "This provider failed and no alternate source is available.");
+      return;
+    }
+    const id = Number(anilistIdInput.trim());
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      setProviderError("This first-party source failed. Enter a valid AniList ID to try provider fallback.");
+      return;
+    }
+    try {
+      await providerPlayback.start(id, playback.episode.episodeNumber, providerAudio);
+    } catch (cause) {
+      setProviderError(cause instanceof Error ? cause.message : "No provider could start playback.");
+    }
+  }
+
   return (
     <main className="page-shell watch-page">
       <Link className="text-link" to={`/anime/${slug}`}>← Back to episode guide</Link>
@@ -273,35 +300,63 @@ function WatchPage() {
         <h1>{playback.episode.title}</h1>
         {playback.episode.synopsis ? <p>{playback.episode.synopsis}</p> : null}
       </section>
-      {source ? (
+      {source && playback.sources.length > 1 && !providerStream ? (
+        <label className="ui-field playback-source-select" htmlFor="playback-source">
+          Video quality
+          <select className="ui-input" id="playback-source" value={source.id} onChange={(event) => setSelectedSourceId(event.target.value)}>
+            {playback.sources.map((item) => <option key={item.id} value={item.id}>{item.qualityLabel || item.mimeType}{item.isDefault ? " · Default" : ""}</option>)}
+          </select>
+        </label>
+      ) : null}
+      <section className="provider-fallback-controls" aria-label="Provider fallback settings">
+        <label className="ui-field" htmlFor="provider-anilist-id">AniList ID for provider fallback
+          <input className="ui-input" id="provider-anilist-id" inputMode="numeric" pattern="[0-9]*" placeholder="Enter the matching AniList ID" value={anilistIdInput} onChange={(event) => setAnilistIdInput(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
+        </label>
+        <label className="ui-field" htmlFor="provider-audio">Provider audio
+          <select className="ui-input" id="provider-audio" value={providerAudio} onChange={(event) => setProviderAudio(event.target.value as "sub" | "dub")}>
+            <option value="sub">Sub</option><option value="dub">Dub</option>
+          </select>
+        </label>
+        <p>Provider fallback starts automatically if the current video source reports a media error.</p>
+      </section>
+      {activeUrl ? (
         <>
-          {playback.sources.length > 1 ? (
-            <label className="ui-field playback-source-select" htmlFor="playback-source">
-              Video quality
-              <select
-                className="ui-input"
-                id="playback-source"
-                value={source.id}
-                onChange={(event) => setSelectedSourceId(event.target.value)}
-              >
-                {playback.sources.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.qualityLabel || item.mimeType}{item.isDefault ? " · Default" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <div className="video-frame">
-            <video key={source.id} controls playsInline preload="metadata" src={source.url} onLoadedMetadata={(event) => { const saved = Number(window.localStorage.getItem(progressKey)); if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved; }} onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }} onEnded={() => window.localStorage.removeItem(progressKey)}>
-              {playback.subtitles.map((track) => <track key={track.id} kind="subtitles" src={track.url} srcLang={track.languageCode} label={track.label} default={track.isDefault} />)}
-              Your browser does not support HTML video playback.
+            <video
+              key={providerStream?.provider ?? source?.id ?? "provider"}
+              controls
+              playsInline
+              preload="metadata"
+              src={activeUrl}
+              onError={(event) => { event.currentTarget.pause(); void handleMediaError(); }}
+              onLoadedMetadata={(event) => {
+                const saved = Number(window.localStorage.getItem(progressKey));
+                if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved;
+              }}
+              onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }}
+              onEnded={() => window.localStorage.removeItem(progressKey)}
+            >
+              {(providerStream?.subtitles ?? playback.subtitles).map((track, index) => (
+                <track
+                  key={"id" in track ? track.id : `${track.srclang}-${index}`}
+                  kind="subtitles"
+                  src={track.url}
+                  srcLang={"languageCode" in track ? track.languageCode : track.srclang}
+                  label={track.label}
+                  default={track.default ?? ("isDefault" in track ? track.isDefault : false)}
+                />
+              ))}
+              Your browser does not support video playback.
             </video>
           </div>
-          <p className="playback-quality">{source.qualityLabel || source.mimeType} · First-party media</p>
+          <p className="playback-quality">
+            {providerStream ? `Provider: ${providerStream.provider} · ${providerStream.quality} · ${providerStream.type.toUpperCase()}` : `${source?.qualityLabel || source?.mimeType} · First-party media`}
+          </p>
         </>
       ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
-      {playback.subtitles.length ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
+      {providerPlayback.isStarting || providerPlayback.isSwitching ? <p className="playback-quality" role="status">{providerPlayback.isStarting ? "Finding a provider stream…" : "Switching to another provider…"}</p> : null}
+      {providerError || providerPlayback.error ? <p className="admin-error" role="alert">{providerError ?? providerPlayback.error}</p> : null}
+      {playback.subtitles.length && !providerStream ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
       <nav className="watch-navigation" aria-label="Episode navigation">
         {previousEpisode ? <Link className="ui-button ui-button--secondary" to={`/watch/${slug}/${previousEpisode.episodeNumber}`}>← Episode {previousEpisode.episodeNumber}</Link> : <span />}
         {nextEpisode ? <Link className="ui-button ui-button--primary" to={`/watch/${slug}/${nextEpisode.episodeNumber}`}>Episode {nextEpisode.episodeNumber} →</Link> : null}
