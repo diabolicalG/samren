@@ -57,6 +57,8 @@ export function AdaptivePlayer({
   onReady,
 }: AdaptivePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const callbacks = useRef({ onError, onReady });
+  callbacks.current = { onError, onReady };
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function AdaptivePlayer({
     const reportFatal = () => {
       if (disposed || fatalReported) return;
       fatalReported = true;
-      onError();
+      callbacks.current.onError();
     };
 
     const restorePosition = () => {
@@ -80,7 +82,7 @@ export function AdaptivePlayer({
         try { video.currentTime = resumeAt; } catch { /* metadata may not be seekable yet */ }
       }
       if (autoPlay) void video.play().catch(() => undefined);
-      onReady?.();
+      callbacks.current.onReady?.();
     };
 
     video.addEventListener("loadedmetadata", restorePosition);
@@ -142,7 +144,7 @@ export function AdaptivePlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [src, type, resumeAt, autoPlay, onError, onReady]);
+  }, [src, type, resumeAt, autoPlay]);
 
   return (
     <div className="adaptive-player">
