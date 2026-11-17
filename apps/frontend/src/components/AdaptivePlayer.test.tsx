@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdaptivePlayer } from "./AdaptivePlayer";
 
@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("AdaptivePlayer", () => {
-  it("attaches HLS.js and recovers one fatal media error before reporting failure", () => {
+  it("attaches HLS.js and recovers one fatal media error before reporting failure", async () => {
     const hlsInstance = {
       attachMedia: vi.fn(),
       loadSource: vi.fn(),
@@ -28,7 +28,7 @@ describe("AdaptivePlayer", () => {
     const onError = vi.fn();
     const { container, unmount } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=x&kind=hls" type="hls" onError={onError} />);
     const video = container.querySelector("video")!;
-    expect(hlsInstance.attachMedia).toHaveBeenCalledWith(video);
+    await waitFor(() => expect(hlsInstance.attachMedia).toHaveBeenCalledWith(video));
     expect(hlsInstance.loadSource).toHaveBeenCalledWith("/api/v1/anivexa/media?url=x&kind=hls");
     const callback = hlsInstance.on.mock.calls[0]?.[1] as (_event: string, data: { fatal?: boolean; type?: string }) => void;
     callback("hlsError", { fatal: true, type: "mediaError" });
@@ -40,7 +40,7 @@ describe("AdaptivePlayer", () => {
     expect(hlsInstance.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it("initializes dash.js and forwards fatal engine errors", () => {
+  it("initializes dash.js and forwards fatal engine errors", async () => {
     const dashPlayer = {
       initialize: vi.fn(),
       on: vi.fn(),
@@ -51,7 +51,7 @@ describe("AdaptivePlayer", () => {
     vi.stubGlobal("dashjs", { MediaPlayer: () => ({ create: () => dashPlayer }) });
     const onError = vi.fn();
     const { container, unmount } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=x&kind=dash" type="dash" onError={onError} />);
-    expect(dashPlayer.initialize).toHaveBeenCalledWith(container.querySelector("video"), "/api/v1/anivexa/media?url=x&kind=dash", false);
+    await waitFor(() => expect(dashPlayer.initialize).toHaveBeenCalledWith(container.querySelector("video"), "/api/v1/anivexa/media?url=x&kind=dash", false));
     const callback = dashPlayer.on.mock.calls[0]?.[1] as (event: unknown) => void;
     callback({ error: { code: 27 } });
     expect(onError).toHaveBeenCalledTimes(1);
