@@ -120,8 +120,7 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
     if (part.name === "baseurl") {
       const target = resolveResource(decodeXml(nodeText(part)), inheritedBase);
       if (!target || !/\.(?:mp4|m4v|webm|m4s|mpd|m3u8|ts|m4a|aac|mp3|vtt)$/i.test(new URL(target).pathname)) return "";
-      const tagName = part.opening.match(/^<\s*([^\s/>]+)/)?.[1] ?? "BaseURL";
-      return "<" + tagName + ">" + proxyUrl(target, referer, true) + "</" + tagName + ">";
+      return part.opening + proxyUrl(target, referer, true) + part.closing;
     }
     let base = inheritedBase;
     const xmlBase = part.opening.match(/\bxml:base\s*=\s*(["'])(.*?)\1/i)?.[2];
