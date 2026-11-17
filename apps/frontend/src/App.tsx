@@ -1,5 +1,6 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useProviderPlayback } from "./hooks/useProviderPlayback";
+import { AdaptivePlayer } from "./components/AdaptivePlayer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
@@ -246,6 +247,7 @@ function WatchPage() {
   const [providerAudio, setProviderAudio] = useState<"sub" | "dub">("sub");
   const [providerError, setProviderError] = useState<string | null>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
+  const fallbackInFlight = useRef(false);
   const providerPlayback = useProviderPlayback();
   useEffect(() => () => { void providerPlayback.close(); }, [providerPlayback.close]);
   const number = Number(episodeNumber);
@@ -269,6 +271,7 @@ function WatchPage() {
     ?? playback.sources[0];
   const providerStream = providerPlayback.stream;
   const activeUrl = providerStream?.url ?? source?.url;
+  const activeType = providerStream?.type ?? (source?.mimeType.toLowerCase().includes("mpegurl") ? "hls" : source?.mimeType.toLowerCase().includes("dash") ? "dash" : "mp4");
   const episodes = animeQuery.data?.episodes ?? [];
   const episodeIndex = episodes.findIndex((item) => item.episodeNumber === playback.episode.episodeNumber);
   const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
@@ -276,22 +279,28 @@ function WatchPage() {
   const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
 
   async function handleMediaError() {
+    if (fallbackInFlight.current) return;
+    fallbackInFlight.current = true;
     setMediaFailed(true);
     setProviderError(null);
     if (providerStream) {
       const replacement = await providerPlayback.reportPlaybackError();
       if (!replacement) setProviderError(providerPlayback.error ?? "This provider failed and no alternate source is available.");
+      fallbackInFlight.current = false;
       return;
     }
     const id = Number(anilistIdInput.trim());
     if (!Number.isSafeInteger(id) || id <= 0) {
       setProviderError("This first-party source failed. Enter a valid AniList ID to try provider fallback.");
+      fallbackInFlight.current = false;
       return;
     }
     try {
       await providerPlayback.start(id, playback.episode.episodeNumber, providerAudio);
     } catch (cause) {
       setProviderError(cause instanceof Error ? cause.message : "No provider could start playback.");
+    } finally {
+      fallbackInFlight.current = false;
     }
   }
 
@@ -328,32 +337,16 @@ function WatchPage() {
       {activeUrl ? (
         <>
           <div className="video-frame">
-            <video
-              key={providerStream?.provider ?? source?.id ?? "provider"}
-              controls
-              playsInline
-              preload="metadata"
+            <AdaptivePlayer
+              key={providerStream ? `${providerStream.provider}-${providerStream.type}` : source?.id ?? "first-party"}
               src={activeUrl}
+              type={activeType}
+              resumeAt={Number(window.localStorage.getItem(progressKey)) || 0}
+              autoPlay={mediaFailed}
               onError={() => { void handleMediaError(); }}
-              onLoadedMetadata={(event) => {
-                const saved = Number(window.localStorage.getItem(progressKey));
-                if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved;
-              }}
-              onTimeUpdate={(event) => { window.localStorage.setItem(progressKey, String(Math.floor(event.currentTarget.currentTime))); }}
+              onTimeUpdate={(seconds) => { window.localStorage.setItem(progressKey, String(seconds)); }}
               onEnded={() => window.localStorage.removeItem(progressKey)}
-            >
-              {(providerStream?.subtitles ?? playback.subtitles).map((track, index) => (
-                <track
-                  key={"id" in track ? track.id : `${track.srclang}-${index}`}
-                  kind="subtitles"
-                  src={track.url}
-                  srcLang={"languageCode" in track ? track.languageCode : track.srclang}
-                  label={track.label}
-                  default={"default" in track ? track.default : ("isDefault" in track ? track.isDefault : false)}
-                />
-              ))}
-              Your browser does not support video playback.
-            </video>
+            />
           </div>
           <p className="playback-quality">
             {providerStream ? `Provider: ${providerStream.provider} · ${providerStream.quality} · ${providerStream.type.toUpperCase()}` : `${source?.qualityLabel || source?.mimeType} · First-party media`}
