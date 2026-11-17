@@ -334,7 +334,7 @@ function WatchPage() {
               playsInline
               preload="metadata"
               src={activeUrl}
-              onError={(event) => { event.currentTarget.pause(); void handleMediaError(); }}
+              onError={() => { void handleMediaError(); }}
               onLoadedMetadata={(event) => {
                 const saved = Number(window.localStorage.getItem(progressKey));
                 if (Number.isFinite(saved) && saved > 0 && saved < event.currentTarget.duration) event.currentTarget.currentTime = saved;
