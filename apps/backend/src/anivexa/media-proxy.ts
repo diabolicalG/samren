@@ -11,8 +11,8 @@ const MAX_MEDIA_BYTES = 512 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
 function proxyUrl(target: string, referer?: string, xml = false): string {
-  const encodedTarget = encodeURIComponent(target).replace(/%24(Number|Time|RepresentationID|Bandwidth)%24/g, function (_match, token) {
-    return "$" + token + "$";
+  const encodedTarget = encodeURIComponent(target).replace(/%24(Number(?:%25\\d+d)?|Time|RepresentationID|Bandwidth)%24/g, function (_match, token) {
+    return "$" + token.replace("%25", "%") + "$";
   });
   const query = "url=" + encodedTarget + (referer ? "&referer=" + encodeURIComponent(referer) : "");
   const value = MEDIA_PATH + "?" + query;
