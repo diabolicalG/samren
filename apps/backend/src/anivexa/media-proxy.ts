@@ -4,10 +4,17 @@ import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } f
 const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
-function proxyUrl(target, referer) {
-  const query = new URLSearchParams({ url: target });
-  if (referer) query.set("referer", referer);
-  return `${MEDIA_PATH}?${query.toString()}`;
+function proxyUrl(target, referer, xml = false) {
+  const encodedTarget = encodeURIComponent(target).replace(/%24(Number|Time|RepresentationID|Bandwidth)%24/g, (_match, token) => `${token}import { safeFetch } from "./core/safe-fetch.js";
+import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
+
+const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
+const MEDIA_PATH = "/api/v1/anivexa/media";
+
+);
+  const query = `url=${encodedTarget}${referer ? `&referer=${encodeURIComponent(referer)}` : ""}`;
+  const value = `${MEDIA_PATH}?${query}`;
+  return xml ? value.replace(/&/g, "&amp;") : value;
 }
 
 function resolveResource(reference, base) {
@@ -32,7 +39,7 @@ export function rewriteHlsManifest(manifest, manifestUrl, referer) {
     if (!/URI="/i.test(line)) return line;
     return line.replace(/URI="([^"]+)"/gi, (match, value) => {
       const resolved = resolveResource(value, manifestUrl);
-      return resolved ? `URI="${proxyUrl(resolved, referer)}"` : match;
+      return resolved ? `URI="${proxyUrl(resolved, referer, true)}"` : match;
     });
   }).join("\n");
 }
@@ -52,7 +59,7 @@ export function rewriteDashManifest(manifest, manifestUrl, referer) {
   });
   rewritten = rewritten.replace(/<Location>([^<]+)<\/Location>/gi, (match, value) => {
     const resolved = resolveResource(value.trim(), base);
-    return resolved ? `<Location>${proxyUrl(resolved, referer)}</Location>` : match;
+    return resolved ? `<Location>${proxyUrl(resolved, referer, true)}</Location>` : match;
   });
   return rewritten;
 }
@@ -105,7 +112,7 @@ export async function proxyAnivexaMedia(request, response) {
       response.status(200);
       response.setHeader("Content-Type", isHls ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
-      response.setHeader("Access-Control-Allow-Origin", request.get("origin") ?? "*");
+      response.setHeader("Access-Control-Allow-Origin", "*");
       response.end(body);
       return;
     }
