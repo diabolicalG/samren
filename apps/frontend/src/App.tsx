@@ -248,7 +248,20 @@ function WatchPage() {
   const [providerError, setProviderError] = useState<string | null>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
   const fallbackInFlight = useRef(false);
+  const playbackGeneration = useRef(0);
+  const playbackKey = `${slug}:${episodeNumber}`;
+  const playbackKeyRef = useRef(playbackKey);
   const providerPlayback = useProviderPlayback();
+  useEffect(() => {
+    if (playbackKeyRef.current === playbackKey) return;
+    playbackKeyRef.current = playbackKey;
+    playbackGeneration.current += 1;
+    fallbackInFlight.current = false;
+    setSelectedSourceId("");
+    setMediaFailed(false);
+    setProviderError(null);
+    void providerPlayback.close();
+  }, [playbackKey, providerPlayback.close]);
   useEffect(() => () => { void providerPlayback.close(); }, [providerPlayback.close]);
   const number = Number(episodeNumber);
   const playbackQuery = useQuery({
@@ -295,11 +308,13 @@ function WatchPage() {
 
   async function handleMediaError() {
     if (fallbackInFlight.current) return;
+    const generation = playbackGeneration.current;
     fallbackInFlight.current = true;
     setMediaFailed(true);
     setProviderError(null);
     if (providerStream) {
       const replacement = await providerPlayback.reportPlaybackError();
+      if (generation !== playbackGeneration.current) return;
       if (!replacement) setProviderError(providerPlayback.error ?? "This provider failed and no alternate source is available.");
       fallbackInFlight.current = false;
       return;
@@ -312,10 +327,13 @@ function WatchPage() {
     }
     try {
       await providerPlayback.start(id, playback.episode.episodeNumber, providerAudio);
+      if (generation !== playbackGeneration.current) return;
     } catch (cause) {
-      setProviderError(cause instanceof Error ? cause.message : "No provider could start playback.");
+      if (generation === playbackGeneration.current) {
+        setProviderError(cause instanceof Error ? cause.message : "No provider could start playback.");
+      }
     } finally {
-      fallbackInFlight.current = false;
+      if (generation === playbackGeneration.current) fallbackInFlight.current = false;
     }
   }
 
