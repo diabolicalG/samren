@@ -83,7 +83,7 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
   const target = typeof request.query.url === "string" ? request.query.url : "";
   const refererValue = typeof request.query.referer === "string" ? request.query.referer : "";
   const kind = typeof request.query.kind === "string" ? request.query.kind : "";
-  if (!target || target.length > 8192 || !["", "hls", "dash", "vtt"].includes(kind)) {
+  if (!target || target.length > 8192 || !["", "hls", "mp4", "dash", "vtt"].includes(kind)) {
     response.status(400).end("Invalid media URL");
     return;
   }
