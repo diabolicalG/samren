@@ -40,7 +40,7 @@ type Session = {
   tasks: Map<ProviderId, Promise<AggregatedStream>>;
 };
 
-const SESSION_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_MS = 60 * 60 * 1000;
 const MAX_SESSIONS = 1_000;
 const SUPPORTED_TYPES = new Set(["hls", "mp4", "dash"]);
 
