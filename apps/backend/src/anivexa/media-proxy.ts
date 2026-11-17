@@ -208,7 +208,12 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       response.status(200);
       response.setHeader("Content-Type", manifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
-      response.end(body);
+      if (request.method === "HEAD") {
+        response.setHeader("Content-Length", String(Buffer.byteLength(body)));
+        response.end();
+      } else {
+        response.end(body);
+      }
       return;
     }
 
