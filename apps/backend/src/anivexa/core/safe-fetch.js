@@ -195,11 +195,12 @@ export async function safeFetchStream(input, init = {}, allowed = configuredHost
     const status = response.statusCode ?? 502;
     if ([301, 302, 303, 307, 308].includes(status)) {
       const location = response.headers.location;
-      response.resume();
-      await new Promise((resolve, reject) => {
+      const drained = new Promise((resolve, reject) => {
         response.once("end", resolve);
         response.once("error", reject);
       });
+      response.resume();
+      await drained;
       if (!location || redirects === 4) throw new Error("Anivexa media redirect limit exceeded");
       const next = new URL(location, url);
       assertAllowedUrl(next, allowed);
@@ -213,12 +214,7 @@ export async function safeFetchStream(input, init = {}, allowed = configuredHost
       response.destroy();
       throw new Error("Anivexa media response exceeded the size limit");
     }
-    let received = 0;
-    response.on("data", (chunk) => {
-      received += chunk.length;
-      if (received > maxBytes) response.destroy(new Error("Anivexa media response exceeded the size limit"));
-    });
-    return { status, headers: response.headers, body: response };
+    return { status, headers: response.headers, body: response, maxBytes };
   }
   throw new Error("Anivexa media redirect limit exceeded");
 }
