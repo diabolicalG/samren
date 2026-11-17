@@ -133,7 +133,7 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
     if (part.name === "location") {
       const location = resolveResource(decodeXml(nodeText(part)), base);
       if (location) {
-        const tagName = part.opening.match(/^<\\s*([^\\s/>]+)/)?.[1] ?? "Location";
+        const tagName = part.opening.match(/^<\s*([^\s/>]+)/)?.[1] ?? "Location";
         return "<" + tagName + ">" + proxyUrl(location, referer, true) + "</" + tagName + ">";
       }
     }
