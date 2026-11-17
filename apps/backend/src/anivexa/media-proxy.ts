@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { IncomingHttpHeaders } from "node:http";
-import { Transform } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { env } from "../config/env.js";
 import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
@@ -146,6 +146,15 @@ export function rewriteDashManifest(manifest: string, manifestUrl: string, refer
   return rewriteDashParts(parseXmlParts(String(manifest)), manifestUrl, referer);
 }
 
+export function detectNestedManifestType(contentType: string, prefix: Buffer): "hls" | "dash" | "" {
+  if (/mpegurl/i.test(contentType)) return "hls";
+  if (/dash\\+xml/i.test(contentType)) return "dash";
+  const text = prefix.toString("utf8", 0, 4096).replace(/^\\uFEFF/, "").trimStart();
+  if (text.startsWith("#EXTM3U")) return "hls";
+  if (/<(?:[A-Za-z_][\\w.-]*:)?MPD(?:\\s|>)/i.test(text)) return "dash";
+  return "";
+}
+
 function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void {
   for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"]) {
     const value = headers[name];
@@ -231,14 +240,20 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       timeoutMs: 60_000,
     });
     const upstreamType = String(upstream.headers["content-type"] ?? "");
-    const nestedManifestType = /mpegurl/i.test(upstreamType) ? "hls" : /dash\+xml/i.test(upstreamType) ? "dash" : "";
+    const iterator = upstream.body[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    const firstChunk = first.done ? null : Buffer.from(first.value);
+    const nestedManifestType = detectNestedManifestType(upstreamType, firstChunk ?? Buffer.alloc(0));
     if (nestedManifestType) {
-      const chunks = [];
-      let total = 0;
-      for await (const chunk of upstream.body) {
-        total += chunk.length;
+      const chunks = firstChunk ? [firstChunk] : [];
+      let total = firstChunk?.length ?? 0;
+      while (true) {
+        const nextChunk = await iterator.next();
+        if (nextChunk.done) break;
+        const bytes = Buffer.from(nextChunk.value);
+        total += bytes.length;
         if (total > MAX_MANIFEST_BYTES) throw new Error("Nested media manifest exceeded the size limit");
-        chunks.push(Buffer.from(chunk));
+        chunks.push(bytes);
       }
       const manifest = Buffer.concat(chunks).toString("utf8");
       const body = nestedManifestType === "hls"
@@ -260,7 +275,15 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
         else callback(null, chunk);
       },
     });
-    await pipeline(upstream.body, sizeLimit, response);
+    const replay = Readable.from((async function* () {
+      if (firstChunk) yield firstChunk;
+      while (true) {
+        const nextChunk = await iterator.next();
+        if (nextChunk.done) return;
+        yield Buffer.from(nextChunk.value);
+      }
+    })());
+    await pipeline(replay, sizeLimit, response);
   } catch {
     if (!response.headersSent) response.status(502).end("Upstream media request failed");
     else response.destroy();
