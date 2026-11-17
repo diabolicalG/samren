@@ -277,6 +277,21 @@ function WatchPage() {
   const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
   const nextEpisode = episodeIndex >= 0 && episodeIndex < episodes.length - 1 ? episodes[episodeIndex + 1] : null;
   const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
+  const subtitleTracks = providerStream
+    ? (providerStream.subtitles ?? []).map((track) => ({
+        src: track.url,
+        label: track.label,
+        srclang: track.srclang,
+        default: track.default === true,
+      }))
+    : playback.subtitles
+      .filter((track) => track.format === "VTT")
+      .map((track) => ({
+        src: track.url,
+        label: track.label,
+        srclang: track.languageCode,
+        default: track.isDefault,
+      }));
 
   async function handleMediaError() {
     if (fallbackInFlight.current) return;
@@ -341,6 +356,7 @@ function WatchPage() {
               key={providerStream ? `${providerStream.provider}-${providerStream.type}` : source?.id ?? "first-party"}
               src={activeUrl}
               type={activeType}
+              subtitles={subtitleTracks}
               resumeAt={Number(window.localStorage.getItem(progressKey)) || 0}
               autoPlay={mediaFailed}
               onError={() => { void handleMediaError(); }}
