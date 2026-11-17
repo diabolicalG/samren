@@ -21,7 +21,8 @@ function clientMediaStream(stream: { url: string; type?: string; referer?: strin
     if (referer) query.set("referer", referer);
     return `/api/v1/anivexa/media?${query.toString()}`;
   };
-  const { referer: _referer, ...publicStream } = stream;
+  const publicStream = { ...stream };
+  delete publicStream.referer;
   return { ...publicStream, url: proxy(stream.url, stream.type), subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url, "vtt") })) };
 }
 
