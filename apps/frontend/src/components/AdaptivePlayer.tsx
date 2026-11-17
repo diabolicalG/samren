@@ -75,6 +75,7 @@ type AdaptivePlayerProps = {
   onEnded?: () => void;
   onError: () => void;
   onReady?: () => void;
+  subtitles?: Array<{ src: string; label: string; srclang: string; default?: boolean }>;
 };
 
 export function AdaptivePlayer({
@@ -86,6 +87,7 @@ export function AdaptivePlayer({
   onEnded,
   onError,
   onReady,
+  subtitles = [],
 }: AdaptivePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const callbacks = useRef({ onError, onReady });
@@ -204,6 +206,16 @@ export function AdaptivePlayer({
         onEnded={onEnded}
         aria-label="Anime episode video player"
       >
+        {subtitles.map((track, index) => (
+          <track
+            key={`${track.srclang}-${track.label}-${index}`}
+            kind="subtitles"
+            src={track.src}
+            srcLang={track.srclang}
+            label={track.label}
+            default={track.default === true}
+          />
+        ))}
         Your browser does not support video playback.
       </video>
       {runtimeError ? <p className="player-runtime-error" role="alert">{runtimeError}</p> : null}
