@@ -58,7 +58,9 @@ export function AdaptivePlayer({
 }: AdaptivePlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const callbacks = useRef({ onError, onReady });
+  const autoPlayRef = useRef(autoPlay);
   callbacks.current = { onError, onReady };
+  autoPlayRef.current = autoPlay;
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function AdaptivePlayer({
       if (resumeAt > 0 && Number.isFinite(video.duration) && resumeAt < video.duration) {
         try { video.currentTime = resumeAt; } catch { /* metadata may not be seekable yet */ }
       }
-      if (autoPlay) void video.play().catch(() => undefined);
+      if (autoPlayRef.current) void video.play().catch(() => undefined);
       callbacks.current.onReady?.();
     };
 
@@ -123,7 +125,7 @@ export function AdaptivePlayer({
           },
         });
         dash.on("error", reportFatal);
-        dash.initialize(video, src, autoPlay);
+        dash.initialize(video, src, autoPlayRef.current);
       } else {
         setRuntimeError("The DASH playback engine could not be loaded. Check the connection and refresh.");
         reportFatal();
@@ -141,7 +143,7 @@ export function AdaptivePlayer({
       video.pause();
       video.removeAttribute("src");
     };
-  }, [src, type, resumeAt, autoPlay]);
+  }, [src, type, resumeAt]);
 
   return (
     <div className="adaptive-player">
