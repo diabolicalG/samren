@@ -46,24 +46,95 @@ export function rewriteHlsManifest(manifest: string, manifestUrl: string, refere
   }).join("\n");
 }
 
-export function rewriteDashManifest(manifest: string, manifestUrl: string, referer?: string): string {
-  const xml = String(manifest);
-  let base = manifestUrl;
-  const rootBase = xml.match(/<BaseURL(?:\s[^>]*)?>([^<]+)<\/BaseURL>/i);
-  if (rootBase) {
-    const resolvedBase = resolveResource(rootBase[1].trim(), manifestUrl);
-    if (resolvedBase) base = resolvedBase;
+type XmlPart = XmlNode | string;
+type XmlNode = { name: string; opening: string; closing: string; children: XmlPart[]; selfClosing: boolean };
+
+function decodeXml(value: string): string {
+  return value.replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (entity) => {
+    const named: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };
+    const lower = entity.toLowerCase();
+    if (named[lower]) return named[lower];
+    const hex = lower.startsWith("&#x");
+    const number = Number.parseInt(entity.slice(hex ? 3 : 2, -1), hex ? 16 : 10);
+    return Number.isFinite(number) && number >= 0 && number <= 0x10ffff ? String.fromCodePoint(number) : entity;
+  });
+}
+
+function parseXmlParts(xml: string): XmlPart[] {
+  const root: XmlNode = { name: "#root", opening: "", closing: "", children: [], selfClosing: false };
+  const stack = [root];
+  const tokens = xml.match(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<![^>]*>|<[^>]+>|[^<]+/g) ?? [];
+  for (const token of tokens) {
+    if (token.startsWith("</")) {
+      const name = token.match(/^<\/\s*([^\s>]+)/)?.[1]?.toLowerCase();
+      if (stack.length > 1 && stack[stack.length - 1]?.name === name) {
+        const node = stack.pop();
+        if (node) node.closing = token;
+      } else {
+        stack[stack.length - 1]?.children.push(token);
+      }
+      continue;
+    }
+    if (token.startsWith("<") && !token.startsWith("<!--") && !token.startsWith("<!") && !token.startsWith("<?")) {
+      const name = token.match(/^<\s*([^\s/>]+)/)?.[1]?.toLowerCase();
+      if (!name) {
+        stack[stack.length - 1]?.children.push(token);
+        continue;
+      }
+      const selfClosing = /\/\s*>$/.test(token);
+      const node: XmlNode = { name, opening: token, closing: "", children: [], selfClosing };
+      stack[stack.length - 1]?.children.push(node);
+      if (!selfClosing) stack.push(node);
+      continue;
+    }
+    stack[stack.length - 1]?.children.push(token);
   }
-  let rewritten = xml.replace(/<BaseURL(?:\s[^>]*)?>[^<]*<\/BaseURL>/i, "");
-  rewritten = rewritten.replace(/\b(media|initialization|sourceURL|href)="([^"]+)"/gi, function (match, attribute, value) {
-    const resolved = resolveResource(value, base);
-    return resolved ? attribute + '="' + proxyUrl(resolved, referer, true) + '"' : match;
+  return root.children;
+}
+
+function nodeText(node: XmlNode): string {
+  return node.children.map((part) => typeof part === "string" ? part : nodeText(part)).join("");
+}
+
+function resolveTemplateResource(reference: string, base: string): string | null {
+  const tokens: string[] = [];
+  const protectedValue = reference.replace(/\$(?!\$)[A-Za-z][A-Za-z0-9]*(?:%0\d+d)?\$/g, (token) => {
+    const marker = "SAMREN_DASH_TOKEN_" + tokens.length + "_END";
+    tokens.push(token);
+    return marker;
   });
-  rewritten = rewritten.replace(/<Location>([^<]+)<\/Location>/gi, function (match, value) {
-    const resolved = resolveResource(value.trim(), base);
-    return resolved ? "<Location>" + proxyUrl(resolved, referer, true) + "</Location>" : match;
-  });
-  return rewritten;
+  const resolved = resolveResource(decodeXml(protectedValue), base);
+  if (!resolved) return null;
+  return resolved.replace(/SAMREN_DASH_TOKEN_(\d+)_END/g, (_match, index) => tokens[Number(index)] ?? "");
+}
+
+function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: string): string {
+  return parts.map((part) => {
+    if (typeof part === "string") return part;
+    if (part.name === "baseurl") return "";
+    let base = inheritedBase;
+    const xmlBase = part.opening.match(/\bxml:base\s*=\s*(["'])(.*?)\1/i)?.[2];
+    if (xmlBase) base = resolveResource(decodeXml(xmlBase), base) ?? base;
+    const baseNode = part.children.find((child): child is XmlNode => typeof child !== "string" && child.name === "baseurl");
+    if (baseNode) base = resolveResource(decodeXml(nodeText(baseNode)), base) ?? base;
+
+    const rewrittenOpening = part.opening.replace(/([A-Za-z_:][\w:.-]*)(\s*=\s*)(["'])(.*?)\3/g, (match, attribute: string, separator: string, quote: string, rawValue: string) => {
+      const name = attribute.toLowerCase();
+      if (!["media", "initialization", "index", "bitstreamswitching", "sourceurl", "href", "xlink:href"].includes(name)) return match;
+      const resolved = resolveTemplateResource(rawValue, base);
+      return resolved ? attribute + separator + quote + proxyUrl(resolved, referer, true) + quote : match;
+    });
+    if (part.name === "location") {
+      const location = resolveResource(decodeXml(nodeText(part)), base);
+      if (location) return "<Location>" + proxyUrl(location, referer, true) + "</Location>";
+    }
+    const children = rewriteDashParts(part.children, base, referer);
+    return rewrittenOpening + children + (part.selfClosing ? "" : part.closing);
+  }).join("");
+}
+
+export function rewriteDashManifest(manifest: string, manifestUrl: string, referer?: string): string {
+  return rewriteDashParts(parseXmlParts(String(manifest)), manifestUrl, referer);
 }
 
 function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void {
