@@ -306,4 +306,41 @@ describe("first-party watch experience", () => {
     });
   });
 
+  it("closes the old provider session and restores first-party media when navigating episodes", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockImplementation(async (_slug, episodeNumber) => ({
+      episode: { id: `episode-${episodeNumber}`, episodeNumber, title: `Episode ${episodeNumber}`, synopsis: null, durationSeconds: 1200 },
+      sources: [{ id: `source-${episodeNumber}`, qualityLabel: "1080p", isDefault: true, mimeType: "video/mp4", url: `/api/v1/media/asset-${episodeNumber}` }],
+      subtitles: [],
+    }));
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({
+      episodes: [
+        { id: "episode-1", episodeNumber: 1, title: "Episode 1" },
+        { id: "episode-2", episodeNumber: 2, title: "Episode 2" },
+      ],
+    } as never);
+    vi.spyOn(apiClient, "aggregatePlayback").mockResolvedValue({
+      sessionId: "session-episode-1",
+      stream: { provider: "animegg", url: "/api/v1/anivexa/media?url=first", type: "mp4", server: "main", quality: "1080p", audio: "sub" },
+      providers: 11,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const closeSession = vi.spyOn(apiClient, "closePlaybackSession").mockResolvedValue(undefined);
+
+    renderApp("/watch/the-clockwork-orbit/1");
+    fireEvent.change(await screen.findByLabelText("AniList ID for provider fallback"), { target: { value: "12345" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find provider stream" }));
+
+    await waitFor(() => {
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/anivexa/media?url=first");
+    });
+
+    fireEvent.click(screen.getByRole("link", { name: "Episode 2 →" }));
+
+    await waitFor(() => {
+      expect(closeSession).toHaveBeenCalledWith("session-episode-1");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/media/asset-2");
+    });
+  });
+
 });
