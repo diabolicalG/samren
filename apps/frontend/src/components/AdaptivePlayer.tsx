@@ -105,6 +105,7 @@ export function AdaptivePlayer({
     let mediaRecoveryUsed = false;
     let hls: HlsInstance | null = null;
     let dash: DashPlayer | null = null;
+    setRuntimeError(null);
 
     const reportFatal = () => {
       if (disposed || fatalReported) return;
@@ -124,7 +125,7 @@ export function AdaptivePlayer({
     video.addEventListener("error", reportFatal);
 
     if (type === "hls") {
-      if (video.canPlayType("application/vnd.apple.mpegurl") && "ManagedMediaSource" in window) {
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
       } else {
         void ensureRuntime("hls").then(() => {
