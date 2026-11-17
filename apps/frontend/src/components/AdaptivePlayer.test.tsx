@@ -59,6 +59,23 @@ describe("AdaptivePlayer", () => {
     expect(dashPlayer.reset).toHaveBeenCalledTimes(1);
   });
 
+  it("renders available subtitle tracks as native video tracks", () => {
+    const subtitles = [
+      { src: "/media/subtitles/en.vtt", label: "English", srclang: "en", default: true },
+      { src: "/media/subtitles/ja.vtt", label: "Japanese", srclang: "ja", default: false },
+    ];
+    const { container } = render(
+      <AdaptivePlayer src="/media/video.mp4" type="mp4" subtitles={subtitles} onError={vi.fn()} />,
+    );
+    const tracks = Array.from(container.querySelectorAll("video track"));
+    expect(tracks).toHaveLength(2);
+    expect(tracks[0]?.getAttribute("src")).toBe("/media/subtitles/en.vtt");
+    expect(tracks[0]?.getAttribute("srclang")).toBe("en");
+    expect(tracks[0]?.getAttribute("label")).toBe("English");
+    expect(tracks[0]?.hasAttribute("default")).toBe(true);
+    expect(tracks[1]?.hasAttribute("default")).toBe(false);
+  });
+
   it("restores the saved position after metadata becomes available", () => {
     const { container } = render(<AdaptivePlayer src="/media/video.mp4" type="mp4" resumeAt={45} onError={vi.fn()} />);
     const video = container.querySelector("video")!;
