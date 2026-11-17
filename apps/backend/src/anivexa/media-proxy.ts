@@ -260,6 +260,9 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
         prefixBytes += bytes.length;
       }
     }
+    if (nestedManifestType && prefixBytes > MAX_MANIFEST_BYTES) {
+      throw new Error("Nested media manifest exceeded the size limit");
+    }
     if (nestedManifestType) {
       const chunks = [...prefixChunks];
       let total = prefixBytes;
