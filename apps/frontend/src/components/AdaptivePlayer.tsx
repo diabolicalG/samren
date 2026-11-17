@@ -173,7 +173,7 @@ export function AdaptivePlayer({
             buffer: { fastSwitchEnabled: true, stableBufferTime: 12, bufferTimeAtTopQuality: 24 },
           },
         });
-        dash.on("error", reportFatal);
+        dash.on("playbackError", reportFatal);
         dash.initialize(video, src, autoPlayRef.current);
       }).catch(() => {
         if (disposed) return;
