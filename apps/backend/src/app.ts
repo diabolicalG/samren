@@ -13,7 +13,22 @@ import { anivexaRouter } from "./anivexa/router.js";
 export const app = express();
 app.set("trust proxy", env.TRUST_PROXY_HOPS);
 app.disable("x-powered-by");
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      fontSrc: ["'self'", "https:", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdn.dashjs.org"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "https:"],
+      mediaSrc: ["'self'", "blob:", "https:"],
+      workerSrc: ["'self'", "blob:"],
+    },
+  },
+}));
 app.use(cors({ origin: env.CORS_ORIGIN.split(",").map((value) => value.trim()), credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(authenticateSession);
