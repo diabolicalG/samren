@@ -1,7 +1,9 @@
-import { safeFetch } from "./core/safe-fetch.js";
+import { pipeline } from "node:stream/promises";
+import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
 import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 
-const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
+const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 512 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
 function proxyUrl(target, referer, xml = false) {
@@ -60,10 +62,20 @@ export function rewriteDashManifest(manifest, manifestUrl, referer) {
   return rewritten;
 }
 
+function forwardHeaders(response, headers) {
+  for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"]) {
+    const value = headers[name];
+    if (value) response.setHeader(name, value);
+  }
+  response.setHeader("Cache-Control", "private, max-age=30");
+  response.setHeader("Access-Control-Allow-Origin", "*");
+}
+
 export async function proxyAnivexaMedia(request, response) {
   const target = typeof request.query.url === "string" ? request.query.url : "";
   const refererValue = typeof request.query.referer === "string" ? request.query.referer : "";
-  if (!target || target.length > 8192) {
+  const kind = typeof request.query.kind === "string" ? request.query.kind : "";
+  if (!target || target.length > 8192 || !["", "hls", "dash", "vtt"].includes(kind)) {
     response.status(400).end("Invalid media URL");
     return;
   }
@@ -87,40 +99,41 @@ export async function proxyAnivexaMedia(request, response) {
   const range = request.get("range");
   if (range && /^bytes=\d*-\d*$/.test(range)) headers.set("Range", range);
   if (referer) headers.set("Referer", referer);
+  const pathname = new URL(target).pathname.toLowerCase();
+  const manifestType = kind === "hls" || kind === "dash"
+    ? kind
+    : pathname.endsWith(".m3u8") ? "hls" : pathname.endsWith(".mpd") ? "dash" : "";
   try {
-    const upstream = await safeFetch(target, { method: request.method, headers }, [...streamHosts], MAX_MEDIA_BYTES);
-    const contentType = upstream.headers.get("content-type") ?? "";
-    const path = new URL(target).pathname.toLowerCase();
-    const isHls = path.endsWith(".m3u8") || /mpegurl/i.test(contentType);
-    const isDash = path.endsWith(".mpd") || /dash\+xml/i.test(contentType);
-    if (!upstream.ok) {
-      response.status(upstream.status);
-      const contentRange = upstream.headers.get("content-range");
-      if (contentRange) response.setHeader("Content-Range", contentRange);
-      response.end(await upstream.arrayBuffer());
-      return;
-    }
-    if (isHls || isDash) {
+    if (manifestType) {
+      const upstream = await safeFetch(target, { method: "GET", headers }, [...streamHosts], MAX_MANIFEST_BYTES);
+      if (!upstream.ok) {
+        response.status(upstream.status);
+        const contentRange = upstream.headers.get("content-range");
+        if (contentRange) response.setHeader("Content-Range", contentRange);
+        response.end(await upstream.arrayBuffer());
+        return;
+      }
       const manifest = await upstream.text();
-      const body = isHls
+      const body = manifestType === "hls"
         ? rewriteHlsManifest(manifest, target, referer)
         : rewriteDashManifest(manifest, target, referer);
       response.status(200);
-      response.setHeader("Content-Type", isHls ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
+      response.setHeader("Content-Type", manifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
       response.setHeader("Access-Control-Allow-Origin", "*");
       response.end(body);
       return;
     }
+
+    const upstream = await safeFetchStream(target, { method: "GET", headers }, [...streamHosts], {
+      maxBytes: MAX_MEDIA_BYTES,
+      timeoutMs: 60_000,
+    });
     response.status(upstream.status);
-    for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"]) {
-      const value = upstream.headers.get(name);
-      if (value) response.setHeader(name, value);
-    }
-    response.setHeader("Cache-Control", "private, max-age=30");
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.end(await upstream.arrayBuffer());
+    forwardHeaders(response, upstream.headers);
+    await pipeline(upstream.body, response);
   } catch {
-    response.status(502).end("Upstream media request failed");
+    if (!response.headersSent) response.status(502).end("Upstream media request failed");
+    else response.destroy();
   }
 }
