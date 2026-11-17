@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { useProviderPlayback } from "./hooks/useProviderPlayback";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
@@ -247,6 +247,7 @@ function WatchPage() {
   const [providerError, setProviderError] = useState<string | null>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
   const providerPlayback = useProviderPlayback();
+  useEffect(() => () => { void providerPlayback.close(); }, [providerPlayback.close]);
   const number = Number(episodeNumber);
   const playbackQuery = useQuery({
     queryKey: ["catalog", "playback", slug, number],
