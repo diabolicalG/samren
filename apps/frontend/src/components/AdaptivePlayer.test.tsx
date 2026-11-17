@@ -52,7 +52,8 @@ describe("AdaptivePlayer", () => {
     const onError = vi.fn();
     const { container, unmount } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=x&kind=dash" type="dash" onError={onError} />);
     await waitFor(() => expect(dashPlayer.initialize).toHaveBeenCalledWith(container.querySelector("video"), "/api/v1/anivexa/media?url=x&kind=dash", false));
-    const callback = dashPlayer.on.mock.calls[0]?.[1] as (event: unknown) => void;
+    expect(dashPlayer.on).toHaveBeenCalledWith("playbackError", expect.any(Function));
+    const callback = dashPlayer.on.mock.calls.find(([event]) => event === "playbackError")?.[1] as (event: unknown) => void;
     callback({ error: { code: 27 } });
     expect(onError).toHaveBeenCalledTimes(1);
     unmount();
@@ -83,4 +84,18 @@ describe("AdaptivePlayer", () => {
     fireEvent.loadedMetadata(video);
     expect(video.currentTime).toBe(45);
   });
+  it("uses native HLS when the browser supports it but MediaSource does not", async () => {
+    const FakeHls = vi.fn();
+    Object.assign(FakeHls, {
+      isSupported: () => false,
+      Events: { ERROR: "hlsError" },
+      ErrorTypes: { NETWORK_ERROR: "networkError", MEDIA_ERROR: "mediaError" },
+    });
+    vi.stubGlobal("Hls", FakeHls);
+    vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("maybe");
+    const { container } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=master" type="hls" onError={vi.fn()} />);
+    const video = container.querySelector("video")!;
+    await waitFor(() => expect(video.src).toContain("/api/v1/anivexa/media?url=master"));
+  });
+
 });
