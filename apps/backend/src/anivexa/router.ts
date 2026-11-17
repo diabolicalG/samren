@@ -11,6 +11,7 @@ import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnim
 
 export const anivexaRouter = Router();
 
+anivexaRouter.head("/media", proxyAnivexaMedia);
 anivexaRouter.get("/media", proxyAnivexaMedia);
 
 function clientMediaStream(stream: { url: string; type?: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }) {
