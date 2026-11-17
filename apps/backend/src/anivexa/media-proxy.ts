@@ -5,15 +5,11 @@ const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
 function proxyUrl(target, referer, xml = false) {
-  const encodedTarget = encodeURIComponent(target).replace(/%24(Number|Time|RepresentationID|Bandwidth)%24/g, (_match, token) => `${token}import { safeFetch } from "./core/safe-fetch.js";
-import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
-
-const MAX_MEDIA_BYTES = 32 * 1024 * 1024;
-const MEDIA_PATH = "/api/v1/anivexa/media";
-
-);
-  const query = `url=${encodedTarget}${referer ? `&referer=${encodeURIComponent(referer)}` : ""}`;
-  const value = `${MEDIA_PATH}?${query}`;
+  const encodedTarget = encodeURIComponent(target).replace(/%24(Number|Time|RepresentationID|Bandwidth)%24/g, function (_match, token) {
+    return "$" + token + "$";
+  });
+  const query = "url=" + encodedTarget + (referer ? "&referer=" + encodeURIComponent(referer) : "");
+  const value = MEDIA_PATH + "?" + query;
   return xml ? value.replace(/&/g, "&amp;") : value;
 }
 
@@ -37,9 +33,9 @@ export function rewriteHlsManifest(manifest, manifestUrl, referer) {
       return resolved ? proxyUrl(resolved, referer) : line;
     }
     if (!/URI="/i.test(line)) return line;
-    return line.replace(/URI="([^"]+)"/gi, (match, value) => {
+    return line.replace(/URI="([^"]+)"/gi, function (match, value) {
       const resolved = resolveResource(value, manifestUrl);
-      return resolved ? `URI="${proxyUrl(resolved, referer, true)}"` : match;
+      return resolved ? 'URI="' + proxyUrl(resolved, referer) + '"' : match;
     });
   }).join("\n");
 }
@@ -53,13 +49,13 @@ export function rewriteDashManifest(manifest, manifestUrl, referer) {
     if (resolvedBase) base = resolvedBase;
   }
   let rewritten = xml.replace(/<BaseURL(?:\s[^>]*)?>[^<]*<\/BaseURL>/i, "");
-  rewritten = rewritten.replace(/\b(media|initialization|sourceURL|href)="([^"]+)"/gi, (match, attribute, value) => {
+  rewritten = rewritten.replace(/\b(media|initialization|sourceURL|href)="([^"]+)"/gi, function (match, attribute, value) {
     const resolved = resolveResource(value, base);
-    return resolved ? `${attribute}="${proxyUrl(resolved, referer)}"` : match;
+    return resolved ? attribute + '="' + proxyUrl(resolved, referer, true) + '"' : match;
   });
-  rewritten = rewritten.replace(/<Location>([^<]+)<\/Location>/gi, (match, value) => {
+  rewritten = rewritten.replace(/<Location>([^<]+)<\/Location>/gi, function (match, value) {
     const resolved = resolveResource(value.trim(), base);
-    return resolved ? `<Location>${proxyUrl(resolved, referer, true)}</Location>` : match;
+    return resolved ? "<Location>" + proxyUrl(resolved, referer, true) + "</Location>" : match;
   });
   return rewritten;
 }
@@ -78,7 +74,7 @@ export async function proxyAnivexaMedia(request, response) {
   }
   let referer;
   if (refererValue) {
-    if (!isAnivexaUrlAllowed(refererValue, anivexaAllowedHosts())) {
+    if (!isAnivexaUrlAllowed(refererValue, new Set([...anivexaAllowedHosts(), ...streamHosts]))) {
       response.status(400).end("Invalid provider referer");
       return;
     }
@@ -122,7 +118,7 @@ export async function proxyAnivexaMedia(request, response) {
       if (value) response.setHeader(name, value);
     }
     response.setHeader("Cache-Control", "private, max-age=30");
-    response.setHeader("Access-Control-Allow-Origin", request.get("origin") ?? "*");
+    response.setHeader("Access-Control-Allow-Origin", "*");
     response.end(await upstream.arrayBuffer());
   } catch {
     response.status(502).end("Upstream media request failed");
