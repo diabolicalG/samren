@@ -6,9 +6,23 @@ import { getAniZoneEpisodes, getAniZoneStreams } from "./anizone.js";
 import { getAniKotoEpisodes, getAniKotoStreams } from "./anikoto.js";
 import { getKaaEpisodes, getKaaStreams } from "./kaa.js";
 import { providerAggregator } from "./aggregator.js";
+import { proxyAnivexaMedia } from "./media-proxy.js";
 import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnimeNoSubEpisodes, getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams, getAniPmEpisodes, getSenshiEpisodes, getAniPmStreams, getSenshiStreams, getAnimeDunyaEpisodes, getAnimeDunyaStreams } from "./legacy-adapters.js";
 
 export const anivexaRouter = Router();
+
+anivexaRouter.route("/media").get(proxyAnivexaMedia).head(proxyAnivexaMedia);
+
+function clientMediaStream(stream: { url: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }) {
+  const referer = stream.referer;
+  const proxy = (url: string) => {
+    const query = new URLSearchParams({ url });
+    if (referer) query.set("referer", referer);
+    return `/api/v1/anivexa/media?${query.toString()}`;
+  };
+  const { referer: _referer, ...publicStream } = stream;
+  return { ...publicStream, url: proxy(stream.url), subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url) })) };
+}
 
 const paramsSchema = z.object({ anilistId: z.coerce.number().int().positive().max(2_147_483_647) });
 const providerSchema = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi", "animedunya"]);
@@ -150,7 +164,7 @@ anivexaRouter.get("/aggregate/:anilistId/:episode", async (request, response) =>
   try {
     const result = await providerAggregator.start(params.data.anilistId, params.data.episode, audio.data);
     response.setHeader("Cache-Control", "private, no-store");
-    response.status(200).json({ data: result, error: null });
+    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream) }, error: null });
   } catch {
     response.status(502).json({ data: null, error: { code: "ANIVEXA_ALL_PROVIDERS_FAILED", message: "No provider returned a valid playable stream" } });
   }
@@ -170,7 +184,7 @@ anivexaRouter.post("/aggregate/:sessionId/fallback", async (request, response) =
   try {
     const result = await providerAggregator.fallback(sessionId.data, body.data.provider);
     response.setHeader("Cache-Control", "private, no-store");
-    response.status(200).json({ data: result, error: null });
+    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream) }, error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const notFound = message.includes("expired or was not found");
