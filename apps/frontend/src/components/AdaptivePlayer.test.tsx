@@ -30,7 +30,7 @@ describe("AdaptivePlayer", () => {
     const video = container.querySelector("video")!;
     expect(hlsInstance.attachMedia).toHaveBeenCalledWith(video);
     expect(hlsInstance.loadSource).toHaveBeenCalledWith("/api/v1/anivexa/media?url=x&kind=hls");
-    const callback = hlsInstance.on.mock.calls[0][1];
+    const callback = hlsInstance.on.mock.calls[0]?.[1] as (_event: string, data: { fatal?: boolean; type?: string }) => void;
     callback("hlsError", { fatal: true, type: "mediaError" });
     expect(hlsInstance.recoverMediaError).toHaveBeenCalledTimes(1);
     expect(onError).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe("AdaptivePlayer", () => {
     const onError = vi.fn();
     const { container, unmount } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=x&kind=dash" type="dash" onError={onError} />);
     expect(dashPlayer.initialize).toHaveBeenCalledWith(container.querySelector("video"), "/api/v1/anivexa/media?url=x&kind=dash", false);
-    const callback = dashPlayer.on.mock.calls[0][1];
+    const callback = dashPlayer.on.mock.calls[0]?.[1] as (event: unknown) => void;
     callback({ error: { code: 27 } });
     expect(onError).toHaveBeenCalledTimes(1);
     unmount();
