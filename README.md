@@ -85,22 +85,5 @@ redis-server
 
 See `.env.example` for all required variables.
 
-## MY BUDGET Demo App
-
-A simple student budget demo is available at the repository root:
-
-- `index.html` — static front-end UI
-- `static/styles.css` — page styles
-- `static/app.js` — client-side budget logic
-- `mybudget_single_file.py` — FastAPI backend with authentication, transactions, and dashboard data
-
-Run the demo using Miniforge Python:
-
-```bash
-C:\Users\Administrator\Miniforge3\python.exe -m pip install -r requirements.txt
-C:\Users\Administrator\Miniforge3\python.exe mybudget_single_file.py
-```
-
-Open `http://localhost:8000` in your browser.
 
 ## License
