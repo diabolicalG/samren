@@ -22,13 +22,13 @@ describe("Anivexa media manifest proxy", () => {
       '<?xml version="1.0"?>',
       '<MPD><BaseURL>https://cdn.example.test/video/</BaseURL>',
       '<Period><AdaptationSet><Representation>',
-      '<SegmentTemplate initialization="init-$RepresentationID$.m4s" media="chunk-$Number$.m4s" />',
+      '<SegmentTemplate initialization="init-$RepresentationID$.m4s" media="chunk-$Number%05d$.m4s" />',
       '<SegmentList><SegmentURL media="segment-1.m4s" /></SegmentList>',
       "</Representation></AdaptationSet></Period></MPD>",
     ].join("");
     const result = rewriteDashManifest(source, "https://cdn.example.test/manifest.mpd", "https://provider.example.test/");
     expect(result).not.toContain("<BaseURL>");
-    expect(result).toContain("chunk-$Number$.m4s");
+    expect(result).toContain("chunk-$Number%05d$.m4s");
     expect(result).toContain("init-$RepresentationID$.m4s");
     expect(result).toContain("&amp;referer=");
     expect(result).toContain("/api/v1/anivexa/media?url=https%3A%2F%2Fcdn.example.test%2Fvideo%2Fsegment-1.m4s");
