@@ -117,7 +117,12 @@ function resolveTemplateResource(reference: string, base: string): string | null
 function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: string): string {
   return parts.map((part) => {
     if (typeof part === "string") return part;
-    if (part.name === "baseurl") return "";
+    if (part.name === "baseurl") {
+      const target = resolveResource(decodeXml(nodeText(part)), inheritedBase);
+      if (!target || !/\\.(?:mp4|m4v|webm|m4s|mpd|m3u8|ts|m4a|aac|mp3|vtt)$/i.test(new URL(target).pathname)) return "";
+      const tagName = part.opening.match(/^<\\s*([^\\s/>]+)/)?.[1] ?? "BaseURL";
+      return "<" + tagName + ">" + proxyUrl(target, referer, true) + "</" + tagName + ">";
+    }
     let base = inheritedBase;
     const xmlBase = part.opening.match(/\bxml:base\s*=\s*(["'])(.*?)\1/i)?.[2];
     if (xmlBase) base = resolveResource(decodeXml(xmlBase), base) ?? base;
@@ -137,7 +142,12 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
         return "<" + tagName + ">" + proxyUrl(location, referer, true) + "</" + tagName + ">";
       }
     }
-    const children = rewriteDashParts(part.children, base, referer);
+    const children = part.children.map((child) => {
+      if (typeof child !== "string" && child.name === "baseurl") {
+        return rewriteDashParts([child], inheritedBase, referer);
+      }
+      return rewriteDashParts([child], base, referer);
+    }).join("");
     return rewrittenOpening + children + (part.selfClosing ? "" : part.closing);
   }).join("");
 }
