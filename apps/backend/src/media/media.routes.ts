@@ -1,13 +1,73 @@
 import { createReadStream } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { readStoredMediaStat } from "./storage.js";
+import { convertSrtToWebVtt } from "./subtitles.js";
 
 export const mediaRouter = Router();
 
 const idSchema = z.string().min(1).max(64);
 const rangeSchema = /^bytes=([0-9]*)-([0-9]*)$/;
+
+async function deliverWebVttSubtitle(request: import("express").Request, response: import("express").Response) {
+  const parsedId = idSchema.safeParse(request.params.id);
+  if (!parsedId.success) {
+    response.status(404).end();
+    return;
+  }
+  try {
+    const asset = await prisma.mediaAsset.findFirst({
+      where: {
+        id: parsedId.data,
+        processingState: "READY",
+        subtitleTracks: {
+          some: {
+            format: { in: ["SRT", "VTT"] },
+            episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } },
+          },
+        },
+      },
+      select: { storageKey: true, mimeType: true },
+    });
+    if (!asset || !["application/x-subrip", "text/srt", "text/vtt"].includes(asset.mimeType)) {
+      response.status(404).end();
+      return;
+    }
+    const stored = await readStoredMediaStat(asset.storageKey);
+    if (!stored) {
+      response.status(404).end();
+      return;
+    }
+    if (stored.sizeBytes > 2 *  1024 * 1024) {
+      response.status(413).end("Subtitle exceeds the playback size limit");
+      return;
+    }
+    const original = await readFile(stored.absolutePath);
+    let body: Buffer;
+    if (asset.mimeType === "text/vtt") body = original;
+    else {
+      try {
+        body = Buffer.from(convertSrtToWebVtt(original.toString("utf8")), "utf8");
+      } catch {
+        response.status(422).end("Subtitle file is not valid SubRip");
+        return;
+      }
+    }
+    response.set({
+      "Content-Type": "text/vtt; charset=utf-8",
+      "Content-Length": String(body.length),
+      "Cache-Control": "public, max-age=300",
+      "X-Content-Type-Options": "nosniff",
+    });
+    response.status(200);
+    if (request.method === "HEAD") response.end();
+    else response.end(body);
+  } catch {
+    response.status(500).end();
+  }
+}
 
 async function deliverMedia(request: import("express").Request, response: import("express").Response) {
   const parsedId = idSchema.safeParse(request.params.id);
@@ -98,4 +158,5 @@ async function deliverMedia(request: import("express").Request, response: import
   }
 }
 
+mediaRouter.route("/:id/vtt").head(deliverWebVttSubtitle).get(deliverWebVttSubtitle);
 mediaRouter.route("/:id").head(deliverMedia).get(deliverMedia);
