@@ -54,7 +54,7 @@ The native Anivexa aggregator registers the 11 integrated providers above (exclu
 - `ANIVEXA_PROVIDER_FAILURE_THRESHOLD`: failures before circuit-open (default 3).
 - `ANIVEXA_PROVIDER_COOLDOWN_MS`: circuit cooldown (default 30000 ms).
 
-The current worker pool and playback-session store are in-process and memory-backed. They are bounded and suitable for the current single-process API deployment, but are not yet a distributed BullMQ/Redis worker system. Multi-instance deployment requires shared Redis-backed session/circuit state and coordinated workers. The backend fallback endpoint is implemented; automatic switching still requires the frontend player to call it when HLS/media playback errors occur.
+The current worker pool and playback-session store are in-process and memory-backed. They are bounded and suitable for the current single-process API deployment, but are not yet a distributed BullMQ/Redis worker system. Multi-instance deployment requires shared Redis-backed session/circuit state and coordinated workers. The frontend watch route now calls the fallback endpoint from fatal HTML media, HLS.js and dash.js playback errors. It retries recoverable HLS network/media errors once before switching providers.
 
 ## Configuration and safety
 
@@ -69,4 +69,16 @@ The current worker pool and playback-session store are in-process and memory-bac
 
 - Unit tests cover worker concurrency, bounded queue saturation, circuit-breaker behavior, first-valid-provider selection, stream-host rejection, and playback fallback selection.
 - CI must pass lint, TypeScript typecheck, backend/frontend/Python tests and production builds before the aggregation layer is considered verified.
-- Live provider availability, source freshness, browser playback, seek behavior, subtitle rendering and automatic frontend fallback remain separate verification gates.
+- Automated tests cover HLS/DASH manifest rewriting and player-engine event handling. Live provider availability, source freshness, codec support, seeking and subtitle rendering still require real-browser/provider verification.
+
+
+## Adaptive playback and media relay (2026-11-17)
+
+- Added an adaptive player using HLS.js 1.7.4 for browsers without native HLS and dash.js 5.3.0 for MPEG-DASH; MP4 continues through native HTML video.
+- The player performs one HLS network retry and one media recovery attempt before reporting a fatal error to the provider fallback controller. It restores the saved playback position after a provider/source change and destroys engine instances on unmount.
+- Added a same-origin Anivexa media relay. HLS playlists and DASH MPDs are rewritten so manifests, variants, keys, subtitles and media segments are fetched through the backend rather than directly from cross-origin CDNs. Provider Referer is applied server-side and is not returned as a standalone client field.
+- Media segments are streamed with HTTP Range forwarding, DNS-pinned HTTPS, host allowlisting, bounded response sizes and request timeouts. Manifest bodies are bounded separately. Redirects are revalidated against the same allowlist.
+- The relay is disabled whenever Anivexa is disabled. Empty or incomplete stream allowlists fail closed. It does not execute provider JavaScript or accept arbitrary upstream hosts.
+- HLS.js and dash.js browser bundles are version-pinned in apps/frontend/index.html; Helmet CSP allows only those two script CDNs and player network requests remain same-origin. These bundles are CDN-hosted rather than vendored, so production requires access to those pinned CDN URLs.
+- Automated tests cover HLS playlist URI rewriting, DASH segment/template rewriting, data/blob URI preservation, HLS recovery/fatal events, dash.js errors and playback-position restoration.
+- Residual limits: DRM/EME streams are not supported by this integration; codecs must still be supported by the browser/device; providers may still deny server-side requests, require unconfigured hostnames, rotate tokens, or return broken media. No implementation can guarantee a provider will remain online. Live playback against all 11 providers and real mobile/desktop browser testing remain required.
