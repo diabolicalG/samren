@@ -1,3 +1,5 @@
+import type { Request, Response } from "express";
+import type { IncomingHttpHeaders } from "node:http";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
@@ -7,7 +9,7 @@ const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_MEDIA_BYTES = 512 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
-function proxyUrl(target, referer, xml = false) {
+function proxyUrl(target: string, referer?: string, xml = false): string {
   const encodedTarget = encodeURIComponent(target).replace(/%24(Number|Time|RepresentationID|Bandwidth)%24/g, function (_match, token) {
     return "$" + token + "$";
   });
@@ -16,7 +18,7 @@ function proxyUrl(target, referer, xml = false) {
   return xml ? value.replace(/&/g, "&amp;") : value;
 }
 
-function resolveResource(reference, base) {
+function resolveResource(reference: string, base: string): string | null {
   const value = String(reference ?? "").trim();
   if (!value || value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("#")) return null;
   try {
@@ -27,7 +29,7 @@ function resolveResource(reference, base) {
   }
 }
 
-export function rewriteHlsManifest(manifest, manifestUrl, referer) {
+export function rewriteHlsManifest(manifest: string, manifestUrl: string, referer?: string): string {
   return String(manifest).split(/\r?\n/).map((line) => {
     const trimmed = line.trim();
     if (!trimmed) return line;
@@ -43,7 +45,7 @@ export function rewriteHlsManifest(manifest, manifestUrl, referer) {
   }).join("\n");
 }
 
-export function rewriteDashManifest(manifest, manifestUrl, referer) {
+export function rewriteDashManifest(manifest: string, manifestUrl: string, referer?: string): string {
   const xml = String(manifest);
   let base = manifestUrl;
   const rootBase = xml.match(/<BaseURL(?:\s[^>]*)?>([^<]+)<\/BaseURL>/i);
@@ -63,7 +65,7 @@ export function rewriteDashManifest(manifest, manifestUrl, referer) {
   return rewritten;
 }
 
-function forwardHeaders(response, headers) {
+function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void {
   for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"]) {
     const value = headers[name];
     if (value) response.setHeader(name, value);
@@ -72,7 +74,7 @@ function forwardHeaders(response, headers) {
   response.setHeader("Access-Control-Allow-Origin", "*");
 }
 
-export async function proxyAnivexaMedia(request, response) {
+export async function proxyAnivexaMedia(request: Request, response: Response): Promise<void> {
   const target = typeof request.query.url === "string" ? request.query.url : "";
   const refererValue = typeof request.query.referer === "string" ? request.query.referer : "";
   const kind = typeof request.query.kind === "string" ? request.query.kind : "";
@@ -85,7 +87,7 @@ export async function proxyAnivexaMedia(request, response) {
     response.status(403).end("Media host is not allowlisted");
     return;
   }
-  let referer;
+  let referer: string | undefined;
   if (refererValue) {
     if (!isAnivexaUrlAllowed(refererValue, new Set([...anivexaAllowedHosts(), ...streamHosts]))) {
       response.status(400).end("Invalid provider referer");
