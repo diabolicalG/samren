@@ -49,11 +49,11 @@ describe("Anivexa media manifest proxy", () => {
   });
 
   it("decodes XML entities in BaseURL values and preserves query strings", () => {
-    const source = '<MPD><BaseURL>https://cdn.example.test/video/?token=a&amp;part=1</BaseURL><SegmentURL media="seg.m4s" /></MPD>';
+    const source = '<MPD><BaseURL>https://cdn.example.test/video/</BaseURL><SegmentURL media="seg.m4s?token=a&amp;part=1" /></MPD>';
     const result = rewriteDashManifest(source, "https://cdn.example.test/manifest.mpd");
     expect(result).toContain("token%3Da%26part%3D1");
     expect(result).toContain("seg.m4s");
-    expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Fvideo%2Fseg.m4s");
+    expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Fvideo%2Fseg.m4s%3Ftoken%3Da%26part%3D1");
   });
 
   it("rewrites DASH Location and XML namespace URL attributes", () => {
