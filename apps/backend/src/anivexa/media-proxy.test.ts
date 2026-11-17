@@ -57,9 +57,9 @@ describe("Anivexa media manifest proxy", () => {
   });
 
   it("rewrites DASH Location and XML namespace URL attributes", () => {
-    const source = '<MPD><Location>next.mpd</Location><SegmentURL xlink:href="segment.m4s" /></MPD>';
+    const source = '<dash:MPD xmlns:dash="urn:mpeg:dash:schema:mpd:2011"><dash:Location>next.mpd</dash:Location><dash:SegmentURL xlink:href="segment.m4s" /></dash:MPD>';
     const result = rewriteDashManifest(source, "https://cdn.example.test/path/manifest.mpd");
-    expect(result).toContain("<Location>/api/v1/anivexa/media?url=https%3A%2F%2Fcdn.example.test%2Fpath%2Fnext.mpd</Location>");
+    expect(result).toContain("<dash:Location>/api/v1/anivexa/media?url=https%3A%2F%2Fcdn.example.test%2Fpath%2Fnext.mpd</dash:Location>");
     expect(result).toContain("xlink:href=\"/api/v1/anivexa/media?url=https%3A%2F%2Fcdn.example.test%2Fpath%2Fsegment.m4s\"");
   });
 
