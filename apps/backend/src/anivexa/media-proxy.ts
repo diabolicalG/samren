@@ -60,13 +60,18 @@ function decodeXml(value: string): string {
   });
 }
 
+function localXmlName(value: string): string {
+  return value.split(":").pop()?.toLowerCase() ?? value.toLowerCase();
+}
+
 function parseXmlParts(xml: string): XmlPart[] {
   const root: XmlNode = { name: "#root", opening: "", closing: "", children: [], selfClosing: false };
   const stack = [root];
   const tokens = xml.match(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<![^>]*>|<[^>]+>|[^<]+/g) ?? [];
   for (const token of tokens) {
     if (token.startsWith("</")) {
-      const name = token.match(/^<\/\s*([^\s>]+)/)?.[1]?.toLowerCase();
+      const rawName = token.match(/^<\/\s*([^\s>]+)/)?.[1];
+      const name = rawName ? localXmlName(rawName) : undefined;
       if (stack.length > 1 && stack[stack.length - 1]?.name === name) {
         const node = stack.pop();
         if (node) node.closing = token;
@@ -76,7 +81,8 @@ function parseXmlParts(xml: string): XmlPart[] {
       continue;
     }
     if (token.startsWith("<") && !token.startsWith("<!--") && !token.startsWith("<!") && !token.startsWith("<?")) {
-      const name = token.match(/^<\s*([^\s/>]+)/)?.[1]?.toLowerCase();
+      const rawName = token.match(/^<\s*([^\s/>]+)/)?.[1];
+      const name = rawName ? localXmlName(rawName) : undefined;
       if (!name) {
         stack[stack.length - 1]?.children.push(token);
         continue;
