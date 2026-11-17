@@ -129,6 +129,27 @@ export async function proxyAnivexaMedia(request, response) {
       maxBytes: MAX_MEDIA_BYTES,
       timeoutMs: 60_000,
     });
+    const upstreamType = String(upstream.headers["content-type"] ?? "");
+    const nestedManifestType = /mpegurl/i.test(upstreamType) ? "hls" : /dash\\+xml/i.test(upstreamType) ? "dash" : "";
+    if (nestedManifestType) {
+      const chunks = [];
+      let total = 0;
+      for await (const chunk of upstream.body) {
+        total += chunk.length;
+        if (total > MAX_MANIFEST_BYTES) throw new Error("Nested media manifest exceeded the size limit");
+        chunks.push(Buffer.from(chunk));
+      }
+      const manifest = Buffer.concat(chunks).toString("utf8");
+      const body = nestedManifestType === "hls"
+        ? rewriteHlsManifest(manifest, target, referer)
+        : rewriteDashManifest(manifest, target, referer);
+      response.status(upstream.status);
+      response.setHeader("Content-Type", nestedManifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
+      response.setHeader("Cache-Control", "private, max-age=15");
+      response.setHeader("Access-Control-Allow-Origin", "*");
+      response.end(body);
+      return;
+    }
     response.status(upstream.status);
     forwardHeaders(response, upstream.headers);
     await pipeline(upstream.body, response);
