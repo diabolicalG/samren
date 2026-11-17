@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewriteDashManifest, rewriteHlsManifest } from "./media-proxy.js";
+import { detectNestedManifestType, rewriteDashManifest, rewriteHlsManifest } from "./media-proxy.js";
 
 describe("Anivexa media manifest proxy", () => {
   it("rewrites HLS variant playlists and URI attributes through the same-origin relay", () => {
@@ -68,4 +68,11 @@ describe("Anivexa media manifest proxy", () => {
     const result = rewriteHlsManifest(source, "https://cdn.example.test/master.m3u8");
     expect(result).toBe(source);
   });
+  it("detects extensionless HLS and namespaced DASH child manifests from their bodies", () => {
+    expect(detectNestedManifestType("text/plain", Buffer.from("#EXTM3U\\n#EXTINF:6,"))).toBe("hls");
+    expect(detectNestedManifestType("application/octet-stream", Buffer.from('<?xml version="1.0"?><dash:MPD xmlns:dash="urn:dash">'))).toBe("dash");
+    expect(detectNestedManifestType("application/vnd.apple.mpegurl", Buffer.alloc(0))).toBe("hls");
+    expect(detectNestedManifestType("video/mp2t", Buffer.from("segment bytes"))).toBe("");
+  });
+
 });
