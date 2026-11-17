@@ -11,17 +11,18 @@ import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnim
 
 export const anivexaRouter = Router();
 
-anivexaRouter.route("/media").get(proxyAnivexaMedia).head(proxyAnivexaMedia);
+anivexaRouter.get("/media", proxyAnivexaMedia);
 
-function clientMediaStream(stream: { url: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }) {
+function clientMediaStream(stream: { url: string; type?: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }) {
   const referer = stream.referer;
-  const proxy = (url: string) => {
+  const proxy = (url: string, kind?: string) => {
     const query = new URLSearchParams({ url });
+    if (kind) query.set("kind", kind);
     if (referer) query.set("referer", referer);
     return `/api/v1/anivexa/media?${query.toString()}`;
   };
   const { referer: _referer, ...publicStream } = stream;
-  return { ...publicStream, url: proxy(stream.url), subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url) })) };
+  return { ...publicStream, url: proxy(stream.url, stream.type), subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url, "vtt") })) };
 }
 
 const paramsSchema = z.object({ anilistId: z.coerce.number().int().positive().max(2_147_483_647) });
