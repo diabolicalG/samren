@@ -254,7 +254,11 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
     }
     if (nestedManifestType && prefixChunks.length === 0) {
       const firstChunk = await iterator.next();
-      if (!firstChunk.done) prefixChunks.push(Buffer.from(firstChunk.value));
+      if (!firstChunk.done) {
+        const bytes = Buffer.from(firstChunk.value);
+        prefixChunks.push(bytes);
+        prefixBytes += bytes.length;
+      }
     }
     if (nestedManifestType) {
       const chunks = [...prefixChunks];
