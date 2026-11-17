@@ -72,7 +72,6 @@ function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void 
     if (value) response.setHeader(name, value);
   }
   response.setHeader("Cache-Control", "private, max-age=30");
-  response.setHeader("Access-Control-Allow-Origin", "*");
 }
 
 export async function proxyAnivexaMedia(request: Request, response: Response): Promise<void> {
@@ -128,7 +127,6 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       response.status(200);
       response.setHeader("Content-Type", manifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
-      response.setHeader("Access-Control-Allow-Origin", "*");
       response.end(body);
       return;
     }
@@ -154,7 +152,6 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       response.status(upstream.status);
       response.setHeader("Content-Type", nestedManifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
-      response.setHeader("Access-Control-Allow-Origin", "*");
       response.end(body);
       return;
     }
