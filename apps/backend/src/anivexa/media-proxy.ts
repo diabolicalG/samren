@@ -148,10 +148,10 @@ export function rewriteDashManifest(manifest: string, manifestUrl: string, refer
 
 export function detectNestedManifestType(contentType: string, prefix: Buffer): "hls" | "dash" | "" {
   if (/mpegurl/i.test(contentType)) return "hls";
-  if (/dash\\+xml/i.test(contentType)) return "dash";
-  const text = prefix.toString("utf8", 0, 4096).replace(/^\\uFEFF/, "").trimStart();
+  if (/dash\+xml/i.test(contentType)) return "dash";
+  const text = prefix.toString("utf8", 0, 4096).replace(/^\uFEFF/, "").trimStart();
   if (text.startsWith("#EXTM3U")) return "hls";
-  if (/<(?:[A-Za-z_][\\w.-]*:)?MPD(?:\\s|>)/i.test(text)) return "dash";
+  if (/<(?:[A-Za-z_][\w.-]*:)?MPD(?:\s|>)/i.test(text)) return "dash";
   return "";
 }
 
