@@ -316,3 +316,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .provider-fallback-controls p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .provider-fallback-controls .ui-field { min-width: 0; }
 @media (max-width: 640px) { .provider-fallback-controls { grid-template-columns: 1fr; } }
+.adaptive-player { position: relative; width: 100%; background: #000; }
+.adaptive-player video { display: block; width: 100%; max-height: min(72vh,760px); aspect-ratio: 16/9; background: #000; object-fit: contain; }
+.player-runtime-error { margin: 0; padding: 10px 14px; color: #fca5a5; background: rgba(127,29,29,.22); font-size: 12px; line-height: 1.5; }
