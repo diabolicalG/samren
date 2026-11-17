@@ -75,4 +75,11 @@ describe("Anivexa media manifest proxy", () => {
     expect(detectNestedManifestType("video/mp2t", Buffer.from("segment bytes"))).toBe("");
   });
 
+  it("proxies direct-file DASH BaseURL resources used with SegmentBase ranges", () => {
+    const source = '<MPD><Period><AdaptationSet><Representation><BaseURL>video.mp4</BaseURL><SegmentBase indexRange="0-999" /></Representation></AdaptationSet></Period></MPD>';
+    const result = rewriteDashManifest(source, "https://cdn.example.test/path/manifest.mpd");
+    expect(result).toContain("<BaseURL>/api/v1/anivexa/media?url=https%3A%2F%2Fcdn.example.test%2Fpath%2Fvideo.mp4</BaseURL>");
+    expect(result).toContain('indexRange="0-999"');
+  });
+
 });
