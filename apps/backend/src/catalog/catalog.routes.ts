@@ -85,9 +85,9 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
           select: { id: true, qualityLabel: true, isDefault: true, asset: { select: { id: true, mimeType: true } } },
         },
         subtitles: {
-          where: { format: "VTT", asset: { processingState: "READY" } },
+          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY" } },
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-          select: { id: true, languageCode: true, label: true, isDefault: true, asset: { select: { id: true } } },
+          select: { id: true, languageCode: true, label: true, isDefault: true, format: true, asset: { select: { id: true } } },
         },
       },
     });
@@ -100,7 +100,7 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
       data: {
         episode: { id: episode.id, episodeNumber: episode.episodeNumber, title: episode.title, synopsis: episode.synopsis, durationSeconds: episode.durationSeconds },
         sources: episode.media.map((item) => ({ id: item.id, qualityLabel: item.qualityLabel, isDefault: item.isDefault, mimeType: item.asset.mimeType, url: `/api/v1/media/${item.asset.id}` })),
-        subtitles: episode.subtitles.map((item) => ({ id: item.id, languageCode: item.languageCode, label: item.label, isDefault: item.isDefault, format: "VTT" as const, url: `/api/v1/media/${item.asset.id}` })),
+        subtitles: episode.subtitles.map((item) => ({ id: item.id, languageCode: item.languageCode, label: item.label, isDefault: item.isDefault, format: "VTT" as const, url: item.format === "SRT" ? `/api/v1/media/${item.asset.id}/vtt` : `/api/v1/media/${item.asset.id}` })),
       },
       error: null,
     });
