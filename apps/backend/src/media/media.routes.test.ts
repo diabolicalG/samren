@@ -101,4 +101,42 @@ describe("public media delivery", () => {
 
     expect(response.status).toBe(404);
   });
+  it("converts published SubRip subtitles into WebVTT for browser tracks", async () => {
+    const subtitle = "1\\n00:00:01,000 --> 00:00:02,500\\nHello from Samren";
+    await writeFile(mediaPath, subtitle);
+    vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
+      ...publishedAsset,
+      mimeType: "application/x-subrip",
+    } as never);
+    vi.mocked(readStoredMediaStat).mockResolvedValue({
+      absolutePath: mediaPath,
+      sizeBytes: Buffer.byteLength(subtitle),
+    });
+
+    const response = await request(app).get("/media/asset-1/vtt");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/vtt");
+    expect(response.text).toBe("WEBVTT\\n\\n00:00:01.000 --> 00:00:02.500\\nHello from Samren\\n");
+    expect(prisma.mediaAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "asset-1",
+        subtitleTracks: expect.any(Object),
+      }),
+    }));
+  });
+
+  it("does not expose malformed SubRip content as a browser subtitle", async () => {
+    await writeFile(mediaPath, "not a subtitle");
+    vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
+      ...publishedAsset,
+      mimeType: "application/x-subrip",
+    } as never);
+    vi.mocked(readStoredMediaStat).mockResolvedValue({ absolutePath: mediaPath, sizeBytes: 14 });
+
+    const response = await request(app).get("/media/asset-1/vtt");
+
+    expect(response.status).toBe(422);
+  });
+
 });
