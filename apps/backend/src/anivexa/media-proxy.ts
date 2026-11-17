@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { IncomingHttpHeaders } from "node:http";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { env } from "../config/env.js";
 import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
 import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
 
@@ -75,6 +76,10 @@ function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void 
 }
 
 export async function proxyAnivexaMedia(request: Request, response: Response): Promise<void> {
+  if (!env.ANIVEXA_ENABLED) {
+    response.status(503).end("Anivexa playback is disabled");
+    return;
+  }
   const target = typeof request.query.url === "string" ? request.query.url : "";
   const refererValue = typeof request.query.referer === "string" ? request.query.referer : "";
   const kind = typeof request.query.kind === "string" ? request.query.kind : "";
