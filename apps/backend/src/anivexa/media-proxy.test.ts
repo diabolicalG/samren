@@ -44,7 +44,7 @@ describe("Anivexa media manifest proxy", () => {
     ].join("");
     const result = rewriteDashManifest(source, "https://cdn.example.test/manifest.mpd");
     expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Froot%2Fseason-1%2Fvideo%2Finit-$RepresentationID$.m4s");
-    expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Froot%2Fseason-1%2Fvideo%2Fchunk-$Number%2505d$.m4s");
+    expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Froot%2Fseason-1%2Fvideo%2Fchunk-$Number%05d$.m4s");
     expect(result).not.toContain("<BaseURL>");
   });
 
@@ -53,7 +53,7 @@ describe("Anivexa media manifest proxy", () => {
     const result = rewriteDashManifest(source, "https://cdn.example.test/manifest.mpd");
     expect(result).toContain("token%3Da%26part%3D1");
     expect(result).toContain("seg.m4s");
-    expect(result).toContain("&amp;url=");
+    expect(result).toContain("url=https%3A%2F%2Fcdn.example.test%2Fvideo%2Fseg.m4s");
   });
 
   it("rewrites DASH Location and XML namespace URL attributes", () => {
