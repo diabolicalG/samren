@@ -130,7 +130,7 @@ export async function proxyAnivexaMedia(request, response) {
       timeoutMs: 60_000,
     });
     const upstreamType = String(upstream.headers["content-type"] ?? "");
-    const nestedManifestType = /mpegurl/i.test(upstreamType) ? "hls" : /dash\\+xml/i.test(upstreamType) ? "dash" : "";
+    const nestedManifestType = /mpegurl/i.test(upstreamType) ? "hls" : /dash\+xml/i.test(upstreamType) ? "dash" : "";
     if (nestedManifestType) {
       const chunks = [];
       let total = 0;
