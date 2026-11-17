@@ -245,6 +245,7 @@ function WatchPage() {
   const [anilistIdInput, setAnilistIdInput] = useState("");
   const [providerAudio, setProviderAudio] = useState<"sub" | "dub">("sub");
   const [providerError, setProviderError] = useState<string | null>(null);
+  const [mediaFailed, setMediaFailed] = useState(false);
   const providerPlayback = useProviderPlayback();
   const number = Number(episodeNumber);
   const playbackQuery = useQuery({
@@ -274,6 +275,7 @@ function WatchPage() {
   const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
 
   async function handleMediaError() {
+    setMediaFailed(true);
     setProviderError(null);
     if (providerStream) {
       const replacement = await providerPlayback.reportPlaybackError();
@@ -317,7 +319,10 @@ function WatchPage() {
             <option value="sub">Sub</option><option value="dub">Dub</option>
           </select>
         </label>
-        <p>Provider fallback starts automatically if the current video source reports a media error.</p>
+        <p>Provider fallback starts automatically if the current video source reports a media error. You can also start provider playback here when no first-party source is attached.</p>
+        <button type="button" className="ui-button ui-button--secondary" onClick={() => { void handleMediaError(); }} disabled={providerPlayback.isStarting || providerPlayback.isSwitching}>
+          {providerPlayback.isStarting ? "Finding a stream…" : providerPlayback.isSwitching ? "Switching provider…" : providerStream ? "Try another provider" : "Find provider stream"}
+        </button>
       </section>
       {activeUrl ? (
         <>
@@ -343,7 +348,7 @@ function WatchPage() {
                   src={track.url}
                   srcLang={"languageCode" in track ? track.languageCode : track.srclang}
                   label={track.label}
-                  default={track.default ?? ("isDefault" in track ? track.isDefault : false)}
+                  default={"default" in track ? track.default : ("isDefault" in track ? track.isDefault : false)}
                 />
               ))}
               Your browser does not support video playback.
@@ -356,6 +361,7 @@ function WatchPage() {
       ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
       {providerPlayback.isStarting || providerPlayback.isSwitching ? <p className="playback-quality" role="status">{providerPlayback.isStarting ? "Finding a provider stream…" : "Switching to another provider…"}</p> : null}
       {providerError || providerPlayback.error ? <p className="admin-error" role="alert">{providerError ?? providerPlayback.error}</p> : null}
+      {mediaFailed && !providerStream && !providerPlayback.isStarting ? <p className="playback-quality" role="status">The previous media source could not be played.</p> : null}
       {playback.subtitles.length && !providerStream ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
       <nav className="watch-navigation" aria-label="Episode navigation">
         {previousEpisode ? <Link className="ui-button ui-button--secondary" to={`/watch/${slug}/${previousEpisode.episodeNumber}`}>← Episode {previousEpisode.episodeNumber}</Link> : <span />}
