@@ -166,3 +166,59 @@ export async function safeFetch(input, init = {}, allowed = configuredHosts(), m
   }
   throw new Error("Anivexa provider redirect limit exceeded");
 }
+
+export async function safeFetchStream(input, init = {}, allowed = configuredHosts(), options = {}) {
+  let url = new URL(input instanceof Request ? input.url : String(input));
+  let method = init.method ?? (input instanceof Request ? input.method : "GET");
+  const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  const maxBytes = options.maxBytes ?? 512 * 1024 * 1024;
+
+  for (let redirects = 0; redirects <= 4; redirects += 1) {
+    const host = assertAllowedUrl(url, allowed);
+    const addresses = await resolvePublicAddresses(host);
+    const signal = AbortSignal.timeout(timeoutMs);
+    const response = await new Promise((resolve, reject) => {
+      const requestHeaders = Object.fromEntries(headers.entries());
+      delete requestHeaders.host;
+      const req = https.request(url, {
+        method,
+        headers: requestHeaders,
+        lookup: isIP(url.hostname) ? undefined : createPinnedLookup(addresses),
+        agent: false,
+        signal,
+      }, resolve);
+      req.once("error", reject);
+      req.end();
+    });
+
+    const status = response.statusCode ?? 502;
+    if ([301, 302, 303, 307, 308].includes(status)) {
+      const location = response.headers.location;
+      response.resume();
+      await new Promise((resolve, reject) => {
+        response.once("end", resolve);
+        response.once("error", reject);
+      });
+      if (!location || redirects === 4) throw new Error("Anivexa media redirect limit exceeded");
+      const next = new URL(location, url);
+      assertAllowedUrl(next, allowed);
+      if (status === 303 || ((status === 301 || status === 302) && method === "POST")) method = "GET";
+      url = next;
+      continue;
+    }
+
+    const declared = Number(response.headers["content-length"]);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      response.destroy();
+      throw new Error("Anivexa media response exceeded the size limit");
+    }
+    let received = 0;
+    response.on("data", (chunk) => {
+      received += chunk.length;
+      if (received > maxBytes) response.destroy(new Error("Anivexa media response exceeded the size limit"));
+    });
+    return { status, headers: response.headers, body: response };
+  }
+  throw new Error("Anivexa media redirect limit exceeded");
+}
