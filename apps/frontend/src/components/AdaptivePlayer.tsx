@@ -35,6 +35,37 @@ declare global {
   }
 }
 
+const runtimeLoads = new Map<string, Promise<void>>();
+const runtimeSources = {
+  hls: "https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js",
+  dash: "https://cdn.dashjs.org/v5.3.0/modern/umd/dash.all.min.js",
+};
+
+function ensureRuntime(name: "hls" | "dash"): Promise<void> {
+  if (name === "hls" && window.Hls) return Promise.resolve();
+  if (name === "dash" && window.dashjs) return Promise.resolve();
+  const existing = runtimeLoads.get(name);
+  if (existing) return existing;
+  const loading = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = runtimeSources[name];
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
+    script.onload = () => {
+      if ((name === "hls" && window.Hls) || (name === "dash" && window.dashjs)) resolve();
+      else reject(new Error("Adaptive player runtime did not expose its browser API"));
+    };
+    script.onerror = () => reject(new Error("Adaptive player runtime could not be downloaded"));
+    document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    runtimeLoads.delete(name);
+    throw error;
+  });
+  runtimeLoads.set(name, loading);
+  return loading;
+}
+
 type AdaptivePlayerProps = {
   src: string;
   type: StreamType;
@@ -91,32 +122,48 @@ export function AdaptivePlayer({
     video.addEventListener("error", reportFatal);
 
     if (type === "hls") {
-      if (window.Hls?.isSupported()) {
-        hls = new window.Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 60 });
-        hls.on(window.Hls.Events.ERROR, (_event, data) => {
-          if (!data.fatal || disposed) return;
-          if (data.type === window.Hls?.ErrorTypes.NETWORK_ERROR && !networkRecoveryUsed) {
-            networkRecoveryUsed = true;
-            hls?.startLoad();
-            return;
-          }
-          if (data.type === window.Hls?.ErrorTypes.MEDIA_ERROR && !mediaRecoveryUsed) {
-            mediaRecoveryUsed = true;
-            hls?.recoverMediaError();
-            return;
-          }
-          reportFatal();
-        });
-        hls.attachMedia(video);
-        hls.loadSource(src);
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      if (video.canPlayType("application/vnd.apple.mpegurl") && "ManagedMediaSource" in window) {
         video.src = src;
       } else {
-        setRuntimeError("HLS playback is not supported by this browser. Update the browser or use a supported device.");
-        reportFatal();
+        void ensureRuntime("hls").then(() => {
+          if (disposed) return;
+          if (!window.Hls?.isSupported()) {
+            if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = src;
+            else {
+              setRuntimeError("HLS playback is not supported by this browser or device.");
+              reportFatal();
+            }
+            return;
+          }
+          hls = new window.Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 60 });
+          hls.on(window.Hls.Events.ERROR, (_event, data) => {
+            if (!data.fatal || disposed) return;
+            if (data.type === window.Hls?.ErrorTypes.NETWORK_ERROR && !networkRecoveryUsed) {
+              networkRecoveryUsed = true;
+              hls?.startLoad();
+              return;
+            }
+            if (data.type === window.Hls?.ErrorTypes.MEDIA_ERROR && !mediaRecoveryUsed) {
+              mediaRecoveryUsed = true;
+              hls?.recoverMediaError();
+              return;
+            }
+            reportFatal();
+          });
+          hls.attachMedia(video);
+          hls.loadSource(src);
+        }).catch(() => {
+          if (disposed) return;
+          if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = src;
+          else {
+            setRuntimeError("The HLS playback engine could not be loaded. Check the connection and refresh.");
+            reportFatal();
+          }
+        });
       }
     } else if (type === "dash") {
-      if (window.dashjs) {
+      void ensureRuntime("dash").then(() => {
+        if (disposed || !window.dashjs) return;
         dash = window.dashjs.MediaPlayer().create();
         dash.updateSettings({
           streaming: {
@@ -126,10 +173,11 @@ export function AdaptivePlayer({
         });
         dash.on("error", reportFatal);
         dash.initialize(video, src, autoPlayRef.current);
-      } else {
+      }).catch(() => {
+        if (disposed) return;
         setRuntimeError("The DASH playback engine could not be loaded. Check the connection and refresh.");
         reportFatal();
-      }
+      });
     } else {
       video.src = src;
     }
