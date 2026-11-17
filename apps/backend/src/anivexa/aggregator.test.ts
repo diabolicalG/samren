@@ -26,6 +26,7 @@ describe("Anivexa provider aggregator", () => {
     const selected = await aggregator.start(21, 4, "sub");
     expect(selected.stream.provider).toBe("anizone");
     expect(selected.providers).toBe(3);
+    expect(Date.parse(selected.expiresAt) - Date.now()).toBeGreaterThan(55 * 60 * 1000);
 
     const fallback = await aggregator.fallback(selected.sessionId, "anizone");
     expect(fallback.stream.provider).toBe("anikoto");
