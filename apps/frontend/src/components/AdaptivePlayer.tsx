@@ -109,7 +109,6 @@ export function AdaptivePlayer({
         hls.loadSource(src);
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
-        video.load();
       } else {
         setRuntimeError("HLS playback is not supported by this browser. Update the browser or use a supported device.");
         reportFatal();
@@ -131,7 +130,6 @@ export function AdaptivePlayer({
       }
     } else {
       video.src = src;
-      video.load();
     }
 
     return () => {
@@ -142,7 +140,6 @@ export function AdaptivePlayer({
       dash?.reset();
       video.pause();
       video.removeAttribute("src");
-      video.load();
     };
   }, [src, type, resumeAt, autoPlay]);
 
