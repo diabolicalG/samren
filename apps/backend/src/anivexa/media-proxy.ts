@@ -1,3 +1,4 @@
+import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
 import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
@@ -152,7 +153,15 @@ export async function proxyAnivexaMedia(request, response) {
     }
     response.status(upstream.status);
     forwardHeaders(response, upstream.headers);
-    await pipeline(upstream.body, response);
+    let sent = 0;
+    const sizeLimit = new Transform({
+      transform(chunk, _encoding, callback) {
+        sent += chunk.length;
+        if (sent > upstream.maxBytes) callback(new Error("Anivexa media response exceeded the size limit"));
+        else callback(null, chunk);
+      },
+    });
+    await pipeline(upstream.body, sizeLimit, response);
   } catch {
     if (!response.headersSent) response.status(502).end("Upstream media request failed");
     else response.destroy();
