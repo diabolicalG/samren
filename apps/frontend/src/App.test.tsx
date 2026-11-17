@@ -268,4 +268,42 @@ describe("first-party watch experience", () => {
       expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/media/asset-hd");
     });
   });
+
+  it("starts provider playback after a media error and switches provider when the fallback also errors", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockResolvedValue({
+      episode: { id: "episode-1", episodeNumber: 4, title: "Pilot", synopsis: null, durationSeconds: 1200 },
+      sources: [{ id: "source-local", qualityLabel: "1080p", isDefault: true, mimeType: "video/mp4", url: "/api/v1/media/local" }],
+      subtitles: [],
+    });
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({ episodes: [] } as never);
+    const aggregate = vi.spyOn(apiClient, "aggregatePlayback").mockResolvedValue({
+      sessionId: "session-1",
+      stream: { provider: "animegg", url: "https://cdn.example.test/first.mp4", type: "mp4", server: "main", quality: "1080p", audio: "sub" },
+      providers: 11,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const fallback = vi.spyOn(apiClient, "fallbackPlayback").mockResolvedValue({
+      stream: { provider: "anizone", url: "https://cdn.example.test/second.mp4", type: "mp4", server: "backup", quality: "720p", audio: "sub" },
+      tried: ["animegg", "anizone"],
+      remaining: 9,
+    });
+
+    renderApp("/watch/the-clockwork-orbit/4");
+    const idInput = await screen.findByLabelText("AniList ID for provider fallback");
+    fireEvent.change(idInput, { target: { value: "12345" } });
+    fireEvent.error(document.querySelector("video")!);
+
+    await waitFor(() => {
+      expect(aggregate).toHaveBeenCalledWith(12345, 4, "sub");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("https://cdn.example.test/first.mp4");
+    });
+
+    fireEvent.error(document.querySelector("video")!);
+    await waitFor(() => {
+      expect(fallback).toHaveBeenCalledWith("session-1", "animegg");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("https://cdn.example.test/second.mp4");
+    });
+  });
+
 });
