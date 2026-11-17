@@ -52,9 +52,12 @@ describe("AdaptivePlayer", () => {
     const onError = vi.fn();
     const { container, unmount } = render(<AdaptivePlayer src="/api/v1/anivexa/media?url=x&kind=dash" type="dash" onError={onError} />);
     await waitFor(() => expect(dashPlayer.initialize).toHaveBeenCalledWith(container.querySelector("video"), "/api/v1/anivexa/media?url=x&kind=dash", false));
+    expect(dashPlayer.on).toHaveBeenCalledWith("error", expect.any(Function));
     expect(dashPlayer.on).toHaveBeenCalledWith("playbackError", expect.any(Function));
-    const callback = dashPlayer.on.mock.calls.find(([event]) => event === "playbackError")?.[1] as (event: unknown) => void;
-    callback({ error: { code: 27 } });
+    const engineError = dashPlayer.on.mock.calls.find(([event]) => event === "error")?.[1] as (event: unknown) => void;
+    const playbackError = dashPlayer.on.mock.calls.find(([event]) => event === "playbackError")?.[1] as (event: unknown) => void;
+    engineError({ error: { code: 27 } });
+    playbackError({ error: { code: 27 } });
     expect(onError).toHaveBeenCalledTimes(1);
     unmount();
     expect(dashPlayer.reset).toHaveBeenCalledTimes(1);
