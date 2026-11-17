@@ -206,3 +206,13 @@ This revision does not authorize unrestricted URL proxying, exposing provider se
 - Worker queues, circuit state and playback sessions are currently bounded in-process memory. This is not a distributed Redis/BullMQ worker service; multi-instance deployment requires shared session/circuit storage and coordinated workers.
 - Live provider availability and browser playback remain unverified. Anivexa remains disabled by default; configure exact upstream and media hosts before enabling. DNS-pinning expansion remains deferred.
 - CI run [43928280200](https://github.com/diabolicalG/samren/actions/runs/43928280200) passed on `539bf97dc9272883aadd705a2efa8a965de2a4f6`, including Prisma validation/migrations/seeding, lint, typecheck, backend tests (including worker/aggregator tests), frontend smoke/accessibility tests, Python API tests and production builds.
+
+
+## 13. Adaptive playback limitations checkpoint (2026-11-17)
+
+- Replaced the native-only player path with AdaptivePlayer: MP4 uses native HTML video, HLS uses version-pinned HLS.js 1.7.4 with bounded network/media recovery, and DASH uses version-pinned dash.js 5.3.0.
+- Added a same-origin media relay for aggregate streams. HLS playlists, nested playlists, keys, segments and DASH manifests/templates/segments are rewritten through the relay, avoiding browser CORS restrictions and applying provider Referer on the server.
+- Added bounded streaming media transport with byte-range forwarding, DNS pinning, HTTPS-only URLs, configured stream-host allowlists, redirect revalidation, a 512 MiB per-response cap and a 60-second upstream timeout. Manifests are separately capped at 2 MiB.
+- Added adaptive player tests and media manifest rewrite tests. Playback progress is restored after source/provider changes; engine instances are disposed when switching streams or leaving the watch page.
+- Updated Helmet CSP for the pinned HLS.js and dash.js script CDNs; media network requests use the same-origin relay. The browser bundles are CDN-hosted rather than vendored.
+- Remaining verification: live playback against each provider, real browser codec support, device-specific seeking, subtitles and any provider-specific anti-bot/token expiry behavior. DRM streams remain unsupported. Do not claim universal playback.
