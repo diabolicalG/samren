@@ -133,12 +133,11 @@ async function pinnedHttpsRequest(url, { method, headers, body, signal }, addres
   });
 }
 
-export async function safeFetch(input, init = {}, allowed = configuredHosts()) {
+export async function safeFetch(input, init = {}, allowed = configuredHosts(), maxBytes = 5 * 1024 * 1024) {
   let url = new URL(input instanceof Request ? input.url : String(input));
   let method = init.method ?? (input instanceof Request ? input.method : "GET");
   let body = init.body ?? (input instanceof Request && input.body ? Buffer.from(await input.clone().arrayBuffer()) : undefined);
   const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
-  const maxBytes = 5 * 1024 * 1024;
 
   for (let redirects = 0; redirects <= 4; redirects += 1) {
     const host = assertAllowedUrl(url, allowed);
