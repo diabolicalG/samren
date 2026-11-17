@@ -132,7 +132,10 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
     });
     if (part.name === "location") {
       const location = resolveResource(decodeXml(nodeText(part)), base);
-      if (location) return "<Location>" + proxyUrl(location, referer, true) + "</Location>";
+      if (location) {
+        const tagName = part.opening.match(/^<\\s*([^\\s/>]+)/)?.[1] ?? "Location";
+        return "<" + tagName + ">" + proxyUrl(location, referer, true) + "</" + tagName + ">";
+      }
     }
     const children = rewriteDashParts(part.children, base, referer);
     return rewrittenOpening + children + (part.selfClosing ? "" : part.closing);
