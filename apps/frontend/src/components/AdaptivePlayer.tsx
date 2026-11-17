@@ -140,7 +140,6 @@ export function AdaptivePlayer({
       video.removeEventListener("error", reportFatal);
       hls?.destroy();
       dash?.reset();
-      video.pause();
       video.removeAttribute("src");
     };
   }, [src, type, resumeAt]);
