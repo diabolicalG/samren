@@ -182,6 +182,16 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
     ? kind
     : pathname.endsWith(".m3u8") ? "hls" : pathname.endsWith(".mpd") ? "dash" : "";
   try {
+    if (request.method === "HEAD" && !manifestType) {
+      const upstream = await safeFetchStream(target, { method: "HEAD", headers }, [...streamHosts], {
+        maxBytes: MAX_MEDIA_BYTES,
+        timeoutMs: 10_000,
+      });
+      response.status(upstream.status);
+      forwardHeaders(response, upstream.headers);
+      response.end();
+      return;
+    }
     if (manifestType) {
       const upstream = await safeFetch(target, { method: "GET", headers }, [...streamHosts], MAX_MANIFEST_BYTES);
       if (!upstream.ok) {
