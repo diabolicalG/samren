@@ -241,12 +241,24 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
     });
     const upstreamType = String(upstream.headers["content-type"] ?? "");
     const iterator = upstream.body[Symbol.asyncIterator]();
-    const first = await iterator.next();
-    const firstChunk = first.done ? null : Buffer.from(first.value);
-    const nestedManifestType = detectNestedManifestType(upstreamType, firstChunk ?? Buffer.alloc(0));
+    const prefixChunks: Buffer[] = [];
+    let prefixBytes = 0;
+    let nestedManifestType = detectNestedManifestType(upstreamType, Buffer.alloc(0));
+    while (!nestedManifestType && prefixBytes < 4096) {
+      const nextChunk = await iterator.next();
+      if (nextChunk.done) break;
+      const bytes = Buffer.from(nextChunk.value);
+      prefixChunks.push(bytes);
+      prefixBytes += bytes.length;
+      nestedManifestType = detectNestedManifestType(upstreamType, Buffer.concat(prefixChunks));
+    }
+    if (nestedManifestType && prefixChunks.length === 0) {
+      const firstChunk = await iterator.next();
+      if (!firstChunk.done) prefixChunks.push(Buffer.from(firstChunk.value));
+    }
     if (nestedManifestType) {
-      const chunks = firstChunk ? [firstChunk] : [];
-      let total = firstChunk?.length ?? 0;
+      const chunks = [...prefixChunks];
+      let total = prefixBytes;
       while (true) {
         const nextChunk = await iterator.next();
         if (nextChunk.done) break;
@@ -276,7 +288,7 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       },
     });
     const replay = Readable.from((async function* () {
-      if (firstChunk) yield firstChunk;
+      for (const prefixChunk of prefixChunks) yield prefixChunk;
       while (true) {
         const nextChunk = await iterator.next();
         if (nextChunk.done) return;
