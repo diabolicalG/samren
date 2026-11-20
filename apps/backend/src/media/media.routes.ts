@@ -7,6 +7,9 @@ import { convertSrtToWebVtt } from "./subtitles.js";
 export const mediaRouter = Router();
 const idSchema = z.string().min(1).max(64);
 const rangeSchema = /^bytes=([0-9]*)-([0-9]*)$/;
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
+const SUBTITLE_MIME_TYPES = ["text/vtt", "application/x-subrip", "text/srt"];
 type OpenedMedia = NonNullable<Awaited<ReturnType<typeof openStoredMediaFile>>>;
 
 async function closeStored(stored: OpenedMedia) {
@@ -45,7 +48,9 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
     const asset = await prisma.mediaAsset.findFirst({
       where: {
         id: parsedId.data,
+        mediaKind: "SUBTITLE",
         processingState: "READY",
+        mimeType: { in: SUBTITLE_MIME_TYPES },
         subtitleTracks: {
           some: {
             format: { in: ["SRT", "VTT"] },
@@ -53,9 +58,9 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
           },
         },
       },
-      select: { storageKey: true, mimeType: true, sizeBytes: true },
+      select: { storageKey: true, mimeType: true, checksumSha256: true, sizeBytes: true },
     });
-    if (!asset || !["application/x-subrip", "text/srt", "text/vtt"].includes(asset.mimeType)) {
+    if (!asset) {
       response.status(404).end();
       return;
     }
@@ -104,6 +109,7 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
       "Cache-Control": "public, max-age=300",
       "X-Content-Type-Options": "nosniff",
     });
+    if (asset.checksumSha256) response.set("ETag", `"${asset.checksumSha256}"`);
     response.status(200);
     if (request.method === "HEAD") {
       response.end();
@@ -130,10 +136,18 @@ async function deliverMedia(request: import("express").Request, response: import
         id: parsedId.data,
         processingState: "READY",
         OR: [
-          { posterFor: { some: { publicationStatus: "PUBLISHED" } } },
-          { bannerFor: { some: { publicationStatus: "PUBLISHED" } } },
-          { episodeMedia: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
-          { subtitleTracks: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
+          { mediaKind: "POSTER", mimeType: { in: IMAGE_MIME_TYPES }, posterFor: { some: { publicationStatus: "PUBLISHED" } } },
+          { mediaKind: "BANNER", mimeType: { in: IMAGE_MIME_TYPES }, bannerFor: { some: { publicationStatus: "PUBLISHED" } } },
+          {
+            mediaKind: "VIDEO",
+            mimeType: { in: VIDEO_MIME_TYPES },
+            episodeMedia: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } },
+          },
+          {
+            mediaKind: "SUBTITLE",
+            mimeType: "text/vtt",
+            subtitleTracks: { some: { format: "VTT", episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } },
+          },
         ],
       },
       select: { storageKey: true, mimeType: true, checksumSha256: true, sizeBytes: true },

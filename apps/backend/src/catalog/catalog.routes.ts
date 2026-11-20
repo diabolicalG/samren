@@ -1,5 +1,6 @@
 import { Router, type Response } from "express";
 import { prisma } from "../db/prisma.js";
+import { readStoredMediaStat } from "../media/storage.js";
 import { catalogListQuerySchema, catalogSlugSchema } from "./catalog.schemas.js";
 import {
   findPublishedAnimeBySlug,
@@ -26,6 +27,15 @@ function sendFailure(response: Response, error: unknown) {
   });
 }
 
+async function isStoredAssetAvailable(storageKey: string, sizeBytes: bigint) {
+  try {
+    const stored = await readStoredMediaStat(storageKey);
+    const expectedSize = Number(sizeBytes);
+    return Boolean(stored && Number.isSafeInteger(expectedSize) && expectedSize > 0 && stored.sizeBytes === expectedSize);
+  } catch {
+    return false;
+  }
+}
 
 catalogRouter.get("/anime", async (request, response) => {
   const parsed = catalogListQuerySchema.safeParse(request.query);
@@ -80,14 +90,20 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
         synopsis: true,
         durationSeconds: true,
         media: {
-          where: { asset: { processingState: "READY" } },
+          where: { asset: { processingState: "READY", mediaKind: "VIDEO" } },
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-          select: { id: true, qualityLabel: true, isDefault: true, asset: { select: { id: true, mimeType: true } } },
+          select: {
+            id: true, qualityLabel: true, isDefault: true,
+            asset: { select: { id: true, mimeType: true, storageKey: true, sizeBytes: true } },
+          },
         },
         subtitles: {
-          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY" } },
+          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY", mediaKind: "SUBTITLE" } },
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-          select: { id: true, languageCode: true, label: true, isDefault: true, format: true, asset: { select: { id: true } } },
+          select: {
+            id: true, languageCode: true, label: true, isDefault: true, format: true,
+            asset: { select: { id: true, storageKey: true, sizeBytes: true } },
+          },
         },
       },
     });
@@ -96,11 +112,45 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
       return;
     }
 
+    const [mediaAvailability, subtitleAvailability] = await Promise.all([
+      Promise.all(episode.media.map(async (item) => ({
+        item,
+        available: await isStoredAssetAvailable(item.asset.storageKey, item.asset.sizeBytes),
+      }))),
+      Promise.all(episode.subtitles.map(async (item) => ({
+        item,
+        available: await isStoredAssetAvailable(item.asset.storageKey, item.asset.sizeBytes),
+      }))),
+    ]);
+
     response.set("Cache-Control", "no-store").json({
       data: {
-        episode: { id: episode.id, episodeNumber: episode.episodeNumber, title: episode.title, synopsis: episode.synopsis, durationSeconds: episode.durationSeconds },
-        sources: episode.media.map((item) => ({ id: item.id, qualityLabel: item.qualityLabel, isDefault: item.isDefault, mimeType: item.asset.mimeType, url: `/api/v1/media/${item.asset.id}` })),
-        subtitles: episode.subtitles.map((item) => ({ id: item.id, languageCode: item.languageCode, label: item.label, isDefault: item.isDefault, format: "VTT" as const, url: item.format === "SRT" ? `/api/v1/media/${item.asset.id}/vtt` : `/api/v1/media/${item.asset.id}` })),
+        episode: {
+          id: episode.id,
+          episodeNumber: episode.episodeNumber,
+          title: episode.title,
+          synopsis: episode.synopsis,
+          durationSeconds: episode.durationSeconds,
+        },
+        sources: mediaAvailability
+          .filter(({ available }) => available)
+          .map(({ item }) => ({
+            id: item.id,
+            qualityLabel: item.qualityLabel,
+            isDefault: item.isDefault,
+            mimeType: item.asset.mimeType,
+            url: `/api/v1/media/${item.asset.id}`,
+          })),
+        subtitles: subtitleAvailability
+          .filter(({ available }) => available)
+          .map(({ item }) => ({
+            id: item.id,
+            languageCode: item.languageCode,
+            label: item.label,
+            isDefault: item.isDefault,
+            format: "VTT" as const,
+            url: item.format === "SRT" ? `/api/v1/media/${item.asset.id}/vtt` : `/api/v1/media/${item.asset.id}`,
+          })),
       },
       error: null,
     });
