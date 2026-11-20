@@ -90,7 +90,7 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
         synopsis: true,
         durationSeconds: true,
         media: {
-          where: { asset: { processingState: "READY", mediaKind: "VIDEO" } },
+          where: { asset: { processingState: "READY", mediaKind: "VIDEO", mimeType: { in: ["video/mp4", "video/webm"] } } },
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
           select: {
             id: true, qualityLabel: true, isDefault: true,
@@ -98,7 +98,7 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
           },
         },
         subtitles: {
-          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY", mediaKind: "SUBTITLE" } },
+          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY", mediaKind: "SUBTITLE", mimeType: { in: ["text/vtt", "application/x-subrip", "text/srt"] } } },
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
           select: {
             id: true, languageCode: true, label: true, isDefault: true, format: true,

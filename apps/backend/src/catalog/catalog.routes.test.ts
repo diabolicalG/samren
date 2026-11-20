@@ -82,9 +82,9 @@ describe("catalogue playback metadata", () => {
         anime: { slug: "demo", publicationStatus: "PUBLISHED" },
       },
       select: expect.objectContaining({
-        media: expect.objectContaining({ where: { asset: { processingState: "READY", mediaKind: "VIDEO" } } }),
+        media: expect.objectContaining({ where: { asset: { processingState: "READY", mediaKind: "VIDEO", mimeType: { in: ["video/mp4", "video/webm"] } } } }),
         subtitles: expect.objectContaining({
-          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY", mediaKind: "SUBTITLE" } },
+          where: { format: { in: ["VTT", "SRT"] }, asset: { processingState: "READY", mediaKind: "SUBTITLE", mimeType: { in: ["text/vtt", "application/x-subrip", "text/srt"] } } },
         }),
       }),
     }));
