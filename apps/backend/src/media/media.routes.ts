@@ -33,9 +33,12 @@ function parseByteRange(value: string, size: number): { start: number; end: numb
   }
 }
 
-async function deliverWebVttSubtitle(request: import("express").Request, response: import("express").Response) {
+async function deliverWebVttSubtitle(request: import("express").Request, response: import("express").Response): Promise<void> {
   const parsedId = idSchema.safeParse(request.params.id);
-  if (!parsedId.success) return response.status(404).end();
+  if (!parsedId.success) {
+    response.status(404).end();
+    return;
+  }
 
   let stored: OpenedMedia | null = null;
   try {
@@ -53,19 +56,27 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
       select: { storageKey: true, mimeType: true, sizeBytes: true },
     });
     if (!asset || !["application/x-subrip", "text/srt", "text/vtt"].includes(asset.mimeType)) {
-      return response.status(404).end();
+      response.status(404).end();
+      return;
     }
 
     stored = await openStoredMediaFile(asset.storageKey);
-    if (!stored) return response.status(404).end();
+    if (!stored) {
+      response.status(404).end();
+      return;
+    }
     const expectedSize = Number(asset.sizeBytes);
     if (!Number.isSafeInteger(expectedSize) || expectedSize !== stored.sizeBytes) {
-      await closeStored(stored); stored = null;
-      return response.status(404).end();
+      await closeStored(stored);
+      stored = null;
+      response.status(404).end();
+      return;
     }
     if (stored.sizeBytes > 2 * 1024 * 1024) {
-      await closeStored(stored); stored = null;
-      return response.status(413).end("Subtitle exceeds the playback size limit");
+      await closeStored(stored);
+      stored = null;
+      response.status(413).end("Subtitle exceeds the playback size limit");
+      return;
     }
 
     let original: Buffer;
@@ -82,7 +93,8 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
       try {
         body = Buffer.from(convertSrtToWebVtt(original.toString("utf8")), "utf8");
       } catch {
-        return response.status(422).end("Subtitle file is not valid SubRip");
+        response.status(422).end("Subtitle file is not valid SubRip");
+        return;
       }
     }
 
@@ -93,17 +105,23 @@ async function deliverWebVttSubtitle(request: import("express").Request, respons
       "X-Content-Type-Options": "nosniff",
     });
     response.status(200);
-    if (request.method === "HEAD") return response.end();
-    return response.end(body);
+    if (request.method === "HEAD") {
+      response.end();
+      return;
+    }
+    response.end(body);
   } catch {
     if (stored) await closeStored(stored);
-    return response.status(500).end();
+    response.status(500).end();
   }
 }
 
-async function deliverMedia(request: import("express").Request, response: import("express").Response) {
+async function deliverMedia(request: import("express").Request, response: import("express").Response): Promise<void> {
   const parsedId = idSchema.safeParse(request.params.id);
-  if (!parsedId.success) return response.status(404).end();
+  if (!parsedId.success) {
+    response.status(404).end();
+    return;
+  }
 
   let stored: OpenedMedia | null = null;
   try {
@@ -115,20 +133,28 @@ async function deliverMedia(request: import("express").Request, response: import
           { posterFor: { some: { publicationStatus: "PUBLISHED" } } },
           { bannerFor: { some: { publicationStatus: "PUBLISHED" } } },
           { episodeMedia: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
-          { subtitleTracks: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } } },
+          { subtitleTracks: { some: { episode: { publicationStatus: "PUBLISHED", anime: { publicationStatus: "PUBLISHED" } } } },
         ],
       },
       select: { storageKey: true, mimeType: true, checksumSha256: true, sizeBytes: true },
     });
-    if (!asset) return response.status(404).end();
+    if (!asset) {
+      response.status(404).end();
+      return;
+    }
 
     stored = await openStoredMediaFile(asset.storageKey);
-    if (!stored) return response.status(404).end();
+    if (!stored) {
+      response.status(404).end();
+      return;
+    }
 
     const expectedSize = Number(asset.sizeBytes);
     if (!Number.isSafeInteger(expectedSize) || expectedSize !== stored.sizeBytes || stored.sizeBytes <= 0) {
-      await closeStored(stored); stored = null;
-      return response.status(404).end();
+      await closeStored(stored);
+      stored = null;
+      response.status(404).end();
+      return;
     }
 
     const size = stored.sizeBytes;
@@ -139,8 +165,10 @@ async function deliverMedia(request: import("express").Request, response: import
     if (range) {
       const parsedRange = parseByteRange(range, size);
       if (!parsedRange) {
-        await closeStored(stored); stored = null;
-        return response.status(416).set("Content-Range", `bytes */${size}`).end();
+        await closeStored(stored);
+        stored = null;
+        response.status(416).set("Content-Range", `bytes */${size}`).end();
+        return;
       }
       start = parsedRange.start;
       end = parsedRange.end;
@@ -159,8 +187,10 @@ async function deliverMedia(request: import("express").Request, response: import
     else response.status(200);
 
     if (request.method === "HEAD") {
-      await closeStored(stored); stored = null;
-      return response.end();
+      await closeStored(stored);
+      stored = null;
+      response.end();
+      return;
     }
 
     const stream = stored.handle.createReadStream({ start, end, autoClose: true });
@@ -169,10 +199,10 @@ async function deliverMedia(request: import("express").Request, response: import
       if (!response.headersSent) response.status(404).end();
       else response.destroy();
     });
-    return stream.pipe(response);
+    stream.pipe(response);
   } catch {
     if (stored) await closeStored(stored);
-    return response.status(500).end();
+    response.status(500).end();
   }
 }
 
