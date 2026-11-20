@@ -1,13 +1,18 @@
 import { Router } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
-import { getAnimeGGEpisodes, getAnimeGGStreams } from "./animegg.js";
-import { getAniZoneEpisodes, getAniZoneStreams } from "./anizone.js";
-import { getAniKotoEpisodes, getAniKotoStreams } from "./anikoto.js";
-import { getKaaEpisodes, getKaaStreams } from "./kaa.js";
+import { prisma } from "../db/prisma.js";
+import { getAnimeGGEpisodes } from "./animegg.js";
+import { getAniZoneEpisodes } from "./anizone.js";
+import { getAniKotoEpisodes } from "./anikoto.js";
+import { getKaaEpisodes } from "./kaa.js";
 import { providerAggregator } from "./aggregator.js";
 import { proxyAnivexaMedia } from "./media-proxy.js";
-import { getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes, getAnimeNoSubEpisodes, getAniWavesStreams, getReAnimeStreams, getAnimeOnsenStreams, getAnimeNoSubStreams, getAniPmEpisodes, getSenshiEpisodes, getAniPmStreams, getSenshiStreams, getAnimeDunyaEpisodes, getAnimeDunyaStreams } from "./legacy-adapters.js";
+import {
+  getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes,
+  getAnimeNoSubEpisodes, getAniPmEpisodes, getSenshiEpisodes,
+  getAnimeDunyaEpisodes,
+} from "./legacy-adapters.js";
 
 export const anivexaRouter = Router();
 
@@ -24,29 +29,57 @@ function clientMediaStream(stream: { url: string; type?: string; referer?: strin
   };
   const publicStream = { ...stream };
   delete publicStream.referer;
-  return { ...publicStream, url: proxy(stream.url, stream.type), subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url, "vtt") })) };
+  return {
+    ...publicStream,
+    url: proxy(stream.url, stream.type),
+    subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url, "vtt") })),
+  };
 }
 
-const paramsSchema = z.object({ anilistId: z.coerce.number().int().positive().max(2_147_483_647) });
+const slugSchema = z.string().min(1).max(180).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const providerSchema = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi", "animedunya"]);
+const audioSchema = z.enum(["sub", "dub"]);
+const episodeSchema = z.coerce.number().int().positive().max(10_000);
+const fallbackBodySchema = z.object({ provider: providerSchema });
+
+async function resolvePublishedAniListId(slug: string): Promise<number | null | "NOT_FOUND"> {
+  const anime = await prisma.anime.findUnique({
+    where: { slug },
+    select: { aniListId: true, publicationStatus: true },
+  });
+  if (!anime || anime.publicationStatus !== "PUBLISHED") return "NOT_FOUND";
+  return anime.aniListId;
+}
+
+function sendMappingError(response: import("express").Response, result: number | null | "NOT_FOUND"): boolean {
+  if (result === "NOT_FOUND") {
+    response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Published anime not found" } });
+    return true;
+  }
+  if (result === null) {
+    response.status(409).json({ data: null, error: { code: "ANILIST_MAPPING_REQUIRED", message: "This anime has no administrator-managed AniList mapping" } });
+    return true;
+  }
+  return false;
+}
 
 anivexaRouter.get("/providers", (_request, response) => {
   if (!env.ANIVEXA_ENABLED) {
     response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
     return;
   }
-  response.status(200).json({ data: { providers: ["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi", "animedunya"], status: "enabled" }, error: null });
+  response.status(200).json({ data: { providers: providerAggregator.status.providers, status: "enabled" }, error: null });
 });
 
-anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
+anivexaRouter.get("/anime/:slug/episodes", async (request, response) => {
   if (!env.ANIVEXA_ENABLED) {
     response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
     return;
   }
-  const params = paramsSchema.safeParse(request.params);
+  const slug = slugSchema.safeParse(request.params.slug);
   const provider = providerSchema.safeParse(request.query.provider ?? "animegg");
-  if (!params.success || !provider.success) {
-    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID and supported Anivexa provider are required" } });
+  if (!slug.success || !provider.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid catalogue slug and supported provider are required" } });
     return;
   }
   if (!env.ANIVEXA_ALLOWED_HOSTS.trim()) {
@@ -54,91 +87,35 @@ anivexaRouter.get("/episodes/:anilistId", async (request, response) => {
     return;
   }
   try {
+    const aniListId = await resolvePublishedAniListId(slug.data);
+    if (sendMappingError(response, aniListId)) return;
     const result = provider.data === "animegg"
-      ? await getAnimeGGEpisodes(params.data.anilistId)
+      ? await getAnimeGGEpisodes(aniListId as number)
       : provider.data === "anizone"
-        ? await getAniZoneEpisodes(params.data.anilistId)
+        ? await getAniZoneEpisodes(aniListId as number)
         : provider.data === "anikoto"
-          ? await getAniKotoEpisodes(params.data.anilistId)
+          ? await getAniKotoEpisodes(aniListId as number)
           : provider.data === "kaa"
-            ? await getKaaEpisodes(params.data.anilistId)
+            ? await getKaaEpisodes(aniListId as number)
             : provider.data === "aniwaves"
-              ? await getAniWavesEpisodes(params.data.anilistId)
+              ? await getAniWavesEpisodes(aniListId as number)
               : provider.data === "reanime"
-                ? await getReAnimeEpisodes(params.data.anilistId)
+                ? await getReAnimeEpisodes(aniListId as number)
                 : provider.data === "animeonsen"
-                  ? await getAnimeOnsenEpisodes(params.data.anilistId)
+                  ? await getAnimeOnsenEpisodes(aniListId as number)
                   : provider.data === "animenosub"
-                  ? await getAnimeNoSubEpisodes(params.data.anilistId)
-                  : provider.data === "anipm"
-                    ? await getAniPmEpisodes(params.data.anilistId)
-                    : provider.data === "senshi"
-                      ? await getSenshiEpisodes(params.data.anilistId)
-                      : await getAnimeDunyaEpisodes(params.data.anilistId);
-    response.setHeader("Cache-Control", "public, max-age=300");
-    response.status(200).json({ data: { anilistId: params.data.anilistId, provider: provider.data, ...result }, error: null });
+                    ? await getAnimeNoSubEpisodes(aniListId as number)
+                    : provider.data === "anipm"
+                      ? await getAniPmEpisodes(aniListId as number)
+                      : provider.data === "senshi"
+                        ? await getSenshiEpisodes(aniListId as number)
+                        : await getAnimeDunyaEpisodes(aniListId as number);
+    response.setHeader("Cache-Control", "private, no-store");
+    response.status(200).json({ data: { slug: slug.data, provider: provider.data, ...result }, error: null });
   } catch {
     response.status(502).json({ data: null, error: { code: "ANIVEXA_UPSTREAM_FAILED", message: "Anivexa provider discovery is temporarily unavailable" } });
   }
 });
-
-const extractParamsSchema = z.object({
-  anilistId: z.coerce.number().int().positive().max(2_147_483_647),
-  episode: z.coerce.number().int().positive().max(10_000),
-});
-const audioSchema = z.enum(["sub", "dub"]);
-
-anivexaRouter.get("/extract/:anilistId/:episode", async (request, response) => {
-  if (!env.ANIVEXA_ENABLED) {
-    response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
-    return;
-  }
-  const params = extractParamsSchema.safeParse(request.params);
-  const audio = audioSchema.safeParse(request.query.audio ?? "sub");
-  const extractor = z.enum(["animegg", "anizone", "anikoto", "kaa", "aniwaves", "reanime", "animeonsen", "animenosub", "anipm", "senshi", "animedunya"]).safeParse(request.query.provider ?? "animegg");
-  if (!params.success || !audio.success || !extractor.success) {
-    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number, provider and audio type are required" } });
-    return;
-  }
-  if (!env.ANIVEXA_ALLOWED_HOSTS.trim() || !env.ANIVEXA_STREAM_ALLOWED_HOSTS.trim()) {
-    response.status(503).json({ data: null, error: { code: "ANIVEXA_HOSTS_NOT_CONFIGURED", message: "Anivexa upstream and stream hosts must both be allowlisted" } });
-    return;
-  }
-  try {
-    const result = extractor.data === "animegg"
-      ? await getAnimeGGStreams(params.data.anilistId, params.data.episode, audio.data)
-      : extractor.data === "anizone"
-        ? await getAniZoneStreams(params.data.anilistId, params.data.episode, audio.data)
-        : extractor.data === "anikoto"
-          ? await getAniKotoStreams(params.data.anilistId, params.data.episode, audio.data)
-          : extractor.data === "kaa"
-            ? await getKaaStreams(params.data.anilistId, params.data.episode, audio.data)
-            : extractor.data === "aniwaves"
-              ? await getAniWavesStreams(params.data.anilistId, params.data.episode, audio.data)
-              : extractor.data === "reanime"
-                ? await getReAnimeStreams(params.data.anilistId, params.data.episode, audio.data)
-                : extractor.data === "animeonsen"
-                  ? await getAnimeOnsenStreams(params.data.anilistId, params.data.episode, audio.data)
-                  : extractor.data === "animenosub"
-                  ? await getAnimeNoSubStreams(params.data.anilistId, params.data.episode, audio.data)
-                  : extractor.data === "anipm"
-                    ? await getAniPmStreams(params.data.anilistId, params.data.episode, audio.data)
-                    : extractor.data === "senshi"
-                      ? await getSenshiStreams(params.data.anilistId, params.data.episode, audio.data)
-                      : await getAnimeDunyaStreams(params.data.anilistId, params.data.episode, audio.data);
-    response.setHeader("Cache-Control", "private, no-store");
-    response.status(200).json({ data: result, error: null });
-  } catch {
-    response.status(502).json({ data: null, error: { code: "ANIVEXA_EXTRACTION_FAILED", message: "Anivexa stream extraction is temporarily unavailable" } });
-  }
-});
-
-
-const aggregateParamsSchema = z.object({
-  anilistId: z.coerce.number().int().positive().max(2_147_483_647),
-  episode: z.coerce.number().int().positive().max(10_000),
-});
-const fallbackBodySchema = z.object({ provider: providerSchema });
 
 anivexaRouter.get("/aggregate/providers", (_request, response) => {
   if (!env.ANIVEXA_ENABLED) {
@@ -149,15 +126,16 @@ anivexaRouter.get("/aggregate/providers", (_request, response) => {
   response.status(200).json({ data: providerAggregator.status, error: null });
 });
 
-anivexaRouter.get("/aggregate/:anilistId/:episode", async (request, response) => {
+anivexaRouter.get("/anime/:slug/episodes/:episodeNumber/aggregate", async (request, response) => {
   if (!env.ANIVEXA_ENABLED) {
     response.status(503).json({ data: null, error: { code: "ANIVEXA_DISABLED", message: "Anivexa integration is disabled" } });
     return;
   }
-  const params = aggregateParamsSchema.safeParse(request.params);
+  const slug = slugSchema.safeParse(request.params.slug);
+  const episode = episodeSchema.safeParse(request.params.episodeNumber);
   const audio = audioSchema.safeParse(request.query.audio ?? "sub");
-  if (!params.success || !audio.success) {
-    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid AniList ID, episode number and audio type are required" } });
+  if (!slug.success || !episode.success || !audio.success) {
+    response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid anime slug, episode number and audio type are required" } });
     return;
   }
   if (!env.ANIVEXA_ALLOWED_HOSTS.trim() || !env.ANIVEXA_STREAM_ALLOWED_HOSTS.trim()) {
@@ -165,7 +143,9 @@ anivexaRouter.get("/aggregate/:anilistId/:episode", async (request, response) =>
     return;
   }
   try {
-    const result = await providerAggregator.start(params.data.anilistId, params.data.episode, audio.data);
+    const aniListId = await resolvePublishedAniListId(slug.data);
+    if (sendMappingError(response, aniListId)) return;
+    const result = await providerAggregator.start(aniListId as number, episode.data, audio.data);
     response.setHeader("Cache-Control", "private, no-store");
     response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream) }, error: null });
   } catch {
