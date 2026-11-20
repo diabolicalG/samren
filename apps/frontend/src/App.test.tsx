@@ -164,7 +164,7 @@ describe("administrator workspace", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit The Clockwork Orbit" }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Clockwork Orbit Revisited" } });
-    fireEvent.change(screen.getByLabelText("AniList ID (optional)"), { target: { value: "23456" } });
+    fireEvent.change(screen.getAllByLabelText("AniList ID (optional)")[1], { target: { value: "23456" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {
@@ -301,7 +301,7 @@ describe("first-party watch experience", () => {
     });
 
     renderApp("/watch/the-clockwork-orbit/4");
-    fireEvent.error(document.querySelector("video")!);
+    fireEvent.error(await screen.findByTestId("watch-video"));
 
     await waitFor(() => {
       expect(aggregate).toHaveBeenCalledWith("the-clockwork-orbit", 4, "sub");
@@ -337,7 +337,7 @@ describe("first-party watch experience", () => {
     const closeSession = vi.spyOn(apiClient, "closePlaybackSession").mockResolvedValue(undefined);
 
     renderApp("/watch/the-clockwork-orbit/1");
-    fireEvent.click(screen.getByRole("button", { name: "Find provider stream" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Find provider stream" }));
 
     await waitFor(() => {
       expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/anivexa/media?url=first");
