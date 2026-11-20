@@ -10,6 +10,7 @@ const userEmail = "phase2-catalog-user@samren.test";
 const adminPassword = "phase2-ci-catalog-admin-password";
 const userPassword = "phase2-ci-catalog-user-password";
 const animeSlug = "phase-two-admin-managed-title";
+const anilistSlug = "phase-three-anilist-mapped-title";
 let adminId: string;
 let userId: string;
 let assetId: string | undefined;
@@ -38,11 +39,11 @@ beforeAll(async () => {
   });
   adminId = admin.id;
   userId = user.id;
-  await prisma.anime.deleteMany({ where: { slug: animeSlug } });
+  await prisma.anime.deleteMany({ where: { slug: { in: [animeSlug, anilistSlug] } } });
 });
 
 afterAll(async () => {
-  await prisma.anime.deleteMany({ where: { slug: animeSlug } });
+  await prisma.anime.deleteMany({ where: { slug: { in: [animeSlug, anilistSlug] } } });
   await prisma.mediaAsset.deleteMany({ where: { id: { in: [assetId, ...relatedAssetIds].filter((id): id is string => Boolean(id)) } } });
   const userIds = [adminId, userId].filter((id): id is string => Boolean(id));
   if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -64,6 +65,35 @@ describe("admin catalogue management", () => {
     const response = await agent.get("/api/v1/admin/catalog/anime");
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("stores a unique administrator-managed AniList identity and supports clearing it", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const created = await agent.post("/api/v1/admin/catalog/anime").set("Origin", origin).send({
+      slug: anilistSlug,
+      title: "AniList Mapped Title",
+      aniListId: 123456,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.aniListId).toBe(123456);
+
+    const duplicate = await agent.post("/api/v1/admin/catalog/anime").set("Origin", origin).send({
+      slug: "phase-three-anilist-duplicate",
+      title: "Duplicate AniList Mapping",
+      aniListId: 123456,
+    });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe("CONFLICT");
+
+    const updated = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
+      .set("Origin", origin).send({ aniListId: 234567 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.aniListId).toBe(234567);
+
+    const cleared = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
+      .set("Origin", origin).send({ aniListId: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.aniListId).toBeNull();
   });
 
   it("exposes full catalogue taxonomies only to administrators", async () => {
