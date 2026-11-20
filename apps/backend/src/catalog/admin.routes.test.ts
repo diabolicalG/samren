@@ -49,10 +49,14 @@ afterAll(async () => {
 });
 
 describe("admin catalogue management", () => {
-  it("rejects unauthenticated catalogue access", async () => {
+  it("rejects unauthenticated catalogue and media diagnostics access", async () => {
     const response = await request(app).get("/api/v1/admin/catalog/anime");
+    const limits = await request(app).get("/api/v1/admin/catalog/assets/upload-limits");
+    const status = await request(app).get("/api/v1/admin/catalog/assets/unknown/status");
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("UNAUTHENTICATED");
+    expect(limits.status).toBe(401);
+    expect(status.status).toBe(401);
   });
 
   it("rejects authenticated non-admin users", async () => {
@@ -98,6 +102,27 @@ describe("admin catalogue management", () => {
       processingState: "READY",
     });
     assetId = uploaded.body.data.id as string;
+
+    const limits = await agent.get("/api/v1/admin/catalog/assets/upload-limits");
+    expect(limits.status).toBe(200);
+    expect(limits.body.data).toMatchObject({
+      POSTER: 15 * 1024 * 1024,
+      BANNER: 15 * 1024 * 1024,
+      VIDEO: 2 * 1024 * 1024 * 1024,
+      SUBTITLE: 2 * 1024 * 1024,
+    });
+
+    const status = await agent.get("/api/v1/admin/catalog/assets/" + assetId + "/status");
+    expect(status.status).toBe(200);
+    expect(status.body.data).toMatchObject({ id: assetId, fileState: "PRESENT", processingState: "READY" });
+    expect(status.body.data).not.toHaveProperty("storageKey");
+    expect(status.body.data).not.toHaveProperty("absolutePath");
+
+    const storedSize = BigInt(uploaded.body.data.sizeBytes as string);
+    await prisma.mediaAsset.update({ where: { id: assetId }, data: { sizeBytes: storedSize + 1n } });
+    const mismatchStatus = await agent.get("/api/v1/admin/catalog/assets/" + assetId + "/status");
+    expect(mismatchStatus.body.data.fileState).toBe("SIZE_MISMATCH");
+    await prisma.mediaAsset.update({ where: { id: assetId }, data: { sizeBytes: storedSize } });
 
     const mismatch = await agent
       .post("/api/v1/admin/catalog/assets/upload")
@@ -197,6 +222,9 @@ describe("admin catalogue management", () => {
     const posterAssetId = asset.body.data.id as string;
     assetId = posterAssetId;
     relatedAssetIds.push(posterAssetId);
+    const metadataStatus = await agent.get("/api/v1/admin/catalog/assets/" + posterAssetId + "/status");
+    expect(metadataStatus.status).toBe(200);
+    expect(metadataStatus.body.data.fileState).toBe("NOT_MANAGED");
 
     const linked = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
       .set("Origin", origin).send({ posterAssetId });

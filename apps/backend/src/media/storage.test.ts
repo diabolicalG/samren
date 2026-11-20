@@ -89,6 +89,18 @@ describe("local media storage", () => {
     await expect(import("../config/env.js")).rejects.toThrow(/outside public web roots/);
   });
 
+  it("loads configured upload limits from the environment", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.MEDIA_UPLOAD_IMAGE_MAX_BYTES = "123456";
+    process.env.MEDIA_UPLOAD_VIDEO_MAX_BYTES = "234567";
+    process.env.MEDIA_UPLOAD_SUBTITLE_MAX_BYTES = "345678";
+    vi.resetModules();
+    const { env } = await import("../config/env.js");
+    expect(env.MEDIA_UPLOAD_IMAGE_MAX_BYTES).toBe(123456);
+    expect(env.MEDIA_UPLOAD_VIDEO_MAX_BYTES).toBe(234567);
+    expect(env.MEDIA_UPLOAD_SUBTITLE_MAX_BYTES).toBe(345678);
+  });
+
   it("accepts an absolute production storage root", async () => {
     process.env.NODE_ENV = "production";
     process.env.MEDIA_STORAGE_ROOT = path.join(os.tmpdir(), "samren-media-prod");
