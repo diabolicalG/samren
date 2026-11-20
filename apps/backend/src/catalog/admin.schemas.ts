@@ -5,6 +5,7 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
 
 export const adminAnimeCreateSchema = z.object({
   slug: slugSchema.optional(),
+  aniListId: z.number().int().positive().max(2_147_483_647).nullable().optional(),
   title: z.string().trim().min(1).max(240),
   englishTitle: optionalText(240),
   nativeTitle: optionalText(240),

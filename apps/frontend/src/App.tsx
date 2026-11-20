@@ -1,4 +1,6 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useProviderPlayback } from "./hooks/useProviderPlayback";
+import { AdaptivePlayer } from "./components/AdaptivePlayer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Compass, Library, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { Link, Route, Routes, useParams } from "react-router-dom";
@@ -15,6 +17,7 @@ function AnimeCard({ anime }: { anime: CatalogAnimeCard }) {
     <Link className="anime-card-link" to={`/anime/${anime.slug}`}>
       <article className="anime-card">
         <div className="anime-poster" aria-hidden="true">
+          {anime.posterAsset?.url ? <img className="anime-poster-image" src={anime.posterAsset.url} alt="" loading="lazy" /> : null}
           <span className="poster-mark"><Clapperboard size={24} strokeWidth={1.3} /></span>
           {anime.featured ? <span className="poster-featured">FEATURED</span> : null}
           <span className="poster-year">{anime.releaseYear ?? "—"}</span>
@@ -150,7 +153,7 @@ function AnimeDetailPage() {
     <main className="page-shell detail-page">
       <Link className="text-link" to="/browse">← Back to catalogue</Link>
       <section className="detail-hero">
-        <div className="detail-art" aria-hidden="true"><Clapperboard size={44} strokeWidth={1.1} /></div>
+        <div className="detail-art" aria-hidden="true">{anime.posterAsset?.url ? <img className="detail-art-image" src={anime.posterAsset.url} alt="" /> : <Clapperboard size={44} strokeWidth={1.1} />}</div>
         <div className="detail-copy">
           <span className="section-kicker">{formatLabel(anime.type)} · {formatLabel(anime.releaseStatus)}</span>
           <h1>{anime.title}</h1>
@@ -163,7 +166,7 @@ function AnimeDetailPage() {
       </section>
       <section className="episode-section">
         <div className="catalog-section-heading"><div><span className="section-kicker">EPISODE GUIDE</span><h2>Episodes</h2></div><span>{anime.episodes.length} published</span></div>
-        {anime.episodes.length ? <div className="episode-list">{anime.episodes.map((episode) => <article className="episode-row" key={episode.id}><span className="episode-number">{String(episode.episodeNumber).padStart(2, "0")}</span><div><h3>{episode.title}</h3>{episode.synopsis ? <p>{episode.synopsis}</p> : null}</div><span className="episode-duration">{episode.durationSeconds ? `${Math.round(episode.durationSeconds / 60)} min` : "—"}</span></article>)}</div> : <Surface className="catalog-empty"><p>Episodes have not been published for this title yet.</p></Surface>}
+        {anime.episodes.length ? <div className="episode-list">{anime.episodes.map((episode) => <Link className="episode-row" key={episode.id} to={`/watch/${anime.slug}/${episode.episodeNumber}`}><span className="episode-number">{String(episode.episodeNumber).padStart(2, "0")}</span><div><h3>{episode.title}</h3>{episode.synopsis ? <p>{episode.synopsis}</p> : null}</div><span className="episode-duration">{episode.durationSeconds ? `${Math.round(episode.durationSeconds / 60)} min` : "—"}</span></Link>)}</div> : <Surface className="catalog-empty"><p>Episodes have not been published for this title yet.</p></Surface>}
         <p className="playback-note">First-party playback is introduced in Phase 3. This catalogue does not link to third-party streams.</p>
       </section>
     </main>
@@ -237,6 +240,205 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
   );
 }
 
+function WatchPage() {
+  const { slug = "", episodeNumber = "" } = useParams();
+  const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [providerAudio, setProviderAudio] = useState<"sub" | "dub">("sub");
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [mediaFailed, setMediaFailed] = useState(false);
+  const fallbackInFlight = useRef(false);
+  const playbackGeneration = useRef(0);
+  const playbackKey = `${slug}:${episodeNumber}`;
+  const playbackKeyRef = useRef(playbackKey);
+  const providerPlayback = useProviderPlayback();
+  useEffect(() => {
+    if (playbackKeyRef.current === playbackKey) return;
+    playbackKeyRef.current = playbackKey;
+    playbackGeneration.current += 1;
+    fallbackInFlight.current = false;
+    setSelectedSourceId("");
+    setMediaFailed(false);
+    setProviderError(null);
+    void providerPlayback.close();
+  }, [playbackKey, providerPlayback.close]);
+  useEffect(() => () => { void providerPlayback.close(); }, [providerPlayback.close]);
+  const number = Number(episodeNumber);
+  const playbackQuery = useQuery({
+    queryKey: ["catalog", "playback", slug, number],
+    queryFn: () => apiClient.catalogPlayback(slug, number),
+    enabled: Boolean(slug) && Number.isSafeInteger(number) && number > 0,
+  });
+  const animeQuery = useQuery({
+    queryKey: ["catalog", "anime", slug],
+    queryFn: () => apiClient.catalogAnimeBySlug(slug),
+    enabled: Boolean(slug),
+  });
+
+  if (playbackQuery.isLoading) return <main className="page-shell"><div className="catalog-loading" role="status">Loading playback…</div></main>;
+  if (playbackQuery.isError || !playbackQuery.data) return <main className="page-shell"><section className="simple-page"><span className="section-kicker">FIRST-PARTY PLAYER</span><h1>Episode unavailable.</h1><p>This episode may be unpublished or unavailable for playback.</p><Link className="text-link" to={`/anime/${slug}`}>Return to episode guide</Link></section></main>;
+
+  const playback = playbackQuery.data;
+  const source = playback.sources.find((item) => item.id === selectedSourceId)
+    ?? playback.sources.find((item) => item.isDefault)
+    ?? playback.sources[0];
+  const providerStream = providerPlayback.stream;
+  const activeUrl = providerStream?.url ?? source?.url;
+  const activeType = providerStream?.type ?? (source?.mimeType.toLowerCase().includes("mpegurl") ? "hls" : source?.mimeType.toLowerCase().includes("dash") ? "dash" : "mp4");
+  const episodes = animeQuery.data?.episodes ?? [];
+  const episodeIndex = episodes.findIndex((item) => item.episodeNumber === playback.episode.episodeNumber);
+  const previousEpisode = episodeIndex > 0 ? episodes[episodeIndex - 1] : null;
+  const nextEpisode = episodeIndex >= 0 && episodeIndex < episodes.length - 1 ? episodes[episodeIndex + 1] : null;
+  const progressKey = `samren:playback:${slug}:${playback.episode.episodeNumber}`;
+  const subtitleTracks = providerStream
+    ? (providerStream.subtitles ?? []).map((track) => ({
+        src: track.url,
+        label: track.label,
+        srclang: track.srclang,
+        default: track.default === true,
+      }))
+    : playback.subtitles
+      .filter((track) => track.format === "VTT")
+      .map((track) => ({
+        src: track.url,
+        label: track.label,
+        srclang: track.languageCode,
+        default: track.isDefault,
+      }));
+
+  async function handleMediaError() {
+    if (fallbackInFlight.current) return;
+    const generation = playbackGeneration.current;
+    fallbackInFlight.current = true;
+    setMediaFailed(true);
+    setProviderError(null);
+    if (providerStream) {
+      const replacement = await providerPlayback.reportPlaybackError();
+      if (generation !== playbackGeneration.current) return;
+      if (!replacement) setProviderError(providerPlayback.error ?? "This provider failed and no alternate source is available.");
+      fallbackInFlight.current = false;
+      return;
+    }
+    try {
+      await providerPlayback.start(slug, playback.episode.episodeNumber, providerAudio);
+      if (generation !== playbackGeneration.current) return;
+    } catch (cause) {
+      if (generation === playbackGeneration.current) {
+        setProviderError(cause instanceof Error ? cause.message : "No provider could start playback.");
+      }
+    } finally {
+      if (generation === playbackGeneration.current) fallbackInFlight.current = false;
+    }
+  }
+
+  return (
+    <main className="page-shell watch-page">
+      <Link className="text-link" to={`/anime/${slug}`}>← Back to episode guide</Link>
+      <section className="watch-heading">
+        <span className="section-kicker">NOW PLAYING · EPISODE {playback.episode.episodeNumber}</span>
+        <h1>{playback.episode.title}</h1>
+        {playback.episode.synopsis ? <p>{playback.episode.synopsis}</p> : null}
+      </section>
+      {source && playback.sources.length > 1 && !providerStream ? (
+        <label className="ui-field playback-source-select" htmlFor="playback-source">
+          Video quality
+          <select className="ui-input" id="playback-source" value={source.id} onChange={(event) => setSelectedSourceId(event.target.value)}>
+            {playback.sources.map((item) => <option key={item.id} value={item.id}>{item.qualityLabel || item.mimeType}{item.isDefault ? " · Default" : ""}</option>)}
+          </select>
+        </label>
+      ) : null}
+      <section className="provider-fallback-controls" aria-label="Provider fallback settings">
+        <label className="ui-field" htmlFor="provider-audio">Provider audio
+          <select className="ui-input" id="provider-audio" value={providerAudio} onChange={(event) => setProviderAudio(event.target.value as "sub" | "dub")}>
+            <option value="sub">Sub</option><option value="dub">Dub</option>
+          </select>
+        </label>
+        <p>Provider fallback uses the AniList identity configured by an administrator for this catalogue entry. It starts automatically after a first-party media error, or you can start it manually.</p>
+        <button type="button" className="ui-button ui-button--secondary" onClick={() => { void handleMediaError(); }} disabled={providerPlayback.isStarting || providerPlayback.isSwitching}>
+          {providerPlayback.isStarting ? "Finding a stream…" : providerPlayback.isSwitching ? "Switching provider…" : providerStream ? "Try another provider" : "Find provider stream"}
+        </button>
+      </section>
+      {activeUrl ? (
+        <>
+          <div className="video-frame">
+            <AdaptivePlayer
+              key={providerStream ? `${providerStream.provider}-${providerStream.type}` : source?.id ?? "first-party"}
+              src={activeUrl}
+              type={activeType}
+              subtitles={subtitleTracks}
+              resumeAt={Number(window.localStorage.getItem(progressKey)) || 0}
+              autoPlay={mediaFailed}
+              onError={() => { void handleMediaError(); }}
+              onTimeUpdate={(seconds) => { window.localStorage.setItem(progressKey, String(seconds)); }}
+              onEnded={() => window.localStorage.removeItem(progressKey)}
+            />
+          </div>
+          <p className="playback-quality">
+            {providerStream ? `Provider: ${providerStream.provider} · ${providerStream.quality} · ${providerStream.type.toUpperCase()}` : `${source?.qualityLabel || source?.mimeType} · First-party media`}
+          </p>
+        </>
+      ) : <Surface className="catalog-empty"><p>No ready first-party video asset is attached to this episode yet.</p></Surface>}
+      {providerPlayback.isStarting || providerPlayback.isSwitching ? <p className="playback-quality" role="status">{providerPlayback.isStarting ? "Finding a provider stream…" : "Switching to another provider…"}</p> : null}
+      {providerError || providerPlayback.error ? <p className="admin-error" role="alert">{providerError ?? providerPlayback.error}</p> : null}
+      {mediaFailed && !providerStream && !providerPlayback.isStarting ? <p className="playback-quality" role="status">The previous media source could not be played.</p> : null}
+      {playback.subtitles.length && !providerStream ? <p className="playback-quality">WebVTT subtitles available in the player controls.</p> : null}
+      <nav className="watch-navigation" aria-label="Episode navigation">
+        {previousEpisode ? <Link className="ui-button ui-button--secondary" to={`/watch/${slug}/${previousEpisode.episodeNumber}`}>← Episode {previousEpisode.episodeNumber}</Link> : <span />}
+        {nextEpisode ? <Link className="ui-button ui-button--primary" to={`/watch/${slug}/${nextEpisode.episodeNumber}`}>Episode {nextEpisode.episodeNumber} →</Link> : null}
+      </nav>
+    </main>
+  );
+}
+
+function MediaUploadForm() {
+  const [kind, setKind] = useState<AdminMediaAsset["mediaKind"]>("POSTER");
+  const [file, setFile] = useState<File | null>(null);
+  const queryClient = useQueryClient();
+  const uploadLimitsQuery = useQuery({
+    queryKey: ["admin", "media-upload-limits"],
+    queryFn: () => apiClient.adminMediaUploadLimits(),
+  });
+  const maxBytes = uploadLimitsQuery.data?.[kind] ?? 0;
+  const tooLarge = Boolean(file && maxBytes > 0 && file.size > maxBytes);
+  const maxLabel = maxBytes >= 1024 * 1024 * 1024
+    ? `${(maxBytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, "")} GiB`
+    : maxBytes > 0
+      ? `${(maxBytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MiB`
+      : "unavailable";
+  const uploadMutation = useMutation({
+    mutationFn: () => {
+      if (!file) throw new Error("Choose a file before uploading");
+      return apiClient.adminUploadAsset(file, kind);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
+      setFile(null);
+    },
+  });
+
+  return (
+    <Surface className="admin-upload-card">
+      <h3>Upload a first-party media file</h3>
+      <p>Files are streamed to private local storage and checked against their content signatures. Remote URLs are not accepted.</p>
+      <form onSubmit={(event) => { event.preventDefault(); uploadMutation.mutate(); }}>
+        <label className="ui-field" htmlFor="media-upload-kind">Media kind
+          <select className="ui-input" id="media-upload-kind" value={kind} onChange={(event) => { setKind(event.target.value as AdminMediaAsset["mediaKind"]); setFile(null); }}>
+            <option value="POSTER">Poster</option><option value="BANNER">Banner</option><option value="VIDEO">Video</option><option value="SUBTITLE">Subtitle</option>
+          </select>
+        </label>
+        <label className="ui-field" htmlFor="media-upload-file">File
+          <input key={file ? "selected" : "empty"} className="ui-input" id="media-upload-file" type="file" accept={kind === "POSTER" || kind === "BANNER" ? "image/jpeg,image/png,image/webp,image/avif" : kind === "VIDEO" ? "video/mp4,video/webm" : ".vtt,.srt,.ass,text/vtt"} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+        </label>
+        <p className="admin-asset-note">Maximum: {uploadLimitsQuery.isLoading ? "checking…" : maxLabel}</p>
+        {uploadLimitsQuery.isError ? <p className="admin-error" role="alert">Upload limits are unavailable. Reload the administrator workspace before uploading.</p> : null}
+        {tooLarge ? <p className="admin-error" role="alert">This file exceeds the selected media kind's upload limit.</p> : null}
+        {uploadMutation.isError ? <p className="admin-error" role="alert">{uploadMutation.error.message}</p> : null}
+        {uploadMutation.isSuccess ? <p className="admin-success" role="status">Upload complete. The asset is ready to associate with catalogue content.</p> : null}
+        <button className="ui-button ui-button--primary" type="submit" disabled={!file || !uploadLimitsQuery.isSuccess || maxBytes <= 0 || tooLarge || uploadMutation.isPending}>{uploadMutation.isPending ? "Uploading…" : "Upload media"}</button>
+      </form>
+    </Surface>
+  );
+}
+
 function AdminPage() {
   const queryClient = useQueryClient();
   const sessionQuery = useQuery({
@@ -248,10 +450,12 @@ function AdminPage() {
   const [password, setPassword] = useState("");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [aniListId, setAniListId] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editSlug, setEditSlug] = useState("");
+  const [editAniListId, setEditAniListId] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editYear, setEditYear] = useState("");
   const [editGenreSlugs, setEditGenreSlugs] = useState<string[]>([]);
@@ -324,11 +528,13 @@ function AdminPage() {
     mutationFn: () => apiClient.adminCreateAnime({
       title: title.trim(),
       ...(slug.trim() ? { slug: slug.trim() } : {}),
+      ...(aniListId.trim() ? { aniListId: Number(aniListId) } : {}),
       ...(synopsis.trim() ? { synopsis: synopsis.trim() } : {}),
     }),
     onSuccess: async () => {
       setTitle("");
       setSlug("");
+      setAniListId("");
       setSynopsis("");
       setFormMessage("Draft created successfully.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
@@ -473,6 +679,7 @@ function AdminPage() {
           <form onSubmit={(event) => { event.preventDefault(); setFormMessage(""); createMutation.mutate(); }}>
             <TextField id="admin-anime-title" label="Anime title" required maxLength={240} value={title} onChange={(event) => setTitle(event.target.value)} />
             <TextField id="admin-anime-slug" label="URL slug (optional)" maxLength={180} placeholder="generated-from-title" value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+            <TextField id="admin-anime-anilist-id" label="AniList ID (optional)" inputMode="numeric" placeholder="Server-side provider mapping" value={aniListId} onChange={(event) => setAniListId(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
             <label className="ui-field" htmlFor="admin-anime-synopsis">Synopsis<textarea id="admin-anime-synopsis" className="ui-input admin-textarea" maxLength={10000} rows={4} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} /></label>
             <button className="ui-button ui-button--primary" type="submit" disabled={createMutation.isPending || !title.trim()}>{createMutation.isPending ? "Creating…" : "Create draft"}</button>
             {formMessage ? <p className={createMutation.isError ? "admin-error" : "admin-success"} role="status">{formMessage}</p> : null}
@@ -491,7 +698,7 @@ function AdminPage() {
                   <div className="admin-record-actions">
                     {item.publicationStatus !== "ARCHIVED" ? <div className="admin-record-actions-main">
                       <button className="ui-button ui-button--quiet" onClick={() => setActiveEpisodeAnimeId((current) => current === item.id ? null : item.id)} aria-expanded={activeEpisodeAnimeId === item.id}>{activeEpisodeAnimeId === item.id ? "Hide episodes" : "Episodes"}</button>
-                      <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); setEditPosterAssetId(item.posterAssetId ?? ""); setEditBannerAssetId(item.bannerAssetId ?? ""); }} aria-label={"Edit " + item.title}>Edit</button>
+                      <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditAniListId(item.aniListId?.toString() ?? ""); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); setEditPosterAssetId(item.posterAssetId ?? ""); setEditBannerAssetId(item.bannerAssetId ?? ""); }} aria-label={"Edit " + item.title}>Edit</button>
                     </div> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
@@ -513,9 +720,10 @@ function AdminPage() {
                 ) : null}
                 {editingId === item.id ? (
                   <Surface className="admin-edit">
-                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs, posterAssetId: editPosterAssetId || null, bannerAssetId: editBannerAssetId || null } }); }}>
+                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), aniListId: editAniListId.trim() ? Number(editAniListId) : null, synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs, posterAssetId: editPosterAssetId || null, bannerAssetId: editBannerAssetId || null } }); }}>
                       <TextField id={"edit-title-" + item.id} label="Title" required maxLength={240} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
                       <TextField id={"edit-slug-" + item.id} label="Slug" required maxLength={180} value={editSlug} onChange={(event) => setEditSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+                      <TextField id={"edit-anilist-id-" + item.id} label="AniList ID (optional)" inputMode="numeric" value={editAniListId} onChange={(event) => setEditAniListId(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
                       <TextField id={"edit-year-" + item.id} label="Release year" inputMode="numeric" placeholder="Optional" value={editYear} onChange={(event) => setEditYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
                       <label className="ui-field" htmlFor={"edit-synopsis-" + item.id}>Synopsis<textarea id={"edit-synopsis-" + item.id} className="ui-input admin-textarea" maxLength={10000} rows={4} value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
                       <label className="ui-field" htmlFor={"edit-genres-" + item.id}>Genres<select multiple className="ui-input admin-multiselect" id={"edit-genres-" + item.id} value={editGenreSlugs} onChange={(event) => setEditGenreSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminGenresQuery.data ?? []).map((genre) => <option key={genre.id} value={genre.slug}>{genre.name}</option>)}</select></label>
@@ -569,9 +777,10 @@ function AdminPage() {
         </div>
       </section>
       <section className="admin-taxonomy admin-assets">
-        <div className="catalog-section-heading"><div><span className="section-kicker">FIRST-PARTY MEDIA</span><h2>Asset metadata</h2></div><span>Metadata only · no upload or playback</span></div>
+        <div className="catalog-section-heading"><div><span className="section-kicker">FIRST-PARTY MEDIA</span><h2>Media library</h2></div><span>Private local uploads</span></div>
+        <MediaUploadForm />
         <Surface className="admin-taxonomy-card">
-          <p className="admin-asset-note">Register internal storage metadata for a future first-party asset workflow. This does not upload a file, make it available publicly, or accept a remote URL.</p>
+          <p className="admin-asset-note">The upload control above stores validated files. The metadata editor below is retained for legacy/manual records; use uploads for new assets.</p>
           <form onSubmit={(event) => { event.preventDefault(); createAssetMutation.mutate(); }}>
             <TextField id="asset-storage-key" label="Internal storage key" required maxLength={500} placeholder="catalogue/posters/example.webp" value={assetStorageKey} onChange={(event) => setAssetStorageKey(event.target.value)} />
             <TextField id="asset-filename" label="Original filename" required maxLength={255} value={assetFilename} onChange={(event) => setAssetFilename(event.target.value)} />
@@ -619,6 +828,7 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/search" element={<BrowsePage />} />
         <Route path="/anime/:slug" element={<AnimeDetailPage />} />
+        <Route path="/watch/:slug/:episodeNumber" element={<WatchPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<main className="page-shell"><section className="simple-page"><span className="section-kicker">COMING INTO FOCUS</span><h1>That page is not ready yet.</h1><Link className="text-link" to="/">Return home</Link></section></main>} />
       </Routes>

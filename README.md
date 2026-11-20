@@ -1,89 +1,67 @@
 # Samren
 
-A modern anime streaming marketplace built as a monorepo with a Next.js frontend, a Python FastAPI backend, and a Python scraper/data source layer.
+Samren is a catalogue-first anime streaming application. The active application is being rebuilt around an application-owned catalogue, first-party media storage and a typed TypeScript API.
 
-## Architecture
+## Active architecture
 
-```
-Browser (Next.js)
-  → Anichi Backend (FastAPI on :4000)
-    → Cache Layer (Redis)
-      → ShivraAPI (Python scraper on :8000)
-        → Jikan API / WCOStream
-```
+- **Frontend:** React + Vite in `apps/frontend` (development origin: `http://localhost:5173`).
+- **Backend:** Express + TypeScript in `apps/backend` (default API port: `4000`).
+- **Database:** PostgreSQL managed through Prisma.
+- **Shared contracts:** `packages/types` and `packages/api-client`.
 
-## Project Structure
+Older Next.js, FastAPI, scraper and shared-package source is retained as legacy/reference material and is not part of the active pnpm workspace or the root development command. Do not use those legacy applications as the active runtime.
 
-```
-samren/
-├── apps/
-│   ├── web/              # Next.js frontend (port 3000)
-│   ├── api/              # Python FastAPI backend API gateway (port 4000)
-│   └── admin/            # Next.js admin dashboard (port 3001)
-├── services/
-│   └── shivra-api/       # Python data source & scraper (port 8000)
-├── packages/
-│   ├── ui/               # Shared UI components
-│   ├── api-client/       # Typed API client (TypeScript)
-│   ├── types/            # Shared TypeScript types
-│   ├── hooks/            # React hooks (React Query)
-│   └── utils/            # Shared utility functions
-├── prisma/               # Database schema (PostgreSQL)
-├── public/               # Static assets
-├── docs/                 # Documentation
-├── docker/               # Dockerfiles & docker-compose
-└── AGENTS.md             # Development rules
-```
+## Requirements
 
-## Routes
+- Node.js 22 (Node.js 20+ is declared by the workspace).
+- pnpm 9 or later.
+- PostgreSQL 16 or a compatible supported PostgreSQL release.
 
-### Frontend (Next.js)
-| Route | Description |
-|-------|-------------|
-| `/` | Home - trending anime |
-| `/anime/ongoing` | Currently airing anime |
-| `/anime/completed` | Finished anime |
-| `/anime/popular` | Popular/trending anime |
-| `/anime/[id]` | Anime detail page with episodes & downloads |
-| `/search` | Search anime |
-| `/genre` | Browse by genre |
-| `/schedule` | Weekly anime schedule |
-| `/history` | Watch history |
-| `/downloads` | Download manager |
-| `/favorites` | Favorite anime list |
-| `/settings` | Player, quality, theme, cache settings |
-| `/help` | Help & FAQ |
-| `/profile` | User profile |
-| `/admin` | Admin dashboard |
+## Local development
 
-## Quick Start
+1. Install dependencies:
 
-### Using Docker (recommended)
+   ```bash
+   pnpm install
+   ```
+
+2. Copy `apps/backend/.env.example` to `apps/backend/.env` and set a local PostgreSQL `DATABASE_URL`. Keep provider integrations disabled unless their host allowlists have been explicitly reviewed.
+
+3. Generate the Prisma client, apply migrations and seed local fixtures:
+
+   ```bash
+   pnpm --filter @samren/backend db:generate
+   pnpm --filter @samren/backend db:migrate:deploy
+   pnpm --filter @samren/backend db:seed
+   ```
+
+4. Start the active frontend and backend:
+
+   ```bash
+   pnpm dev
+   ```
+
+The Vite frontend defaults to port 5173 and the Express API defaults to port 4000. The backend CORS origin must match the frontend origin.
+
+## Useful commands
 
 ```bash
-cp .env.example .env
-docker-compose -f docker/docker-compose.yml up --build
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-### Development (local)
+The backend-specific database and administrator bootstrap scripts are defined in `apps/backend/package.json`. See `apps/backend/ADMIN_SETUP.md` for administrator provisioning instructions.
 
-```bash
-# Terminal 1 - Frontend
-cd apps/web && pnpm dev
+## Media and playback status
 
-# Terminal 2 - Backend API
-cd apps/api && uvicorn src.main:app --port 4000 --reload
+First-party media storage, upload, delivery and playback are being completed in Phase 3. Local storage uses `MEDIA_STORAGE_ROOT`; production deployments must use a persistent path outside the repository and outside public web roots.
 
-# Terminal 3 - ShivraAPI scraper
-cd services/shivra-api && uvicorn main:app --port 8000 --reload
+Provider integrations are optional and disabled by default. They require explicit upstream and stream-host allowlists. First-party uploaded assets and transient provider-resolved streams are separate media paths. Do not treat a provider URL as a locally stored `MediaAsset`.
 
-# Terminal 4 - Redis
-redis-server
-```
+Phase 3 remains in progress until its security, browser playback, integration and operational acceptance gates are verified. A passing typecheck or jsdom test is not proof of real browser playback or live provider availability.
 
-## Environment Variables
+## Repository boundaries
 
-See `.env.example` for all required variables.
-
-
-## License
+All Samren implementation work belongs in this repository. The separate `diabolicalG/Anime-streaming` repository may be used as a read-only architecture reference; it must not be modified as part of Samren development.

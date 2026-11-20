@@ -6,6 +6,14 @@ import App from "./App";
 import { apiClient } from "@samren/api-client";
 
 function renderApp(initialEntry = "/") {
+  if (initialEntry.startsWith("/admin")) {
+    vi.spyOn(apiClient, "adminMediaUploadLimits").mockResolvedValue({
+      POSTER: 15 * 1024 * 1024,
+      BANNER: 15 * 1024 * 1024,
+      VIDEO: 2 * 1024 * 1024 * 1024,
+      SUBTITLE: 2 * 1024 * 1024,
+    });
+  }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -116,6 +124,7 @@ describe("administrator workspace", () => {
     const item = {
       id: "anime-1",
       slug: "clockwork-orbit",
+      aniListId: 12345,
       title: "The Clockwork Orbit",
       englishTitle: null,
       nativeTitle: null,
@@ -155,12 +164,14 @@ describe("administrator workspace", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit The Clockwork Orbit" }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Clockwork Orbit Revisited" } });
+    fireEvent.change(screen.getAllByLabelText("AniList ID (optional)")[1], { target: { value: "23456" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith("anime-1", expect.objectContaining({
         title: "Clockwork Orbit Revisited",
         slug: "clockwork-orbit",
+        aniListId: 23456,
         genreSlugs: ["adventure"],
         studioSlugs: ["samren-studio"],
       }));
@@ -239,4 +250,105 @@ describe("administrator workspace", () => {
     expect(await screen.findByRole("heading", { name: /administrator access required/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /create draft/i })).toBeNull();
   });
+});
+
+
+describe("first-party watch experience", () => {
+  it("lets viewers switch between available video qualities", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockResolvedValue({
+      episode: { id: "episode-1", episodeNumber: 1, title: "Pilot", synopsis: null, durationSeconds: 1200 },
+      sources: [
+        { id: "source-sd", qualityLabel: "480p", isDefault: true, mimeType: "video/mp4", url: "/api/v1/media/asset-sd" },
+        { id: "source-hd", qualityLabel: "1080p", isDefault: false, mimeType: "video/mp4", url: "/api/v1/media/asset-hd" },
+      ],
+      subtitles: [],
+    });
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({
+      episodes: [{ id: "episode-1", episodeNumber: 1, title: "Pilot" }],
+    } as never);
+
+    renderApp("/watch/the-clockwork-orbit/1");
+
+    const quality = await screen.findByLabelText("Video quality") as HTMLSelectElement;
+    expect(quality.value).toBe("source-sd");
+    fireEvent.change(quality, { target: { value: "source-hd" } });
+
+    await waitFor(() => {
+      expect(quality.value).toBe("source-hd");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/media/asset-hd");
+    });
+  });
+
+  it("starts provider playback after a media error and switches provider when the fallback also errors", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockResolvedValue({
+      episode: { id: "episode-1", episodeNumber: 4, title: "Pilot", synopsis: null, durationSeconds: 1200 },
+      sources: [{ id: "source-local", qualityLabel: "1080p", isDefault: true, mimeType: "video/mp4", url: "/api/v1/media/local" }],
+      subtitles: [],
+    });
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({ episodes: [] } as never);
+    const aggregate = vi.spyOn(apiClient, "aggregatePlayback").mockResolvedValue({
+      sessionId: "session-1",
+      stream: { provider: "animegg", url: "https://cdn.example.test/first.mp4", type: "mp4", server: "main", quality: "1080p", audio: "sub" },
+      providers: 11,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const fallback = vi.spyOn(apiClient, "fallbackPlayback").mockResolvedValue({
+      stream: { provider: "anizone", url: "https://cdn.example.test/second.mp4", type: "mp4", server: "backup", quality: "720p", audio: "sub" },
+      tried: ["animegg", "anizone"],
+      remaining: 9,
+    });
+
+    renderApp("/watch/the-clockwork-orbit/4");
+    fireEvent.error(await screen.findByLabelText("Anime episode video player"));
+
+    await waitFor(() => {
+      expect(aggregate).toHaveBeenCalledWith("the-clockwork-orbit", 4, "sub");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("https://cdn.example.test/first.mp4");
+    });
+
+    fireEvent.error(document.querySelector("video")!);
+    await waitFor(() => {
+      expect(fallback).toHaveBeenCalledWith("session-1", "animegg");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("https://cdn.example.test/second.mp4");
+    });
+  });
+
+  it("closes the old provider session and restores first-party media when navigating episodes", async () => {
+    vi.spyOn(apiClient, "health").mockRejectedValue(new Error("offline"));
+    vi.spyOn(apiClient, "catalogPlayback").mockImplementation(async (_slug, episodeNumber) => ({
+      episode: { id: `episode-${episodeNumber}`, episodeNumber, title: `Episode ${episodeNumber}`, synopsis: null, durationSeconds: 1200 },
+      sources: [{ id: `source-${episodeNumber}`, qualityLabel: "1080p", isDefault: true, mimeType: "video/mp4", url: `/api/v1/media/asset-${episodeNumber}` }],
+      subtitles: [],
+    }));
+    vi.spyOn(apiClient, "catalogAnimeBySlug").mockResolvedValue({
+      episodes: [
+        { id: "episode-1", episodeNumber: 1, title: "Episode 1" },
+        { id: "episode-2", episodeNumber: 2, title: "Episode 2" },
+      ],
+    } as never);
+    vi.spyOn(apiClient, "aggregatePlayback").mockResolvedValue({
+      sessionId: "session-episode-1",
+      stream: { provider: "animegg", url: "/api/v1/anivexa/media?url=first", type: "mp4", server: "main", quality: "1080p", audio: "sub" },
+      providers: 11,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const closeSession = vi.spyOn(apiClient, "closePlaybackSession").mockResolvedValue(undefined);
+
+    renderApp("/watch/the-clockwork-orbit/1");
+    fireEvent.click(await screen.findByRole("button", { name: "Find provider stream" }));
+
+    await waitFor(() => {
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/anivexa/media?url=first");
+    });
+
+    fireEvent.click(screen.getByRole("link", { name: "Episode 2 →" }));
+
+    await waitFor(() => {
+      expect(closeSession).toHaveBeenCalledWith("session-episode-1");
+      expect(document.querySelector("video")?.getAttribute("src")).toBe("/api/v1/media/asset-2");
+    });
+  });
+
 });

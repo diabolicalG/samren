@@ -8,6 +8,7 @@ export type CatalogAssetPreview = {
   mimeType: string;
   width: number | null;
   height: number | null;
+  url?: string;
 };
 
 export type CatalogTaxonomyItem = {
@@ -99,6 +100,7 @@ export type AdminAuthUser = {
 export type AdminCatalogAnime = {
   id: string;
   slug: string;
+  aniListId: number | null;
   title: string;
   englishTitle: string | null;
   nativeTitle: string | null;
@@ -123,6 +125,7 @@ export type AdminCatalogAnime = {
 
 export type AdminAnimeWriteInput = {
   slug?: string;
+  aniListId?: number | null;
   title?: string;
   englishTitle?: string | null;
   nativeTitle?: string | null;
@@ -200,4 +203,16 @@ export type AdminSubtitleTrack = {
     mimeType: string;
     processingState: "PENDING" | "READY" | "FAILED";
   };
+};
+
+export type CatalogPlayback = {
+  episode: {
+    id: string;
+    episodeNumber: number;
+    title: string;
+    synopsis: string | null;
+    durationSeconds: number | null;
+  };
+  sources: Array<{ id: string; qualityLabel: string | null; isDefault: boolean; mimeType: string; url: string }>;
+  subtitles: Array<{ id: string; languageCode: string; label: string; isDefault: boolean; format: "VTT"; url: string }>;
 };

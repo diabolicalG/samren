@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
+import { deleteStoredMedia, isManagedStorageKey } from "../media/storage.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
 import {
@@ -28,6 +29,7 @@ export const adminCatalogRouter = Router();
 const adminAnimeSelect = {
   id: true,
   slug: true,
+  aniListId: true,
   title: true,
   englishTitle: true,
   nativeTitle: true,
@@ -343,7 +345,16 @@ adminCatalogRouter.delete("/assets/:id", requireTrustedOrigin, async (request, r
       response.status(409).json({ data: null, error: { code: "IN_USE", message: "This asset is attached to catalogue content and cannot be deleted" } });
       return;
     }
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: id.data },
+      select: { storageKey: true },
+    });
+    if (!asset) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "The media asset was not found" } });
+      return;
+    }
     await prisma.mediaAsset.delete({ where: { id: id.data } });
+    if (isManagedStorageKey(asset.storageKey)) await deleteStoredMedia(asset.storageKey);
     response.status(204).end();
   } catch (error) {
     sendError(response, error);
@@ -708,6 +719,7 @@ adminCatalogRouter.post("/anime", requireTrustedOrigin, async (request, response
     const item = await prisma.anime.create({
       data: {
         slug,
+        aniListId: data.aniListId,
         title: data.title,
         englishTitle: data.englishTitle,
         nativeTitle: data.nativeTitle,
@@ -758,6 +770,7 @@ adminCatalogRouter.patch("/anime/:id", requireTrustedOrigin, async (request, res
 
     const update: Prisma.AnimeUpdateInput = {
       slug: data.slug,
+      aniListId: data.aniListId,
       title: data.title,
       englishTitle: data.englishTitle,
       nativeTitle: data.nativeTitle,

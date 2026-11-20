@@ -1,15 +1,15 @@
 # Samren Phase 3 — First-Party Media Storage, Delivery and Playback
 
-**Status:** PROPOSED — scope approved by product owner; implementation NOT authorized  
+**Status:** IMPLEMENTATION AUTHORIZED — revised scope approved by product owner on 2026-11-15  
 **Repository:** `diabolicalG/samren`  
-**Branch:** `main`  
+**Implementation branch:** `phase-3-media-providers`  
 **Planning baseline:** `9726d72336daa5e635b0905ce44a90b6470a1639`  
 **Previous phase:** Phase 2 — COMPLETE and FROZEN  
 **Storage decision:** Local, application-managed filesystem storage  
-**Scope decision:** Full proposed Phase 3 scope  
+**Scope decision:** First-party local media lifecycle plus native Kuhi and Anivexa provider integration  
 **Architecture reference:** `diabolicalG/Anime-streaming` is READ ONLY
 
-> This document authorizes planning and review only. It does not authorize implementation, dependency changes, migrations, configuration changes, or application-code edits. Phase 3 implementation requires a separate, explicit approval after this document has been reviewed.
+
 
 ---
 
@@ -19,9 +19,9 @@ Implement a secure, first-party media lifecycle for Samren using the existing ap
 
 Administrators must be able to upload and manage poster, banner, video and subtitle files. Samren must verify and store those files locally, expose only authorized application-owned media, and provide a working watch experience for published episodes that have playable first-party video assets.
 
-The media system must remain independent of external anime APIs, scraping systems, streaming providers, embed hosts, remote stream URLs and arbitrary proxy targets.
+Local uploaded media and provider-resolved external streams are separate media paths. Provider streams must never be represented as locally stored MediaAsset records.
 
-If an episode has no ready, valid first-party video asset, the watch experience must show an intentional unavailable state. It must never attempt a third-party fallback.
+If an episode has no ready, valid first-party video asset, the watch experience may offer the separately approved Kuhi/Anivexa provider path. It must not silently treat remote streams as first-party assets.
 
 ## 2. Baseline and existing contracts
 
@@ -44,7 +44,7 @@ Phase 2 explicitly does not implement file uploads, storage-object verification,
 - Modify only `diabolicalG/samren`.
 - `diabolicalG/Anime-streaming` is read-only architecture reference; never commit changes there.
 - Do not delete or refactor legacy Samren applications or shared packages as part of this phase unless a separately approved, directly necessary change is documented first.
-- No external anime metadata APIs, anime APIs, scrapers, crawlers, provider adapters, provider identifiers, source resolvers, third-party embeds, remote stream URLs, stream proxies or provider fallbacks.
+- Provider integrations are allowed only under the explicit scope amendment in Section 13. Arbitrary URL fetching and unrestricted remote stream proxying remain prohibited.
 - No arbitrary URL fetcher, user-controlled redirect target, arbitrary filesystem path, or public static mount of the storage directory.
 - Only application-owned files uploaded through authorized Samren workflows may become media assets.
 - PostgreSQL remains the authoritative source for catalogue and asset metadata. The filesystem stores bytes, not catalogue identity.
@@ -328,7 +328,7 @@ The following are not part of Phase 3:
 - S3 or other cloud/object storage implementation.
 - CDN, multi-region or multi-host storage replication.
 - FFmpeg transcoding, adaptive-bitrate generation, HLS packaging and background media-processing workers.
-- External media hosting, streaming providers, embeds, source resolvers, scraping or stream proxies.
+- Additional external media hosts, providers, embeds, source resolvers, scraping integrations or stream proxies beyond the approved Kuhi/Anivexa implementation.
 - Public user registration, account recovery, MFA, role management or session redesign.
 - Server-synchronized watch history, cross-device resume, watchlists, favourites and personal library.
 - Downloads/offline playback and DRM.
@@ -343,6 +343,53 @@ Any proposal to add one of these requires a separate scope decision before imple
 - Local managed filesystem storage: APPROVED.
 - Planning document creation: APPROVED.
 
-**Implementation authorization: NOT GRANTED.**
+**Implementation authorization:** SUPERSEDED by the explicit approval in Section 13. Implementation is authorized on the dedicated `phase-3-media-providers` branch. Phase 2 remains complete and frozen.
 
-No Phase 3 implementation may begin until the user reviews this document and gives a separate, explicit instruction authorizing implementation. Phase 2 remains complete and frozen. Phase 3 remains NOT STARTED until that authorization is received.
+
+---
+
+## 13. Product-owner scope amendment — Kuhi and Anivexa (2026-11-15)
+
+This section is an explicit, user-approved revision to the original Phase 3 boundaries and takes precedence over contradictory exclusions elsewhere in this document.
+
+The product owner instructed: integrate Kuhi and Anivexa from `diabolicalG/Anime-streaming` into Samren, selecting option B: copy and adapt the Anivexa provider/extractor implementation into Samren rather than requiring a separately operated Anivexa API service.
+
+### 13.1 Repository boundary
+
+- `diabolicalG/samren` is the only repository in which implementation changes may be committed.
+- `diabolicalG/Anime-streaming` is read-only. Its files may be inspected and adapted, but it must never be modified.
+- Phase 1 and Phase 2 remain frozen. Do not refactor unrelated legacy apps or shared packages.
+
+### 13.2 Provider implementation
+
+- Adapt the Kuhi client and any required Kuhi service source that is actually accessible and licensed for reuse.
+- Bring the Anivexa provider, extractor, and required supporting implementation into Samren's existing TypeScript backend architecture.
+- Do not introduce a separately managed Anivexa service as a runtime requirement.
+- Do not copy an entire unrelated runtime or its server shell when a focused adapter is sufficient.
+- Preserve attribution and license notices required by source files and dependencies.
+- Audit dependencies, execution model, browser automation, request behavior, and source provenance before adoption. In particular, do not blindly add browser automation or request-impersonation dependencies without demonstrating necessity and CI compatibility.
+- Integrate provider search, episode discovery/mapping, stream resolution and subtitle metadata only where the source supports those operations.
+
+### 13.3 Separate media paths
+
+- First-party uploads remain represented by `MediaAsset`, `EpisodeMedia`, and `SubtitleTrack`, backed by Samren's local storage adapter.
+- Provider-resolved remote streams are transient external playback results. They are not local assets and must not be inserted into local storage metadata tables.
+- Public APIs must not expose provider secrets or internal credentials.
+- Provider URLs, headers, and subtitle URLs must be validated and normalized. Do not return private provider headers to the browser.
+- Do not accept arbitrary client-supplied URLs or use them as server-side fetch targets.
+- Enforce strict provider endpoint configuration, SSRF protections, DNS/IP validation where server-side requests are made, redirect restrictions, request timeouts, response-size limits, and safe error handling.
+- Do not implement an unrestricted proxy. If a provider's playback protocol requires server-side proxying, isolate it behind a narrowly scoped, allowlisted implementation with explicit tests and no user-controlled destination.
+- Do not expose provider credentials, cookies, authorization headers, or internal diagnostic messages in API responses or logs.
+- Provider unavailability must produce a safe, explicit playback error and must not compromise first-party asset delivery.
+
+### 13.4 Acceptance and reporting
+
+Phase 3 now has two distinct playback sources:
+1. First-party uploaded assets delivered through Samren's local storage and publication policy.
+2. External provider streams resolved through the approved Kuhi/Anivexa integration.
+
+The final audit must separately verify both paths, their security boundaries, their failure modes, and the frontend's handling of each. Do not claim provider functionality that cannot be traced to accessible source code and verified tests.
+
+The original no-provider/no-remote-stream statements in Sections 1, 3, 8, 11 and 12 are superseded only to the extent necessary to implement this Section 13. All other security, authorization, repository-boundary, storage and acceptance requirements remain in force.
+
+**Implementation authorization:** GRANTED for the revised Phase 3 scope, including Kuhi and Anivexa integration. Do not push directly to `main`; work on the dedicated Phase 3 branch and commit coherent checkpoints.

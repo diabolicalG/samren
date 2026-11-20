@@ -284,3 +284,38 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-inline-edit > button { align-self: end; }
 .admin-taxonomy-list > li:has(.admin-inline-edit) { display: block; }
 @media (max-width: 560px) { .admin-inline-edit { grid-template-columns: 1fr; } }
+
+
+/* Phase 3 — first-party media */
+.anime-poster-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.anime-poster-image ~ .poster-mark { opacity: 0; }
+.detail-art-image { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.admin-upload-card { margin: 18px 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: rgba(18,23,34,.72); }
+.admin-upload-card h3 { margin: 0 0 8px; font: 700 16px Manrope,sans-serif; }
+.admin-upload-card p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.admin-upload-card form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; align-items: end; }
+.admin-upload-card form > p, .admin-upload-card form > button { grid-column: 1 / -1; }
+.admin-success { color: #9de7c1 !important; }
+@media (max-width: 640px) { .admin-upload-card form { grid-template-columns: 1fr; } }
+
+
+/* Phase 3 — first-party episode playback */
+.watch-page { padding-top: 32px; padding-bottom: 64px; }
+.watch-heading { padding: 32px 0 22px; }
+.watch-heading h1 { margin: 10px 0; font: 800 clamp(28px,4vw,44px)/1.12 Manrope,sans-serif; letter-spacing: -.045em; }
+.watch-heading p { max-width: 760px; color: var(--muted); line-height: 1.7; font-size: 13px; }
+.video-frame { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #000; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.video-frame video { display: block; width: 100%; max-height: min(72vh,760px); aspect-ratio: 16/9; background: #000; }
+.playback-quality { color: var(--muted); font-size: 11px; }
+.episode-row { color: inherit; }
+.episode-row:hover { border-color: rgba(167,139,250,.48); }
+
+.watch-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
+
+.provider-fallback-controls { display: grid; grid-template-columns: minmax(180px,1fr) minmax(140px,.5fr); gap: 12px; align-items: end; margin: 0 0 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(18,23,34,.52); }
+.provider-fallback-controls p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.provider-fallback-controls .ui-field { min-width: 0; }
+@media (max-width: 640px) { .provider-fallback-controls { grid-template-columns: 1fr; } }
+.adaptive-player { position: relative; width: 100%; background: #000; }
+.adaptive-player video { display: block; width: 100%; max-height: min(72vh,760px); aspect-ratio: 16/9; background: #000; object-fit: contain; }
+.player-runtime-error { margin: 0; padding: 10px 14px; color: #fca5a5; background: rgba(127,29,29,.22); font-size: 12px; line-height: 1.5; }

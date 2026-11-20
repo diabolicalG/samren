@@ -10,6 +10,7 @@ const userEmail = "phase2-catalog-user@samren.test";
 const adminPassword = "phase2-ci-catalog-admin-password";
 const userPassword = "phase2-ci-catalog-user-password";
 const animeSlug = "phase-two-admin-managed-title";
+const anilistSlug = "phase-three-anilist-mapped-title";
 let adminId: string;
 let userId: string;
 let assetId: string | undefined;
@@ -38,21 +39,25 @@ beforeAll(async () => {
   });
   adminId = admin.id;
   userId = user.id;
-  await prisma.anime.deleteMany({ where: { slug: animeSlug } });
+  await prisma.anime.deleteMany({ where: { slug: { in: [animeSlug, anilistSlug] } } });
 });
 
 afterAll(async () => {
-  await prisma.anime.deleteMany({ where: { slug: animeSlug } });
+  await prisma.anime.deleteMany({ where: { slug: { in: [animeSlug, anilistSlug] } } });
   await prisma.mediaAsset.deleteMany({ where: { id: { in: [assetId, ...relatedAssetIds].filter((id): id is string => Boolean(id)) } } });
   const userIds = [adminId, userId].filter((id): id is string => Boolean(id));
   if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 });
 
 describe("admin catalogue management", () => {
-  it("rejects unauthenticated catalogue access", async () => {
+  it("rejects unauthenticated catalogue and media diagnostics access", async () => {
     const response = await request(app).get("/api/v1/admin/catalog/anime");
+    const limits = await request(app).get("/api/v1/admin/catalog/assets/upload-limits");
+    const status = await request(app).get("/api/v1/admin/catalog/assets/unknown/status");
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("UNAUTHENTICATED");
+    expect(limits.status).toBe(401);
+    expect(status.status).toBe(401);
   });
 
   it("rejects authenticated non-admin users", async () => {
@@ -60,6 +65,35 @@ describe("admin catalogue management", () => {
     const response = await agent.get("/api/v1/admin/catalog/anime");
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("stores a unique administrator-managed AniList identity and supports clearing it", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const created = await agent.post("/api/v1/admin/catalog/anime").set("Origin", origin).send({
+      slug: anilistSlug,
+      title: "AniList Mapped Title",
+      aniListId: 123456,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.aniListId).toBe(123456);
+
+    const duplicate = await agent.post("/api/v1/admin/catalog/anime").set("Origin", origin).send({
+      slug: "phase-three-anilist-duplicate",
+      title: "Duplicate AniList Mapping",
+      aniListId: 123456,
+    });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe("CONFLICT");
+
+    const updated = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
+      .set("Origin", origin).send({ aniListId: 234567 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.aniListId).toBe(234567);
+
+    const cleared = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
+      .set("Origin", origin).send({ aniListId: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.aniListId).toBeNull();
   });
 
   it("exposes full catalogue taxonomies only to administrators", async () => {
@@ -75,6 +109,111 @@ describe("admin catalogue management", () => {
     expect(studios.status).toBe(200);
     expect(studios.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ slug: "samren-studio-sample" })]));
     expect(seasons.status).toBe(200);
+  });
+
+  it("accepts a bounded first-party image upload only when its file signature matches", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const uploaded = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .set("x-original-filename", "phase3-upload.png")
+      .set("Content-Type", "image/png")
+      .send(pngHeader);
+
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.data).toMatchObject({
+      originalFilename: "phase3-upload.png",
+      mediaKind: "POSTER",
+      mimeType: "image/png",
+      sizeBytes: String(pngHeader.length),
+      processingState: "READY",
+    });
+    assetId = uploaded.body.data.id as string;
+
+    const limits = await agent.get("/api/v1/admin/catalog/assets/upload-limits");
+    expect(limits.status).toBe(200);
+    expect(limits.body.data).toMatchObject({
+      POSTER: 15 * 1024 * 1024,
+      BANNER: 15 * 1024 * 1024,
+      VIDEO: 2 * 1024 * 1024 * 1024,
+      SUBTITLE: 2 * 1024 * 1024,
+    });
+
+    const status = await agent.get("/api/v1/admin/catalog/assets/" + assetId + "/status");
+    expect(status.status).toBe(200);
+    expect(status.body.data).toMatchObject({ id: assetId, fileState: "PRESENT", processingState: "READY" });
+    expect(status.body.data).not.toHaveProperty("storageKey");
+    expect(status.body.data).not.toHaveProperty("absolutePath");
+
+    const storedSize = BigInt(uploaded.body.data.sizeBytes as string);
+    await prisma.mediaAsset.update({ where: { id: assetId }, data: { sizeBytes: storedSize + 1n } });
+    const mismatchStatus = await agent.get("/api/v1/admin/catalog/assets/" + assetId + "/status");
+    expect(mismatchStatus.body.data.fileState).toBe("SIZE_MISMATCH");
+    await prisma.mediaAsset.update({ where: { id: assetId }, data: { sizeBytes: storedSize } });
+
+    const mismatch = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .set("x-original-filename", "not-a-png.png")
+      .set("Content-Type", "image/png")
+      .send(Buffer.from("not an image"));
+
+    expect(mismatch.status).toBe(415);
+    expect(mismatch.body.error.code).toBe("FILE_SIGNATURE_MISMATCH");
+    const failedAsset = await prisma.mediaAsset.findFirst({ where: { originalFilename: "not-a-png.png" }, select: { processingState: true } });
+    expect(failedAsset?.processingState).toBe("FAILED");
+
+    const removed = await agent.delete("/api/v1/admin/catalog/assets/" + assetId).set("Origin", origin);
+    expect(removed.status).toBe(204);
+    assetId = undefined;
+  });
+
+  it("accepts a bounded multipart upload with one signature-verified file", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const uploaded = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .attach("file", pngHeader, { filename: "multipart-poster.png", contentType: "image/png" });
+
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.data).toMatchObject({
+      originalFilename: "multipart-poster.png",
+      mediaKind: "POSTER",
+      mimeType: "image/png",
+      sizeBytes: String(pngHeader.length),
+      processingState: "READY",
+    });
+    const multipartAssetId = uploaded.body.data.id as string;
+    const deleted = await agent.delete("/api/v1/admin/catalog/assets/" + multipartAssetId).set("Origin", origin);
+    expect(deleted.status).toBe(204);
+  });
+
+  it("rejects multipart uploads with extra fields or multiple files", async () => {
+    const agent = await login(adminEmail, adminPassword);
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    const extraField = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .field("unexpected", "not allowed")
+      .attach("file", pngHeader, { filename: "extra-field.png", contentType: "image/png" });
+    expect(extraField.status).toBe(400);
+
+    const multipleFiles = await agent
+      .post("/api/v1/admin/catalog/assets/upload")
+      .set("Origin", origin)
+      .set("x-media-kind", "POSTER")
+      .attach("file", pngHeader, { filename: "first.png", contentType: "image/png" })
+      .attach("second", pngHeader, { filename: "second.png", contentType: "image/png" });
+    expect(multipleFiles.status).toBe(400);
   });
 
   it("creates, publishes, edits, and archives a first-party catalogue record", async () => {
@@ -113,6 +252,9 @@ describe("admin catalogue management", () => {
     const posterAssetId = asset.body.data.id as string;
     assetId = posterAssetId;
     relatedAssetIds.push(posterAssetId);
+    const metadataStatus = await agent.get("/api/v1/admin/catalog/assets/" + posterAssetId + "/status");
+    expect(metadataStatus.status).toBe(200);
+    expect(metadataStatus.body.data.fileState).toBe("NOT_MANAGED");
 
     const linked = await agent.patch("/api/v1/admin/catalog/anime/" + created.body.data.id)
       .set("Origin", origin).send({ posterAssetId });

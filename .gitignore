@@ -23,6 +23,9 @@ venv/
 .env.local
 .env.*.local
 
+# Private local media storage
+.data/
+
 # Databases
 *.db
 *.sqlite

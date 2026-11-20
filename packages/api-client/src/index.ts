@@ -1,4 +1,4 @@
-import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
+import type { AdminAnimeWriteInput, AdminAuthUser, AdminCatalogAnime, AdminCatalogEpisode, AdminEpisodeMedia, AdminMediaAsset, AdminSubtitleTrack, ApiEnvelope, CatalogAnimeDetail, CatalogAnimeCard, CatalogEpisode, CatalogListParams, CatalogPage, CatalogPublicationStatus, CatalogPlayback, CatalogSeason, CatalogTaxonomyItem, HealthStatus } from "@samren/types";
 
 export type ApiClientOptions = {
   baseUrl?: string;
@@ -49,6 +49,12 @@ export function createApiClient(options: ApiClientOptions = {}) {
     adminCatalogAnime: () => request<{ items: AdminCatalogAnime[] }>("/admin/catalog/anime"),
     adminCatalogEpisodes: (animeId: string) => request<AdminCatalogEpisode[]>("/admin/catalog/anime/" + encodeURIComponent(animeId) + "/episodes"),
     adminCatalogAssets: () => request<AdminMediaAsset[]>("/admin/catalog/assets"),
+    adminMediaUploadLimits: () => request<Record<AdminMediaAsset["mediaKind"], number>>("/admin/catalog/assets/upload-limits"),
+    adminUploadAsset: (file: File, mediaKind: AdminMediaAsset["mediaKind"]) => {
+      const body = new FormData();
+      body.append("file", file, file.name);
+      return request<AdminMediaAsset>("/admin/catalog/assets/upload", { method: "POST", headers: { "x-media-kind": mediaKind }, body });
+    },
     adminCreateAsset: (input: { storageKey: string; originalFilename: string; mediaKind: AdminMediaAsset["mediaKind"]; mimeType: string; sizeBytes: number; width?: number | null; height?: number | null; durationSeconds?: number | null; checksumSha256?: string | null }) => request<AdminMediaAsset>("/admin/catalog/assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminUpdateAsset: (id: string, input: { originalFilename?: string; mimeType?: string; sizeBytes?: number; width?: number | null; height?: number | null; durationSeconds?: number | null; checksumSha256?: string | null }) => request<AdminMediaAsset>("/admin/catalog/assets/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
     adminDeleteAsset: (id: string) => request<void>("/admin/catalog/assets/" + encodeURIComponent(id), { method: "DELETE" }),
@@ -81,9 +87,16 @@ export function createApiClient(options: ApiClientOptions = {}) {
     catalogAnime: (params: CatalogListParams = {}) => request<CatalogPage<CatalogAnimeCard>>(`/catalog/anime${queryString(params)}`),
     catalogAnimeBySlug: (slug: string) => request<CatalogAnimeDetail>(`/catalog/anime/${encodeURIComponent(slug)}`),
     catalogEpisodes: (slug: string) => request<CatalogEpisode[]>(`/catalog/anime/${encodeURIComponent(slug)}/episodes`),
+    catalogPlayback: (slug: string, episodeNumber: number) => request<CatalogPlayback>(`/catalog/anime/${encodeURIComponent(slug)}/episodes/${episodeNumber}/playback`),
     catalogGenres: () => request<CatalogTaxonomyItem[]>("/catalog/genres"),
     catalogStudios: () => request<CatalogTaxonomyItem[]>("/catalog/studios"),
     catalogSeasons: () => request<CatalogSeason[]>("/catalog/seasons"),
+    aggregatePlayback: (slug: string, episode: number, audio: "sub" | "dub" = "sub") =>
+      request<{ sessionId: string; stream: { provider: string; url: string; type: "hls" | "mp4" | "dash"; server: string; quality: string; audio: "sub" | "dub"; referer?: string; subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }> }; providers: number; expiresAt: string }>(`/anivexa/anime/${encodeURIComponent(slug)}/episodes/${episode}/aggregate?audio=${audio}`),
+    fallbackPlayback: (sessionId: string, failedProvider: string) =>
+      request<{ stream: { provider: string; url: string; type: "hls" | "mp4" | "dash"; server: string; quality: string; audio: "sub" | "dub"; referer?: string; subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }> }; tried: string[]; remaining: number }>(`/anivexa/aggregate/${encodeURIComponent(sessionId)}/fallback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: failedProvider }) }),
+    closePlaybackSession: (sessionId: string) =>
+      request<void>(`/anivexa/aggregate/${encodeURIComponent(sessionId)}`, { method: "DELETE" }),
   };
 }
 
