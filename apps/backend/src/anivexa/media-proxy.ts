@@ -5,17 +5,20 @@ import { pipeline } from "node:stream/promises";
 import { env } from "../config/env.js";
 import { safeFetch, safeFetchStream } from "./core/safe-fetch.js";
 import { anivexaAllowedHosts, anivexaStreamAllowedHosts, isAnivexaUrlAllowed } from "./http.js";
+import { readPlaybackSessionToken } from "./playback-session.js";
+import { createPlaybackResourceHandle, resolvePlaybackResourceHandle, type PlaybackResourceKind } from "./resource-registry.js";
 
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_MEDIA_BYTES = 512 * 1024 * 1024;
 const MEDIA_PATH = "/api/v1/anivexa/media";
 
-function proxyUrl(target: string, referer?: string, xml = false): string {
-  const encodedTarget = encodeURIComponent(target).replace(/%24(Number(?:%25\d+d)?|Time|RepresentationID|Bandwidth)%24/g, function (_match, token) {
-    return "$" + token.replace("%25", "%") + "$";
-  });
-  const query = "url=" + encodedTarget + (referer ? "&referer=" + encodeURIComponent(referer) : "");
-  const value = MEDIA_PATH + "?" + query;
+export function createMediaResourceUrl(target: string, referer: string | undefined, sessionToken: string, providerSessionId: string, kind: PlaybackResourceKind = "auto"): string {
+  const handle = createPlaybackResourceHandle({ url: target, referer, sessionToken, providerSessionId, kind });
+  return MEDIA_PATH + "/" + handle;
+}
+
+function proxyUrl(target: string, referer: string | undefined, sessionToken: string, providerSessionId: string, xml = false): string {
+  const value = createMediaResourceUrl(target, referer, sessionToken, providerSessionId);
   return xml ? value.replace(/&/g, "&amp;") : value;
 }
 
@@ -30,18 +33,18 @@ function resolveResource(reference: string, base: string): string | null {
   }
 }
 
-export function rewriteHlsManifest(manifest: string, manifestUrl: string, referer?: string): string {
+export function rewriteHlsManifest(manifest: string, manifestUrl: string, referer: string | undefined, sessionToken: string, providerSessionId: string): string {
   return String(manifest).split(/\r?\n/).map((line) => {
     const trimmed = line.trim();
     if (!trimmed) return line;
     if (!trimmed.startsWith("#")) {
       const resolved = resolveResource(trimmed, manifestUrl);
-      return resolved ? proxyUrl(resolved, referer) : line;
+      return resolved ? proxyUrl(resolved, referer, sessionToken, providerSessionId) : line;
     }
     if (!/URI="/i.test(line)) return line;
     return line.replace(/URI="([^"]+)"/gi, function (match, value) {
       const resolved = resolveResource(value, manifestUrl);
-      return resolved ? 'URI="' + proxyUrl(resolved, referer) + '"' : match;
+      return resolved ? 'URI="' + proxyUrl(resolved, referer, sessionToken, providerSessionId) + '"' : match;
     });
   }).join("\n");
 }
@@ -114,13 +117,13 @@ function resolveTemplateResource(reference: string, base: string): string | null
   return resolved.replace(/SAMREN_DASH_TOKEN_(\d+)_END/g, (_match, index) => tokens[Number(index)] ?? "");
 }
 
-function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: string): string {
+function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer: string | undefined, sessionToken: string, providerSessionId: string): string {
   return parts.map((part) => {
     if (typeof part === "string") return part;
     if (part.name === "baseurl") {
       const target = resolveResource(decodeXml(nodeText(part)), inheritedBase);
       if (!target || !/\.(?:mp4|m4v|webm|m4s|mpd|m3u8|ts|m4a|aac|mp3|vtt)$/i.test(new URL(target).pathname)) return "";
-      return part.opening + proxyUrl(target, referer, true) + part.closing;
+      return part.opening + proxyUrl(target, referer, sessionToken, providerSessionId, true) + part.closing;
     }
     let base = inheritedBase;
     const xmlBase = part.opening.match(/\bxml:base\s*=\s*(["'])(.*?)\1/i)?.[2];
@@ -132,7 +135,7 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
       const name = attribute.toLowerCase();
       if (!["media", "initialization", "index", "bitstreamswitching", "sourceurl", "href", "xlink:href"].includes(name)) return match;
       const resolved = resolveTemplateResource(rawValue, base);
-      return resolved ? attribute + separator + quote + proxyUrl(resolved, referer, true) + quote : match;
+      return resolved ? attribute + separator + quote + proxyUrl(resolved, referer, sessionToken, providerSessionId, true) + quote : match;
     });
     if (part.name === "location") {
       const location = resolveResource(decodeXml(nodeText(part)), base);
@@ -143,16 +146,16 @@ function rewriteDashParts(parts: XmlPart[], inheritedBase: string, referer?: str
     }
     const children = part.children.map((child) => {
       if (typeof child !== "string" && child.name === "baseurl") {
-        return rewriteDashParts([child], inheritedBase, referer);
+        return rewriteDashParts([child], inheritedBase, referer, sessionToken, providerSessionId);
       }
-      return rewriteDashParts([child], base, referer);
+      return rewriteDashParts([child], base, referer, sessionToken, providerSessionId);
     }).join("");
     return rewrittenOpening + children + (part.selfClosing ? "" : part.closing);
   }).join("");
 }
 
-export function rewriteDashManifest(manifest: string, manifestUrl: string, referer?: string): string {
-  return rewriteDashParts(parseXmlParts(String(manifest)), manifestUrl, referer);
+export function rewriteDashManifest(manifest: string, manifestUrl: string, referer: string | undefined, sessionToken: string, providerSessionId: string): string {
+  return rewriteDashParts(parseXmlParts(String(manifest)), manifestUrl, referer, sessionToken, providerSessionId);
 }
 
 export function detectNestedManifestType(contentType: string, prefix: Buffer): "hls" | "dash" | "" {
@@ -169,7 +172,8 @@ function forwardHeaders(response: Response, headers: IncomingHttpHeaders): void 
     const value = headers[name];
     if (value) response.setHeader(name, value);
   }
-  response.setHeader("Cache-Control", "private, max-age=30");
+  response.setHeader("Cache-Control", "private, no-store");
+  response.setHeader("Vary", "Cookie");
 }
 
 export async function proxyAnivexaMedia(request: Request, response: Response): Promise<void> {
@@ -177,25 +181,28 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
     response.status(503).end("Anivexa playback is disabled");
     return;
   }
-  const target = typeof request.query.url === "string" ? request.query.url : "";
-  const refererValue = typeof request.query.referer === "string" ? request.query.referer : "";
-  const kind = typeof request.query.kind === "string" ? request.query.kind : "";
-  if (!target || target.length > 8192 || !["", "hls", "mp4", "dash", "vtt"].includes(kind)) {
-    response.status(400).end("Invalid media URL");
+  const handle = typeof request.params.handle === "string" ? request.params.handle : "";
+  const sessionToken = readPlaybackSessionToken(request);
+  if (!handle || !sessionToken) {
+    response.status(404).end("Media resource not found");
     return;
   }
+  const resource = resolvePlaybackResourceHandle(handle, sessionToken);
+  if (!resource) {
+    response.status(404).end("Media resource not found");
+    return;
+  }
+  const target = resource.url;
+  const referer = resource.referer;
+  const kind = resource.kind;
   const streamHosts = anivexaStreamAllowedHosts();
   if (!isAnivexaUrlAllowed(target, streamHosts)) {
     response.status(403).end("Media host is not allowlisted");
     return;
   }
-  let referer: string | undefined;
-  if (refererValue) {
-    if (!isAnivexaUrlAllowed(refererValue, new Set([...anivexaAllowedHosts(), ...streamHosts]))) {
-      response.status(400).end("Invalid provider referer");
-      return;
-    }
-    referer = refererValue;
+  if (referer && !isAnivexaUrlAllowed(referer, new Set([...anivexaAllowedHosts(), ...streamHosts]))) {
+    response.status(403).end("Provider referer is not allowlisted");
+    return;
   }
   const headers = new Headers({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36",
@@ -230,11 +237,12 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       }
       const manifest = await upstream.text();
       const body = manifestType === "hls"
-        ? rewriteHlsManifest(manifest, target, referer)
-        : rewriteDashManifest(manifest, target, referer);
+        ? rewriteHlsManifest(manifest, target, referer, sessionToken, resource.providerSessionId)
+        : rewriteDashManifest(manifest, target, referer, sessionToken, resource.providerSessionId);
       response.status(200);
       response.setHeader("Content-Type", manifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
-      response.setHeader("Cache-Control", "private, max-age=15");
+      response.setHeader("Cache-Control", "private, no-store");
+      response.setHeader("Vary", "Cookie");
       if (request.method === "HEAD") {
         response.setHeader("Content-Length", String(Buffer.byteLength(body)));
         response.end();
@@ -285,8 +293,8 @@ export async function proxyAnivexaMedia(request: Request, response: Response): P
       }
       const manifest = Buffer.concat(chunks).toString("utf8");
       const body = nestedManifestType === "hls"
-        ? rewriteHlsManifest(manifest, target, referer)
-        : rewriteDashManifest(manifest, target, referer);
+        ? rewriteHlsManifest(manifest, target, referer, sessionToken, resource.providerSessionId)
+        : rewriteDashManifest(manifest, target, referer, sessionToken, resource.providerSessionId);
       response.status(upstream.status);
       response.setHeader("Content-Type", nestedManifestType === "hls" ? "application/vnd.apple.mpegurl; charset=utf-8" : "application/dash+xml; charset=utf-8");
       response.setHeader("Cache-Control", "private, max-age=15");
