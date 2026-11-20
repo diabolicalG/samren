@@ -410,9 +410,9 @@ function MediaUploadForm() {
   const maxBytes = uploadLimitsQuery.data?.[kind] ?? 0;
   const tooLarge = Boolean(file && maxBytes > 0 && file.size > maxBytes);
   const maxLabel = maxBytes >= 1024 * 1024 * 1024
-    ? `${(maxBytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\\.0$/, "")} GiB`
+    ? `${(maxBytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, "")} GiB`
     : maxBytes > 0
-      ? `${(maxBytes / (1024 * 1024)).toFixed(1).replace(/\\.0$/, "")} MiB`
+      ? `${(maxBytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MiB`
       : "unavailable";
   const uploadMutation = useMutation({
     mutationFn: () => {
