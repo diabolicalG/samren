@@ -215,3 +215,14 @@ Reconciliation CI run [44735651560](https://github.com/diabolicalG/samren/action
 The feature branch is now zero commits behind Samren main; the raw GitHub PR API reports `mergeable=true`. PR #5 remains draft and unmerged. The legacy Python changes were removed from the Phase 3 diff, the active README/CORS example were corrected, and the detailed contracts are recorded in [PHASE_3_CONTRACTS.md](./PHASE_3_CONTRACTS.md).
 
 **Checkpoint 3.1 — Contracts and branch reconciliation: ACCEPTED.** This acceptance does not accept Phase 3 as a whole and does not authorize merging PR #5. Continue with Checkpoint 3.2 and audit it before proceeding.
+
+
+### Checkpoint 3.2 audit — 2026-11-20
+
+**Verdict: ACCEPTED.** Samren storage hardening was implemented in commits `71c046a`, `0efdc264` and `6ee0e93`. The final CI run [44737230985](https://github.com/diabolicalG/samren/actions/runs/44737230985) passed every active-workspace gate, including lint, typecheck, backend API tests, frontend smoke/accessibility tests and production builds.
+
+Verified changes: generated-key reads reject symlinked files/shards; reads use `O_NOFOLLOW` where supported and verify the opened descriptor is a regular file; database `sizeBytes` must match the opened file before public delivery; storage-root symlinks are rejected; production requires an explicit absolute root and rejects known repository public directories; byte-range parsing handles oversized suffix ranges correctly; and tests cover these cases plus HEAD behavior and subtitle-size consistency.
+
+Residual limits: production persistence and backup/restore are not operationally certified; deployment-specific public/static roots must be configured outside media storage; stored SHA-256 values are not recomputed on every read; upload size limits remain hard-coded, the admin asset-status endpoint is still missing, and upload timeout/disconnect hardening belongs to Checkpoint 3.3.
+
+No changes were made to `diabolicalG/Anime-streaming`. Continue to Checkpoint 3.3 only after this audit; do not skip the next audit gate.

@@ -96,7 +96,7 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 | Checkpoint | Status |
 |---|---|
 | 3.1 — Contracts and branch reconciliation | **Complete** — branch reconciled, contracts recorded, legacy changes removed, and CI passed |
-| 3.2 — Storage hardening | Not started |
+| 3.2 — Storage hardening | **Complete** — symlink-safe reads, production-root validation, file-size consistency and range-edge tests; CI run 447372 passed |
 | 3.3 — Secure ingestion | Not started |
 | 3.4 — First-party delivery | Not started |
 | 3.5 — Playback contracts and providers | Not started |
@@ -115,3 +115,13 @@ Finish each checkpoint, run its tests, inspect the diff and record its audit bef
 - The branch is zero commits behind main and the raw PR API reports `mergeable=true`. PR #5 remains draft/open/unmerged.
 - The contracts and readiness/provider audit documents now reflect the read-only reference boundary, Kuhi service restrictions, Anivexa provenance issue, server-owned resource handles, AniList mapping, rate limits and upload configuration.
 - **Checkpoint 3.1 accepted.** Proceed to Checkpoint 3.2 only; do not begin later checkpoints until 3.2 is implemented, tested and audited.
+
+
+### Checkpoint 3.2 acceptance — 2026-11-20
+
+- Implementation commits: `71c046a3b02b494827f787a5ebd4e29b1e6f8c02`, syntax correction `0efdc264f1be280ccb0ac4d9dc06f39f35cde2db`, and production-root/fd-cleanup hardening `6ee0e9314b6efa2a9471d30da490e23122911124`.
+- CI run [44737230985](https://github.com/diabolicalG/samren/actions/runs/44737230985) completed successfully: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend tests, frontend smoke/accessibility tests and production builds all passed.
+- Managed media reads now reject file and shard symlinks, use no-follow file opens, compare actual file size with database metadata, and close handles safely.
+- Production requires an explicit absolute storage root and rejects the repository's known public web roots. Deployment-specific static roots must still be checked in deployment configuration.
+- Range handling now correctly clamps oversized suffix ranges; tests cover GET/HEAD and malformed/unsatisfiable ranges.
+- **Checkpoint 3.2 accepted.** Checkpoint 3.3 is next; do not begin provider/playback work until secure ingestion is implemented and audited.
