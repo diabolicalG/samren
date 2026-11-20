@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -28,6 +29,7 @@ if (!parsed.success) throw new Error(`Invalid environment configuration: ${parse
 
 const mediaStorageRoot = parsed.data.MEDIA_STORAGE_ROOT ?? ".data/media";
 if (parsed.data.NODE_ENV === "production") {
+  if (!parsed.data.PLAYBACK_SESSION_SECRET) throw new Error("PLAYBACK_SESSION_SECRET must be configured in production");
   if (!parsed.data.MEDIA_STORAGE_ROOT || !path.isAbsolute(parsed.data.MEDIA_STORAGE_ROOT)) {
     throw new Error("MEDIA_STORAGE_ROOT must be explicitly configured as an absolute persistent path in production");
   }
@@ -44,5 +46,5 @@ if (parsed.data.NODE_ENV === "production") {
   }
 }
 
-export const env = { ...parsed.data, MEDIA_STORAGE_ROOT: mediaStorageRoot };
+export const env = { ...parsed.data, MEDIA_STORAGE_ROOT: mediaStorageRoot, PLAYBACK_SESSION_SECRET: parsed.data.PLAYBACK_SESSION_SECRET ?? randomBytes(32).toString("hex") };
 export const isProduction = env.NODE_ENV === "production";
