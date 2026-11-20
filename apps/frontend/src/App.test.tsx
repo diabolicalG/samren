@@ -124,6 +124,7 @@ describe("administrator workspace", () => {
     const item = {
       id: "anime-1",
       slug: "clockwork-orbit",
+      aniListId: 12345,
       title: "The Clockwork Orbit",
       englishTitle: null,
       nativeTitle: null,
@@ -163,12 +164,14 @@ describe("administrator workspace", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit The Clockwork Orbit" }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Clockwork Orbit Revisited" } });
+    fireEvent.change(screen.getByLabelText("AniList ID (optional)"), { target: { value: "23456" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith("anime-1", expect.objectContaining({
         title: "Clockwork Orbit Revisited",
         slug: "clockwork-orbit",
+        aniListId: 23456,
         genreSlugs: ["adventure"],
         studioSlugs: ["samren-studio"],
       }));

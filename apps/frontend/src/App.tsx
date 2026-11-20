@@ -460,10 +460,12 @@ function AdminPage() {
   const [password, setPassword] = useState("");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [aniListId, setAniListId] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editSlug, setEditSlug] = useState("");
+  const [editAniListId, setEditAniListId] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editYear, setEditYear] = useState("");
   const [editGenreSlugs, setEditGenreSlugs] = useState<string[]>([]);
@@ -536,11 +538,13 @@ function AdminPage() {
     mutationFn: () => apiClient.adminCreateAnime({
       title: title.trim(),
       ...(slug.trim() ? { slug: slug.trim() } : {}),
+      ...(aniListId.trim() ? { aniListId: Number(aniListId) } : {}),
       ...(synopsis.trim() ? { synopsis: synopsis.trim() } : {}),
     }),
     onSuccess: async () => {
       setTitle("");
       setSlug("");
+      setAniListId("");
       setSynopsis("");
       setFormMessage("Draft created successfully.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
@@ -685,6 +689,7 @@ function AdminPage() {
           <form onSubmit={(event) => { event.preventDefault(); setFormMessage(""); createMutation.mutate(); }}>
             <TextField id="admin-anime-title" label="Anime title" required maxLength={240} value={title} onChange={(event) => setTitle(event.target.value)} />
             <TextField id="admin-anime-slug" label="URL slug (optional)" maxLength={180} placeholder="generated-from-title" value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+            <TextField id="admin-anime-anilist-id" label="AniList ID (optional)" inputMode="numeric" placeholder="Server-side provider mapping" value={aniListId} onChange={(event) => setAniListId(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
             <label className="ui-field" htmlFor="admin-anime-synopsis">Synopsis<textarea id="admin-anime-synopsis" className="ui-input admin-textarea" maxLength={10000} rows={4} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} /></label>
             <button className="ui-button ui-button--primary" type="submit" disabled={createMutation.isPending || !title.trim()}>{createMutation.isPending ? "Creating…" : "Create draft"}</button>
             {formMessage ? <p className={createMutation.isError ? "admin-error" : "admin-success"} role="status">{formMessage}</p> : null}
@@ -703,7 +708,7 @@ function AdminPage() {
                   <div className="admin-record-actions">
                     {item.publicationStatus !== "ARCHIVED" ? <div className="admin-record-actions-main">
                       <button className="ui-button ui-button--quiet" onClick={() => setActiveEpisodeAnimeId((current) => current === item.id ? null : item.id)} aria-expanded={activeEpisodeAnimeId === item.id}>{activeEpisodeAnimeId === item.id ? "Hide episodes" : "Episodes"}</button>
-                      <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); setEditPosterAssetId(item.posterAssetId ?? ""); setEditBannerAssetId(item.bannerAssetId ?? ""); }} aria-label={"Edit " + item.title}>Edit</button>
+                      <button className="ui-button ui-button--quiet" onClick={() => { setEditingId(item.id); setEditTitle(item.title); setEditSlug(item.slug); setEditAniListId(item.aniListId?.toString() ?? ""); setEditSynopsis(item.synopsis ?? ""); setEditYear(item.releaseYear?.toString() ?? ""); setEditGenreSlugs(item.genres.map(({ genre }) => genre.slug)); setEditStudioSlugs(item.studios.map(({ studio }) => studio.slug)); setEditPosterAssetId(item.posterAssetId ?? ""); setEditBannerAssetId(item.bannerAssetId ?? ""); }} aria-label={"Edit " + item.title}>Edit</button>
                     </div> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--secondary" onClick={() => updateMutation.mutate({ id: item.id, publicationStatus: item.publicationStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED" })} disabled={updateMutation.isPending}>{item.publicationStatus === "PUBLISHED" ? "Unpublish" : "Publish"}</button> : null}
                     {item.publicationStatus !== "ARCHIVED" ? <button className="ui-button ui-button--quiet" onClick={() => archiveMutation.mutate(item.id)} disabled={archiveMutation.isPending}>Archive</button> : null}
@@ -725,9 +730,10 @@ function AdminPage() {
                 ) : null}
                 {editingId === item.id ? (
                   <Surface className="admin-edit">
-                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs, posterAssetId: editPosterAssetId || null, bannerAssetId: editBannerAssetId || null } }); }}>
+                    <form onSubmit={(event) => { event.preventDefault(); editMutation.mutate({ id: item.id, input: { title: editTitle.trim(), slug: editSlug.trim(), aniListId: editAniListId.trim() ? Number(editAniListId) : null, synopsis: editSynopsis.trim() || null, releaseYear: editYear ? Number(editYear) : null, genreSlugs: editGenreSlugs, studioSlugs: editStudioSlugs, posterAssetId: editPosterAssetId || null, bannerAssetId: editBannerAssetId || null } }); }}>
                       <TextField id={"edit-title-" + item.id} label="Title" required maxLength={240} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
                       <TextField id={"edit-slug-" + item.id} label="Slug" required maxLength={180} value={editSlug} onChange={(event) => setEditSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
+                      <TextField id={"edit-anilist-id-" + item.id} label="AniList ID (optional)" inputMode="numeric" value={editAniListId} onChange={(event) => setEditAniListId(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
                       <TextField id={"edit-year-" + item.id} label="Release year" inputMode="numeric" placeholder="Optional" value={editYear} onChange={(event) => setEditYear(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
                       <label className="ui-field" htmlFor={"edit-synopsis-" + item.id}>Synopsis<textarea id={"edit-synopsis-" + item.id} className="ui-input admin-textarea" maxLength={10000} rows={4} value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
                       <label className="ui-field" htmlFor={"edit-genres-" + item.id}>Genres<select multiple className="ui-input admin-multiselect" id={"edit-genres-" + item.id} value={editGenreSlugs} onChange={(event) => setEditGenreSlugs(Array.from(event.target.selectedOptions, (option) => option.value))}>{(adminGenresQuery.data ?? []).map((genre) => <option key={genre.id} value={genre.slug}>{genre.name}</option>)}</select></label>
