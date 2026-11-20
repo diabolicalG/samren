@@ -256,18 +256,18 @@ describe("Anivexa API", () => {
   it("keeps Anivexa disabled unless explicitly enabled", async () => {
     const response = await request(app).get("/api/v1/anivexa/providers");
 
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("ANIVEXA_DISABLED");
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
   });
 
-  it("keeps stream extraction disabled until the integration is enabled", async () => {
+  it("does not expose the legacy raw AniList-ID extract route", async () => {
     const response = await request(app).get("/api/v1/anivexa/extract/21/1?audio=sub");
 
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("ANIVEXA_DISABLED");
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
   });
 
-  it("does not allow invalid provider IDs", async () => {
+  it("does not expose the legacy raw AniList-ID episode route", async () => {
     const response = await request(app).get("/api/v1/anivexa/episodes/not-an-id");
 
     expect(response.status).toBe(503);
