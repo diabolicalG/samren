@@ -43,6 +43,7 @@ model UserPreferences {
 model Anime {
   id                 String            @id @default(cuid())
   slug               String            @unique @db.VarChar(180)
+  aniListId          Int?              @unique
   title              String            @db.VarChar(240)
   englishTitle       String?           @db.VarChar(240)
   nativeTitle        String?           @db.VarChar(240)

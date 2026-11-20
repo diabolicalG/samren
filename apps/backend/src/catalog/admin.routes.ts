@@ -29,6 +29,7 @@ export const adminCatalogRouter = Router();
 const adminAnimeSelect = {
   id: true,
   slug: true,
+  aniListId: true,
   title: true,
   englishTitle: true,
   nativeTitle: true,
@@ -718,6 +719,7 @@ adminCatalogRouter.post("/anime", requireTrustedOrigin, async (request, response
     const item = await prisma.anime.create({
       data: {
         slug,
+        aniListId: data.aniListId,
         title: data.title,
         englishTitle: data.englishTitle,
         nativeTitle: data.nativeTitle,
@@ -768,6 +770,7 @@ adminCatalogRouter.patch("/anime/:id", requireTrustedOrigin, async (request, res
 
     const update: Prisma.AnimeUpdateInput = {
       slug: data.slug,
+      aniListId: data.aniListId,
       title: data.title,
       englishTitle: data.englishTitle,
       nativeTitle: data.nativeTitle,
