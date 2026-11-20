@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, lstat, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 
 const originalRoot = process.env.MEDIA_STORAGE_ROOT;
+const originalNodeEnv = process.env.NODE_ENV;
 let temporaryRoot = "";
 
 afterEach(async () => {
@@ -12,6 +13,8 @@ afterEach(async () => {
   if (temporaryRoot) await rm(temporaryRoot, { recursive: true, force: true });
   if (originalRoot === undefined) delete process.env.MEDIA_STORAGE_ROOT;
   else process.env.MEDIA_STORAGE_ROOT = originalRoot;
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = originalNodeEnv;
   temporaryRoot = "";
 });
 
@@ -36,6 +39,55 @@ describe("local media storage", () => {
     expect((await stat(stored.absolutePath)).mode & 0o777).toBe(0o600);
   });
 
+  it("refuses to follow a symlink in place of a managed media file", async () => {
+    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-file-link-"));
+    process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
+    const { createMediaStorageKey, resolveStoredMediaPath, openStoredMediaFile, readStoredMediaStat } = await import("./storage.js");
+    const key = createMediaStorageKey();
+    const destination = await resolveStoredMediaPath(key);
+    const outside = path.join(temporaryRoot, "outside-secret.bin");
+    await writeFile(outside, "must never be served");
+    await symlink(outside, destination);
+
+    expect(await openStoredMediaFile(key)).toBeNull();
+    expect(await readStoredMediaStat(key)).toBeNull();
+  });
+
+  it("rejects a symlink used as a managed storage shard", async () => {
+    temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-shard-link-"));
+    process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
+    vi.resetModules();
+    const { resolveStoredMediaPath } = await import("./storage.js");
+    const outside = path.join(temporaryRoot, "outside");
+    await mkdir(outside);
+    await symlink(outside, path.join(temporaryRoot, "aa"), "dir");
+
+    await expect(resolveStoredMediaPath(`aa/${"b".repeat(32)}`)).rejects.toThrow("real directory");
+  });
+
+  it("requires an explicit absolute storage root in production", async () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.MEDIA_STORAGE_ROOT;
+    vi.resetModules();
+    await expect(import("../config/env.js")).rejects.toThrow(/MEDIA_STORAGE_ROOT.*absolute persistent path/);
+  });
+
+  it("rejects relative production storage roots", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.MEDIA_STORAGE_ROOT = ".data/media";
+    vi.resetModules();
+    await expect(import("../config/env.js")).rejects.toThrow(/MEDIA_STORAGE_ROOT.*absolute persistent path/);
+  });
+
+  it("accepts an absolute production storage root", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.MEDIA_STORAGE_ROOT = path.join(os.tmpdir(), "samren-media-prod");
+    vi.resetModules();
+    const { env } = await import("../config/env.js");
+    expect(env.MEDIA_STORAGE_ROOT).toBe(path.join(os.tmpdir(), "samren-media-prod"));
+  });
+
   it("lists only stale regular files with generated managed storage keys", async () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-orphans-"));
     process.env.MEDIA_STORAGE_ROOT = temporaryRoot;
@@ -47,7 +99,6 @@ describe("local media storage", () => {
     await utimes(stale.absolutePath, new Date(now - 120_000), new Date(now - 120_000));
 
     const candidates = await listStaleManagedMediaKeys(60_000, now);
-
     expect(candidates).toEqual([stale.storageKey]);
     expect(candidates).not.toContain(fresh.storageKey);
   });
@@ -99,7 +150,6 @@ describe("local media storage", () => {
   });
 });
 
-
 describe("stale media temporary-file cleanup", () => {
   it("removes only old generated temp files and preserves fresh, unrelated, and symlink entries", async () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "samren-media-cleanup-"));
@@ -122,7 +172,6 @@ describe("stale media temporary-file cleanup", () => {
     await symlink(stale, symlinkPath);
 
     const removed = await cleanupStaleMediaTempFiles(60_000, now);
-
     expect(removed).toBe(1);
     await expect(readFile(stale)).rejects.toMatchObject({ code: "ENOENT" });
     expect(await readFile(fresh, "utf8")).toBe("active partial");

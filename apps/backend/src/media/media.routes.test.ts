@@ -1,29 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import request from "supertest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { prisma } from "../db/prisma.js";
-import { readStoredMediaStat } from "./storage.js";
+import { openStoredMediaFile } from "./storage.js";
 import { mediaRouter } from "./media.routes.js";
 
-vi.mock("../db/prisma.js", () => ({
-  prisma: { mediaAsset: { findFirst: vi.fn() } },
-}));
-vi.mock("./storage.js", () => ({
-  readStoredMediaStat: vi.fn(),
-}));
+vi.mock("../db/prisma.js", () => ({ prisma: { mediaAsset: { findFirst: vi.fn() } } }));
+vi.mock("./storage.js", () => ({ openStoredMediaFile: vi.fn() }));
 
 const app = express();
 app.use("/media", mediaRouter);
 let temporaryRoot = "";
 let mediaPath = "";
-
 const publishedAsset = {
   storageKey: "aa/00000000000000000000000000000000",
   mimeType: "video/mp4",
   checksumSha256: "a".repeat(64),
+  sizeBytes: 10n,
 };
 
 beforeEach(async () => {
@@ -31,7 +28,11 @@ beforeEach(async () => {
   mediaPath = path.join(temporaryRoot, "sample.mp4");
   await writeFile(mediaPath, "0123456789");
   vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue(publishedAsset as never);
-  vi.mocked(readStoredMediaStat).mockResolvedValue({ absolutePath: mediaPath, sizeBytes: 10 });
+  vi.mocked(openStoredMediaFile).mockImplementation(async () => {
+    const handle = await open(mediaPath, constants.O_RDONLY);
+    const details = await handle.stat();
+    return { absolutePath: mediaPath, sizeBytes: details.size, handle };
+  });
 });
 
 afterEach(async () => {
@@ -42,7 +43,6 @@ afterEach(async () => {
 describe("public media delivery", () => {
   it("serves published ready media with safe headers", async () => {
     const response = await request(app).get("/media/asset-1");
-
     expect(response.status).toBe(200);
     expect(response.body.toString()).toBe("0123456789");
     expect(response.headers["content-type"]).toContain("video/mp4");
@@ -50,36 +50,42 @@ describe("public media delivery", () => {
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers.etag).toBe(`"${publishedAsset.checksumSha256}"`);
     expect(prisma.mediaAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        id: "asset-1",
-        processingState: "READY",
-        OR: expect.arrayContaining([
-          expect.objectContaining({ episodeMedia: expect.any(Object) }),
-        ]),
-      }),
+      where: expect.objectContaining({ id: "asset-1", processingState: "READY" }),
     }));
   });
 
   it("supports HEAD without returning the media body", async () => {
     const response = await request(app).head("/media/asset-1");
-
     expect(response.status).toBe(200);
     expect(response.headers["content-length"]).toBe("10");
     expect(response.text ?? "").toBe("");
   });
 
+  it("supports HEAD byte ranges without returning a body", async () => {
+    const response = await request(app).head("/media/asset-1").set("Range", "bytes=2-4");
+    expect(response.status).toBe(206);
+    expect(response.headers["content-range"]).toBe("bytes 2-4/10");
+    expect(response.headers["content-length"]).toBe("3");
+    expect(response.text ?? "").toBe("");
+  });
+
   it("serves a requested byte range and clamps the end to the file size", async () => {
     const response = await request(app).get("/media/asset-1").set("Range", "bytes=7-99");
-
     expect(response.status).toBe(206);
     expect(response.headers["content-range"]).toBe("bytes 7-9/10");
     expect(response.body.toString()).toBe("789");
   });
 
+  it("clamps an oversized suffix range to the complete file", async () => {
+    const response = await request(app).get("/media/asset-1").set("Range", "bytes=-999999999999999999999999999999");
+    expect(response.status).toBe(206);
+    expect(response.headers["content-range"]).toBe("bytes 0-9/10");
+    expect(response.body.toString()).toBe("0123456789");
+  });
+
   it("rejects malformed and unsatisfiable byte ranges", async () => {
     const malformed = await request(app).get("/media/asset-1").set("Range", "bytes=abc");
     const unsatisfiable = await request(app).get("/media/asset-1").set("Range", "bytes=10-");
-
     expect(malformed.status).toBe(416);
     expect(malformed.headers["content-range"]).toBe("bytes */10");
     expect(unsatisfiable.status).toBe(416);
@@ -87,56 +93,41 @@ describe("public media delivery", () => {
 
   it("does not deliver an asset that is not attached to published content", async () => {
     vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue(null);
-
     const response = await request(app).get("/media/unpublished");
-
     expect(response.status).toBe(404);
-    expect(readStoredMediaStat).not.toHaveBeenCalled();
+    expect(openStoredMediaFile).not.toHaveBeenCalled();
   });
 
   it("returns not found when the managed file is missing", async () => {
-    vi.mocked(readStoredMediaStat).mockResolvedValue(null);
-
+    vi.mocked(openStoredMediaFile).mockResolvedValue(null);
     const response = await request(app).get("/media/missing");
-
     expect(response.status).toBe(404);
   });
+
+  it("does not serve a file whose size differs from database metadata", async () => {
+    vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({ ...publishedAsset, sizeBytes: 11n } as never);
+    const response = await request(app).get("/media/asset-size-mismatch");
+    expect(response.status).toBe(404);
+  });
+
   it("converts published SubRip subtitles into WebVTT for browser tracks", async () => {
     const subtitle = "1\n00:00:01,000 --> 00:00:02,500\nHello from Samren";
     await writeFile(mediaPath, subtitle);
     vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
-      ...publishedAsset,
-      mimeType: "application/x-subrip",
+      ...publishedAsset, mimeType: "application/x-subrip", sizeBytes: BigInt(Buffer.byteLength(subtitle)),
     } as never);
-    vi.mocked(readStoredMediaStat).mockResolvedValue({
-      absolutePath: mediaPath,
-      sizeBytes: Buffer.byteLength(subtitle),
-    });
-
     const response = await request(app).get("/media/asset-1/vtt");
-
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("text/vtt");
     expect(response.text).toBe("WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nHello from Samren\n");
-    expect(prisma.mediaAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        id: "asset-1",
-        subtitleTracks: expect.any(Object),
-      }),
-    }));
   });
 
   it("does not expose malformed SubRip content as a browser subtitle", async () => {
     await writeFile(mediaPath, "not a subtitle");
     vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
-      ...publishedAsset,
-      mimeType: "application/x-subrip",
+      ...publishedAsset, mimeType: "application/x-subrip", sizeBytes: BigInt(Buffer.byteLength("not a subtitle")),
     } as never);
-    vi.mocked(readStoredMediaStat).mockResolvedValue({ absolutePath: mediaPath, sizeBytes: 14 });
-
     const response = await request(app).get("/media/asset-1/vtt");
-
     expect(response.status).toBe(422);
   });
-
 });

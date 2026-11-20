@@ -1,3 +1,4 @@
+import path from "node:path";
 import { z } from "zod";
 
 const schema = z.object({
@@ -7,7 +8,7 @@ const schema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   DATABASE_URL: z.string().min(1).optional(),
-  MEDIA_STORAGE_ROOT: z.string().min(1).default(".data/media"),
+  MEDIA_STORAGE_ROOT: z.string().trim().min(1).optional(),
   ANIVEXA_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   ANIVEXA_ALLOWED_HOSTS: z.string().default(""),
   ANIVEXA_STREAM_ALLOWED_HOSTS: z.string().default(""),
@@ -18,9 +19,13 @@ const schema = z.object({
 });
 
 const parsed = schema.safeParse(process.env);
-if (!parsed.success) {
-  throw new Error(`Invalid environment configuration: ${parsed.error.message}`);
+if (!parsed.success) throw new Error(`Invalid environment configuration: ${parsed.error.message}`);
+
+const mediaStorageRoot = parsed.data.MEDIA_STORAGE_ROOT ?? ".data/media";
+if (parsed.data.NODE_ENV === "production"
+  && (!parsed.data.MEDIA_STORAGE_ROOT || !path.isAbsolute(parsed.data.MEDIA_STORAGE_ROOT))) {
+  throw new Error("MEDIA_STORAGE_ROOT must be explicitly configured as an absolute persistent path in production");
 }
 
-export const env = parsed.data;
+export const env = { ...parsed.data, MEDIA_STORAGE_ROOT: mediaStorageRoot };
 export const isProduction = env.NODE_ENV === "production";
