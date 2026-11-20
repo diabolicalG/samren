@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 const schema = z.object({
@@ -22,9 +23,21 @@ const parsed = schema.safeParse(process.env);
 if (!parsed.success) throw new Error(`Invalid environment configuration: ${parsed.error.message}`);
 
 const mediaStorageRoot = parsed.data.MEDIA_STORAGE_ROOT ?? ".data/media";
-if (parsed.data.NODE_ENV === "production"
-  && (!parsed.data.MEDIA_STORAGE_ROOT || !path.isAbsolute(parsed.data.MEDIA_STORAGE_ROOT))) {
-  throw new Error("MEDIA_STORAGE_ROOT must be explicitly configured as an absolute persistent path in production");
+if (parsed.data.NODE_ENV === "production") {
+  if (!parsed.data.MEDIA_STORAGE_ROOT || !path.isAbsolute(parsed.data.MEDIA_STORAGE_ROOT)) {
+    throw new Error("MEDIA_STORAGE_ROOT must be explicitly configured as an absolute persistent path in production");
+  }
+
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+  const publicRoots = [
+    path.join(repoRoot, "public"),
+    path.join(repoRoot, "apps", "frontend", "public"),
+    path.join(repoRoot, "apps", "backend", "public"),
+  ];
+  const configuredRoot = path.resolve(parsed.data.MEDIA_STORAGE_ROOT);
+  if (publicRoots.some((publicRoot) => configuredRoot === publicRoot || configuredRoot.startsWith(publicRoot + path.sep))) {
+    throw new Error("MEDIA_STORAGE_ROOT must be outside public web roots");
+  }
 }
 
 export const env = { ...parsed.data, MEDIA_STORAGE_ROOT: mediaStorageRoot };

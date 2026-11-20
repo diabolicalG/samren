@@ -85,19 +85,24 @@ export async function resolveStoredMediaPath(storageKey: string, createParent = 
 
 export async function openStoredMediaFile(storageKey: string): Promise<OpenedStoredMedia | null> {
   const absolutePath = await resolveStoredMediaPath(storageKey, false);
+  let handle: FileHandle | null = null;
   try {
     const entry = await lstat(absolutePath);
     if (entry.isSymbolicLink() || !entry.isFile()) return null;
 
     const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
-    const handle = await open(absolutePath, constants.O_RDONLY | noFollow);
+    handle = await open(absolutePath, constants.O_RDONLY | noFollow);
     const details = await handle.stat();
     if (!details.isFile()) {
       await handle.close();
+      handle = null;
       return null;
     }
-    return { absolutePath, sizeBytes: details.size, handle };
+    const opened = { absolutePath, sizeBytes: details.size, handle };
+    handle = null;
+    return opened;
   } catch (error) {
+    if (handle) await handle.close().catch(() => undefined);
     if (isFsCode(error, "ENOENT") || isFsCode(error, "ELOOP")) return null;
     throw error;
   }

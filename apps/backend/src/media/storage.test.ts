@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 
 const originalRoot = process.env.MEDIA_STORAGE_ROOT;
@@ -78,6 +79,14 @@ describe("local media storage", () => {
     process.env.MEDIA_STORAGE_ROOT = ".data/media";
     vi.resetModules();
     await expect(import("../config/env.js")).rejects.toThrow(/MEDIA_STORAGE_ROOT.*absolute persistent path/);
+  });
+
+  it("rejects production storage roots inside application public directories", async () => {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+    process.env.NODE_ENV = "production";
+    process.env.MEDIA_STORAGE_ROOT = path.join(repoRoot, "apps", "frontend", "public", "media");
+    vi.resetModules();
+    await expect(import("../config/env.js")).rejects.toThrow(/outside public web roots/);
   });
 
   it("accepts an absolute production storage root", async () => {
