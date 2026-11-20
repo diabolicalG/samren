@@ -7,7 +7,9 @@ import { getAniZoneEpisodes } from "./anizone.js";
 import { getAniKotoEpisodes } from "./anikoto.js";
 import { getKaaEpisodes } from "./kaa.js";
 import { providerAggregator } from "./aggregator.js";
-import { proxyAnivexaMedia } from "./media-proxy.js";
+import { createMediaResourceUrl, proxyAnivexaMedia } from "./media-proxy.js";
+import { ensurePlaybackSession, readPlaybackSessionToken } from "./playback-session.js";
+import { bindProviderSession, isProviderSessionBound, revokePlaybackResourcesForProviderSession } from "./resource-registry.js";
 import {
   getAniWavesEpisodes, getReAnimeEpisodes, getAnimeOnsenEpisodes,
   getAnimeNoSubEpisodes, getAniPmEpisodes, getSenshiEpisodes,
@@ -16,23 +18,21 @@ import {
 
 export const anivexaRouter = Router();
 
-anivexaRouter.head("/media", proxyAnivexaMedia);
-anivexaRouter.get("/media", proxyAnivexaMedia);
+anivexaRouter.head("/media/:handle", proxyAnivexaMedia);
+anivexaRouter.get("/media/:handle", proxyAnivexaMedia);
 
-function clientMediaStream(stream: { url: string; type?: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }) {
+function clientMediaStream(stream: { url: string; type?: string; referer?: string; subtitles?: Array<{ url: string; [key: string]: unknown }>; [key: string]: unknown }, sessionToken: string, providerSessionId: string) {
   const referer = stream.referer;
-  const proxy = (url: string, kind?: string) => {
-    const query = new URLSearchParams({ url });
-    if (kind) query.set("kind", kind);
-    if (referer) query.set("referer", referer);
-    return `/api/v1/anivexa/media?${query.toString()}`;
-  };
+  const kind = stream.type === "hls" || stream.type === "dash" || stream.type === "mp4" ? stream.type : "auto";
   const publicStream = { ...stream };
   delete publicStream.referer;
   return {
     ...publicStream,
-    url: proxy(stream.url, stream.type),
-    subtitles: stream.subtitles?.map((track) => ({ ...track, url: proxy(track.url, "vtt") })),
+    url: createMediaResourceUrl(stream.url, referer, sessionToken, providerSessionId, kind),
+    subtitles: stream.subtitles?.map((track) => ({
+      ...track,
+      url: createMediaResourceUrl(track.url, referer, sessionToken, providerSessionId, "vtt"),
+    })),
   };
 }
 
@@ -145,9 +145,11 @@ anivexaRouter.get("/anime/:slug/episodes/:episodeNumber/aggregate", async (reque
   try {
     const aniListId = await resolvePublishedAniListId(slug.data);
     if (sendMappingError(response, aniListId)) return;
+    const sessionToken = ensurePlaybackSession(request, response);
     const result = await providerAggregator.start(aniListId as number, episode.data, audio.data);
+    bindProviderSession(result.sessionId, sessionToken);
     response.setHeader("Cache-Control", "private, no-store");
-    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream) }, error: null });
+    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream, sessionToken, result.sessionId) }, error: null });
   } catch {
     response.status(502).json({ data: null, error: { code: "ANIVEXA_ALL_PROVIDERS_FAILED", message: "No provider returned a valid playable stream" } });
   }
@@ -164,10 +166,15 @@ anivexaRouter.post("/aggregate/:sessionId/fallback", async (request, response) =
     response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid playback session and failed provider are required" } });
     return;
   }
+  const sessionToken = readPlaybackSessionToken(request);
+  if (!sessionToken || !isProviderSessionBound(sessionId.data, sessionToken)) {
+    response.status(404).json({ data: null, error: { code: "PLAYBACK_SESSION_NOT_FOUND", message: "Playback session is unavailable for this browser" } });
+    return;
+  }
   try {
     const result = await providerAggregator.fallback(sessionId.data, body.data.provider);
     response.setHeader("Cache-Control", "private, no-store");
-    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream) }, error: null });
+    response.status(200).json({ data: { ...result, stream: clientMediaStream(result.stream, sessionToken, sessionId.data) }, error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const notFound = message.includes("expired or was not found");
@@ -184,6 +191,12 @@ anivexaRouter.delete("/aggregate/:sessionId", async (request, response) => {
     response.status(400).json({ data: null, error: { code: "VALIDATION_ERROR", message: "A valid playback session is required" } });
     return;
   }
+  const sessionToken = readPlaybackSessionToken(request);
+  if (!sessionToken || !isProviderSessionBound(sessionId.data, sessionToken)) {
+    response.status(404).json({ data: null, error: { code: "PLAYBACK_SESSION_NOT_FOUND", message: "Playback session is unavailable for this browser" } });
+    return;
+  }
   await providerAggregator.close(sessionId.data);
+  revokePlaybackResourcesForProviderSession(sessionId.data);
   response.status(204).end();
 });
