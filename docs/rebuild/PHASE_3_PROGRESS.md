@@ -97,7 +97,7 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 |---|---|
 | 3.1 — Contracts and branch reconciliation | **Complete** — branch reconciled, contracts recorded, legacy changes removed, and CI passed |
 | 3.2 — Storage hardening | **Complete** — symlink-safe reads, production-root validation, file-size consistency and range-edge tests; CI run 447372 passed |
-| 3.3 — Secure ingestion | Not started |
+| 3.3 — Secure ingestion | **Complete** — configurable limits, admin status/limits endpoints, abort cleanup and UI integration; CI run 447378 passed |
 | 3.4 — First-party delivery | Not started |
 | 3.5 — Playback contracts and providers | Not started |
 | 3.6 — Frontend playback | Not started |
@@ -125,3 +125,14 @@ Finish each checkpoint, run its tests, inspect the diff and record its audit bef
 - Production requires an explicit absolute storage root and rejects the repository's known public web roots. Deployment-specific static roots must still be checked in deployment configuration.
 - Range handling now correctly clamps oversized suffix ranges; tests cover GET/HEAD and malformed/unsatisfiable ranges.
 - **Checkpoint 3.2 accepted.** Checkpoint 3.3 is next; do not begin provider/playback work until secure ingestion is implemented and audited.
+
+
+### Checkpoint 3.3 acceptance — 2026-11-20
+
+- Implementation commits: `100bd608f1e586b9cd0871040ea55113db3afeac`, `59aef045b229b39c9df4e183d2b8aeb06689e81a`, `3ad433c0713bc94050e0f1440bcfb992632a5911` and final UI formatting fix `3172f0dedb96cb4b0aa2cee4177b37ca122758ac`.
+- CI run [44737814111](https://github.com/diabolicalG/samren/actions/runs/44737814111) completed successfully. Prisma validation/migrations/seeding, lint, typecheck, backend tests, frontend smoke/accessibility tests and production builds passed.
+- Upload limits are validated environment settings, exposed through an ADMIN-only API and loaded by the upload UI. The backend remains authoritative and disables upload when limits cannot be loaded.
+- Added ADMIN-only asset status reporting with safe file states and no storage-key/path disclosure.
+- Added request timeout configuration and abort/disconnect checks; multipart temporary directories and partial storage writes are cleaned on failure.
+- Tests cover authentication, configured limits, PRESENT/NOT_MANAGED/SIZE_MISMATCH status, and the existing signature/size/multipart upload paths.
+- **Checkpoint 3.3 accepted.** Proceed to Checkpoint 3.4 — first-party delivery audit and hardening.

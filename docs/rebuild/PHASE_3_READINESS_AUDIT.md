@@ -226,3 +226,14 @@ Verified changes: generated-key reads reject symlinked files/shards; reads use `
 Residual limits: production persistence and backup/restore are not operationally certified; deployment-specific public/static roots must be configured outside media storage; stored SHA-256 values are not recomputed on every read; upload size limits remain hard-coded, the admin asset-status endpoint is still missing, and upload timeout/disconnect hardening belongs to Checkpoint 3.3.
 
 No changes were made to `diabolicalG/Anime-streaming`. Continue to Checkpoint 3.3 only after this audit; do not skip the next audit gate.
+
+
+### Checkpoint 3.3 audit — 2026-11-20
+
+**Verdict: ACCEPTED.** Secure ingestion and administrator diagnostics are implemented in Samren. CI run [44737814111](https://github.com/diabolicalG/samren/actions/runs/44737814111) completed successfully with all active-workspace gates passing.
+
+Verified: validated environment-based per-kind upload limits (15 MiB image, 2 GiB video, 2 MiB subtitle defaults); an ADMIN-only `GET /admin/catalog/assets/upload-limits`; frontend upload preflight driven by those server values; an ADMIN-only asset status endpoint returning `PRESENT`, `MISSING`, `SIZE_MISMATCH`, `NOT_MANAGED` or `UNAVAILABLE` without exposing storage keys/paths; a configurable request timeout; request-abort checks before finalization; and cleanup of multipart temp directories/partial managed files on failure. Backend tests verify auth boundaries, dynamic limit values and file-state reporting. Frontend smoke/accessibility tests and production builds pass.
+
+Residual limits: upload throttling is not yet implemented; request timeout is applied at the Node server level rather than only to upload routes; no malware scanner or deep codec probe is included; browser-disconnect behavior is not yet exercised in a real-browser E2E test; and the status endpoint reports filesystem presence/size, not a full checksum revalidation. These remain release-hardening items.
+
+**Checkpoint 3.3 accepted.** Proceed to Checkpoint 3.4 — review first-party delivery/publication gating and end-to-end range behavior. Anime-streaming remains read-only.
