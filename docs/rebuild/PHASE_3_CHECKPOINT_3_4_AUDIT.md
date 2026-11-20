@@ -51,7 +51,7 @@ CI run 44738805397 passed:
 - No CDN or object storage is included; this checkpoint uses the approved local managed filesystem.
 - Conditional 304 handling and multi-range delivery are not implemented; neither is required by the current approved scope.
 - Real-browser playback, seeking and cross-browser codec compatibility remain for the frontend/integration checkpoints.
-- The active React/Vite app still has no watch route/player; this is not a Checkpoint 3.4 acceptance criterion.
+- The active React/Vite app has a WatchPage/AdaptivePlayer consuming the first-party API. Real-browser/device playback, seeking and codec verification are separate integration gates and are not claimed by this delivery-route checkpoint.
 
 ## 5. Repository boundary
 

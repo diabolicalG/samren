@@ -61,7 +61,7 @@ This acceptance does **not** complete overall Checkpoint 3.5. The following rema
 - Per-client and provider rate limiting.
 - Integration tests for provider resolution, session binding and failure isolation.
 
-The active React/Vite frontend still has no watch route and does not consume this API. That remains Checkpoint 3.6.
+The active React/Vite frontend has a WatchPage at /watch/:slug/:episodeNumber and consumes the first-party playback API through AdaptivePlayer. The provider fallback previously required a manually entered AniList ID; the current implementation now resolves that ID server-side from the admin-managed catalogue mapping using the slug. Checkpoint 3.6 remains in progress for real-browser/device verification, subtitle-selection UX and player reliability.
 
 ## 6. Repository boundary
 

@@ -100,7 +100,7 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 | 3.3 — Secure ingestion | **Complete** — configurable limits, admin status/limits endpoints, abort cleanup and UI integration; CI run 447378 passed |
 | 3.4 — First-party delivery | **Complete** — published-content/MIME eligibility, GET/HEAD/range delivery, file integrity checks and delivery tests; CI run 447388 passed |
 | 3.5 — Playback contracts and providers | **In progress** — first-party playback metadata/subtitle API subcheckpoint accepted; Kuhi, clean-room/licensed Anivexa, AniList mapping, opaque resource handles and rate limits remain |
-| 3.6 — Frontend playback | Not started — active React app has no watch route/player; legacy apps/web is not active |
+| 3.6 — Frontend playback | **In progress** — active WatchPage/AdaptivePlayer uses first-party playback API, quality selection, subtitles, browser-local resume and episode navigation; real-browser verification and player UX hardening remain |
 | 3.7 — Integration/security verification | Not started |
 | 3.8 — Final audit and freeze | Not started |
 
@@ -155,4 +155,4 @@ Finish each checkpoint, run its tests, inspect the diff and record its audit bef
 
 ### Active frontend correction — 2026-11-20
 
-The active React/Vite App.tsx registers Home, Browse, Search, Anime detail and Admin routes only. It has no /watch route and does not call apiClient.catalogPlayback. The legacy apps/web watch route is excluded from the active pnpm workspace. Therefore the actual player, source switching, subtitles in the UI, episode navigation and browser-local progress remain outstanding under Checkpoint 3.6. Earlier statements in this progress document that described an active watch page were inaccurate and are superseded by this correction.
+The active React/Vite app registers /watch/:slug/:episodeNumber. WatchPage consumes apiClient.catalogPlayback and renders AdaptivePlayer, first-party source selection, native subtitle tracks, browser-local resume progress and previous/next episode navigation. The earlier correction claiming that no active watch route existed was inaccurate and is superseded. The provider fallback previously asked viewers to enter an AniList ID; it now resolves the ID server-side from the administrator-managed AniList mapping using the local catalogue slug. The legacy apps/web watch route remains excluded from the active pnpm workspace.
