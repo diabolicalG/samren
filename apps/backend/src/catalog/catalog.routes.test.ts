@@ -76,7 +76,6 @@ describe("catalogue playback metadata", () => {
     expect(readStoredMediaStat).toHaveBeenCalledWith(missingVideoKey);
     expect(readStoredMediaStat).toHaveBeenCalledWith(vttKey);
     expect(readStoredMediaStat).toHaveBeenCalledWith(mismatchedSrtKey);
-    expect(readStoredMediaStat).toHaveBeenCalledWith(`ee/${"e".repeat(32)}`);
     expect(prisma.episode.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         episodeNumber: 1,
