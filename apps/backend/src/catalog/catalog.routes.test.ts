@@ -34,8 +34,9 @@ const playbackEpisode = {
     { id: "episode-media-2", qualityLabel: "720p", isDefault: false, asset: { id: "video-missing", mimeType: "video/mp4", storageKey: missingVideoKey, sizeBytes: 50n } },
   ],
   subtitles: [
-    { id: "subtitle-1", languageCode: "en", label: "English", isDefault: true, format: "VTT", asset: { id: "subtitle-vtt", storageKey: vttKey, sizeBytes: 12n } },
-    { id: "subtitle-2", languageCode: "ja", label: "Japanese", isDefault: false, format: "SRT", asset: { id: "subtitle-srt", storageKey: mismatchedSrtKey, sizeBytes: 14n } },
+    { id: "subtitle-1", languageCode: "en", label: "English", isDefault: true, format: "VTT", asset: { id: "subtitle-vtt", mimeType: "text/vtt", storageKey: vttKey, sizeBytes: 12n } },
+    { id: "subtitle-2", languageCode: "ja", label: "Japanese", isDefault: false, format: "SRT", asset: { id: "subtitle-srt", mimeType: "application/x-subrip", storageKey: mismatchedSrtKey, sizeBytes: 14n } },
+    { id: "subtitle-3", languageCode: "fr", label: "French", isDefault: false, format: "VTT", asset: { id: "subtitle-invalid-format", mimeType: "application/x-subrip", storageKey: `ee/${"e".repeat(32)}`, sizeBytes: 15n } },
   ],
 };
 
@@ -45,7 +46,7 @@ describe("catalogue playback metadata", () => {
   it("returns only attached, published, ready and physically available first-party media", async () => {
     vi.mocked(prisma.episode.findFirst).mockResolvedValue(playbackEpisode as never);
     vi.mocked(readStoredMediaStat).mockImplementation(async (storageKey) => {
-      const sizes = new Map<string, number>([[videoKey, 100], [vttKey, 12], [mismatchedSrtKey, 13]]);
+      const sizes = new Map<string, number>([[videoKey, 100], [vttKey, 12], [mismatchedSrtKey, 13], [`ee/${"e".repeat(32)}`, 15]]);
       const sizeBytes = sizes.get(storageKey);
       return sizeBytes === undefined ? null : { absolutePath: "/private/samren-media/file", sizeBytes };
     });
@@ -75,6 +76,7 @@ describe("catalogue playback metadata", () => {
     expect(readStoredMediaStat).toHaveBeenCalledWith(missingVideoKey);
     expect(readStoredMediaStat).toHaveBeenCalledWith(vttKey);
     expect(readStoredMediaStat).toHaveBeenCalledWith(mismatchedSrtKey);
+    expect(readStoredMediaStat).toHaveBeenCalledWith(`ee/${"e".repeat(32)}`);
     expect(prisma.episode.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         episodeNumber: 1,

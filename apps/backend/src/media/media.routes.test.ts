@@ -61,6 +61,38 @@ describe("public media delivery", () => {
     }));
   });
 
+  it("serves a published poster only through its poster relation and image MIME allowlist", async () => {
+    vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
+      ...publishedAsset, mediaKind: "POSTER", mimeType: "image/webp",
+    } as never);
+    const response = await request(app).get("/media/poster-1");
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/webp");
+    expect(prisma.mediaAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          expect.objectContaining({ mediaKind: "POSTER", mimeType: { in: ["image/jpeg", "image/png", "image/webp", "image/avif"] }, posterFor: expect.any(Object) }),
+        ]),
+      }),
+    }));
+  });
+
+  it("serves direct WebVTT subtitle assets through the generic media endpoint", async () => {
+    vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValue({
+      ...publishedAsset, mediaKind: "SUBTITLE", mimeType: "text/vtt",
+    } as never);
+    const response = await request(app).get("/media/subtitle-vtt");
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/vtt");
+    expect(prisma.mediaAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          expect.objectContaining({ mediaKind: "SUBTITLE", mimeType: "text/vtt", subtitleTracks: expect.any(Object) }),
+        ]),
+      }),
+    }));
+  });
+
   it("supports HEAD without returning the media body", async () => {
     const response = await request(app).head("/media/asset-1");
     expect(response.status).toBe(200);

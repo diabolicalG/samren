@@ -102,7 +102,7 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
           orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
           select: {
             id: true, languageCode: true, label: true, isDefault: true, format: true,
-            asset: { select: { id: true, storageKey: true, sizeBytes: true } },
+            asset: { select: { id: true, mimeType: true, storageKey: true, sizeBytes: true } },
           },
         },
       },
@@ -115,7 +115,8 @@ catalogRouter.get("/anime/:slug/episodes/:episodeNumber/playback", async (reques
     const [mediaAvailability, subtitleAvailability] = await Promise.all([
       Promise.all(episode.media.map(async (item) => ({
         item,
-        available: await isStoredAssetAvailable(item.asset.storageKey, item.asset.sizeBytes),
+        available: (item.format === "VTT" ? item.asset.mimeType === "text/vtt" : ["application/x-subrip", "text/srt"].includes(item.asset.mimeType))
+          && await isStoredAssetAvailable(item.asset.storageKey, item.asset.sizeBytes),
       }))),
       Promise.all(episode.subtitles.map(async (item) => ({
         item,
