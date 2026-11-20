@@ -13,7 +13,7 @@ export function useProviderPlayback() {
   const [isSwitching, setIsSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const start = useCallback(async (anilistId: number, episode: number, audio: "sub" | "dub" = "sub") => {
+  const start = useCallback(async (slug: string, episode: number, audio: "sub" | "dub" = "sub") => {
     const operation = ++operationRef.current;
     const previous = sessionRef.current;
     sessionRef.current = null;
@@ -24,7 +24,7 @@ export function useProviderPlayback() {
     setError(null);
     if (previous) await apiClient.closePlaybackSession(previous.sessionId).catch(() => undefined);
     try {
-      const result = await apiClient.aggregatePlayback(anilistId, episode, audio);
+      const result = await apiClient.aggregatePlayback(slug, episode, audio);
       if (operation !== operationRef.current) {
         await apiClient.closePlaybackSession(result.sessionId).catch(() => undefined);
         throw new Error("Playback request was superseded by a newer episode.");

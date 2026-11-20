@@ -301,12 +301,10 @@ describe("first-party watch experience", () => {
     });
 
     renderApp("/watch/the-clockwork-orbit/4");
-    const idInput = await screen.findByLabelText("AniList ID for provider fallback");
-    fireEvent.change(idInput, { target: { value: "12345" } });
     fireEvent.error(document.querySelector("video")!);
 
     await waitFor(() => {
-      expect(aggregate).toHaveBeenCalledWith(12345, 4, "sub");
+      expect(aggregate).toHaveBeenCalledWith("the-clockwork-orbit", 4, "sub");
       expect(document.querySelector("video")?.getAttribute("src")).toBe("https://cdn.example.test/first.mp4");
     });
 
@@ -339,7 +337,6 @@ describe("first-party watch experience", () => {
     const closeSession = vi.spyOn(apiClient, "closePlaybackSession").mockResolvedValue(undefined);
 
     renderApp("/watch/the-clockwork-orbit/1");
-    fireEvent.change(await screen.findByLabelText("AniList ID for provider fallback"), { target: { value: "12345" } });
     fireEvent.click(screen.getByRole("button", { name: "Find provider stream" }));
 
     await waitFor(() => {

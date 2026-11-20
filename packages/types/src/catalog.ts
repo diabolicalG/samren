@@ -27,7 +27,6 @@ export type CatalogSeason = {
 export type CatalogAnimeCard = {
   id: string;
   slug: string;
-  aniListId: number | null;
   title: string;
   englishTitle: string | null;
   synopsis: string | null;
@@ -101,6 +100,7 @@ export type AdminAuthUser = {
 export type AdminCatalogAnime = {
   id: string;
   slug: string;
+  aniListId: number | null;
   title: string;
   englishTitle: string | null;
   nativeTitle: string | null;

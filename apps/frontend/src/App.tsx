@@ -243,7 +243,6 @@ function EpisodeAssetManager({ episodeId, assets }: { episodeId: string; assets:
 function WatchPage() {
   const { slug = "", episodeNumber = "" } = useParams();
   const [selectedSourceId, setSelectedSourceId] = useState("");
-  const [anilistIdInput, setAnilistIdInput] = useState("");
   const [providerAudio, setProviderAudio] = useState<"sub" | "dub">("sub");
   const [providerError, setProviderError] = useState<string | null>(null);
   const [mediaFailed, setMediaFailed] = useState(false);
@@ -319,14 +318,8 @@ function WatchPage() {
       fallbackInFlight.current = false;
       return;
     }
-    const id = Number(anilistIdInput.trim());
-    if (!Number.isSafeInteger(id) || id <= 0) {
-      setProviderError("This first-party source failed. Enter a valid AniList ID to try provider fallback.");
-      fallbackInFlight.current = false;
-      return;
-    }
     try {
-      await providerPlayback.start(id, playback.episode.episodeNumber, providerAudio);
+      await providerPlayback.start(slug, playback.episode.episodeNumber, providerAudio);
       if (generation !== playbackGeneration.current) return;
     } catch (cause) {
       if (generation === playbackGeneration.current) {
@@ -354,15 +347,12 @@ function WatchPage() {
         </label>
       ) : null}
       <section className="provider-fallback-controls" aria-label="Provider fallback settings">
-        <label className="ui-field" htmlFor="provider-anilist-id">AniList ID for provider fallback
-          <input className="ui-input" id="provider-anilist-id" inputMode="numeric" pattern="[0-9]*" placeholder="Enter the matching AniList ID" value={anilistIdInput} onChange={(event) => setAnilistIdInput(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} />
-        </label>
         <label className="ui-field" htmlFor="provider-audio">Provider audio
           <select className="ui-input" id="provider-audio" value={providerAudio} onChange={(event) => setProviderAudio(event.target.value as "sub" | "dub")}>
             <option value="sub">Sub</option><option value="dub">Dub</option>
           </select>
         </label>
-        <p>Provider fallback starts automatically if the current video source reports a media error. You can also start provider playback here when no first-party source is attached.</p>
+        <p>Provider fallback uses the AniList identity configured by an administrator for this catalogue entry. It starts automatically after a first-party media error, or you can start it manually.</p>
         <button type="button" className="ui-button ui-button--secondary" onClick={() => { void handleMediaError(); }} disabled={providerPlayback.isStarting || providerPlayback.isSwitching}>
           {providerPlayback.isStarting ? "Finding a stream…" : providerPlayback.isSwitching ? "Switching provider…" : providerStream ? "Try another provider" : "Find provider stream"}
         </button>

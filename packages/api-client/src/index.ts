@@ -91,8 +91,8 @@ export function createApiClient(options: ApiClientOptions = {}) {
     catalogGenres: () => request<CatalogTaxonomyItem[]>("/catalog/genres"),
     catalogStudios: () => request<CatalogTaxonomyItem[]>("/catalog/studios"),
     catalogSeasons: () => request<CatalogSeason[]>("/catalog/seasons"),
-    aggregatePlayback: (anilistId: number, episode: number, audio: "sub" | "dub" = "sub") =>
-      request<{ sessionId: string; stream: { provider: string; url: string; type: "hls" | "mp4" | "dash"; server: string; quality: string; audio: "sub" | "dub"; referer?: string; subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }> }; providers: number; expiresAt: string }>(`/anivexa/aggregate/${anilistId}/${episode}?audio=${audio}`),
+    aggregatePlayback: (slug: string, episode: number, audio: "sub" | "dub" = "sub") =>
+      request<{ sessionId: string; stream: { provider: string; url: string; type: "hls" | "mp4" | "dash"; server: string; quality: string; audio: "sub" | "dub"; referer?: string; subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }> }; providers: number; expiresAt: string }>(`/anivexa/anime/${encodeURIComponent(slug)}/episodes/${episode}/aggregate?audio=${audio}`),
     fallbackPlayback: (sessionId: string, failedProvider: string) =>
       request<{ stream: { provider: string; url: string; type: "hls" | "mp4" | "dash"; server: string; quality: string; audio: "sub" | "dub"; referer?: string; subtitles?: Array<{ url: string; label: string; srclang: string; default?: boolean }> }; tried: string[]; remaining: number }>(`/anivexa/aggregate/${encodeURIComponent(sessionId)}/fallback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: failedProvider }) }),
     closePlaybackSession: (sessionId: string) =>
