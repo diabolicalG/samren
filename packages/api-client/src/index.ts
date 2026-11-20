@@ -49,6 +49,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
     adminCatalogAnime: () => request<{ items: AdminCatalogAnime[] }>("/admin/catalog/anime"),
     adminCatalogEpisodes: (animeId: string) => request<AdminCatalogEpisode[]>("/admin/catalog/anime/" + encodeURIComponent(animeId) + "/episodes"),
     adminCatalogAssets: () => request<AdminMediaAsset[]>("/admin/catalog/assets"),
+    adminMediaUploadLimits: () => request<Record<AdminMediaAsset["mediaKind"], number>>("/admin/catalog/assets/upload-limits"),
     adminUploadAsset: (file: File, mediaKind: AdminMediaAsset["mediaKind"]) => {
       const body = new FormData();
       body.append("file", file, file.name);

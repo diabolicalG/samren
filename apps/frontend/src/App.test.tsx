@@ -6,6 +6,14 @@ import App from "./App";
 import { apiClient } from "@samren/api-client";
 
 function renderApp(initialEntry = "/") {
+  if (initialEntry.startsWith("/admin")) {
+    vi.spyOn(apiClient, "adminMediaUploadLimits").mockResolvedValue({
+      POSTER: 15 * 1024 * 1024,
+      BANNER: 15 * 1024 * 1024,
+      VIDEO: 2 * 1024 * 1024 * 1024,
+      SUBTITLE: 2 * 1024 * 1024,
+    });
+  }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

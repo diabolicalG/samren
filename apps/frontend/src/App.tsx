@@ -403,8 +403,17 @@ function MediaUploadForm() {
   const [kind, setKind] = useState<AdminMediaAsset["mediaKind"]>("POSTER");
   const [file, setFile] = useState<File | null>(null);
   const queryClient = useQueryClient();
-  const maxBytes = kind === "VIDEO" ? 2 * 1024 * 1024 * 1024 : kind === "SUBTITLE" ? 2 * 1024 * 1024 : 15 * 1024 * 1024;
-  const tooLarge = Boolean(file && file.size > maxBytes);
+  const uploadLimitsQuery = useQuery({
+    queryKey: ["admin", "media-upload-limits"],
+    queryFn: () => apiClient.adminMediaUploadLimits(),
+  });
+  const maxBytes = uploadLimitsQuery.data?.[kind] ?? 0;
+  const tooLarge = Boolean(file && maxBytes > 0 && file.size > maxBytes);
+  const maxLabel = maxBytes >= 1024 * 1024 * 1024
+    ? `${(maxBytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\\.0$/, "")} GiB`
+    : maxBytes > 0
+      ? `${(maxBytes / (1024 * 1024)).toFixed(1).replace(/\\.0$/, "")} MiB`
+      : "unavailable";
   const uploadMutation = useMutation({
     mutationFn: () => {
       if (!file) throw new Error("Choose a file before uploading");
@@ -429,11 +438,12 @@ function MediaUploadForm() {
         <label className="ui-field" htmlFor="media-upload-file">File
           <input key={file ? "selected" : "empty"} className="ui-input" id="media-upload-file" type="file" accept={kind === "POSTER" || kind === "BANNER" ? "image/jpeg,image/png,image/webp,image/avif" : kind === "VIDEO" ? "video/mp4,video/webm" : ".vtt,.srt,.ass,text/vtt"} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
         </label>
-        <p className="admin-asset-note">Maximum: {kind === "VIDEO" ? "2 GiB" : kind === "SUBTITLE" ? "2 MiB" : "15 MiB"}</p>
+        <p className="admin-asset-note">Maximum: {uploadLimitsQuery.isLoading ? "checking…" : maxLabel}</p>
+        {uploadLimitsQuery.isError ? <p className="admin-error" role="alert">Upload limits are unavailable. Reload the administrator workspace before uploading.</p> : null}
         {tooLarge ? <p className="admin-error" role="alert">This file exceeds the selected media kind's upload limit.</p> : null}
         {uploadMutation.isError ? <p className="admin-error" role="alert">{uploadMutation.error.message}</p> : null}
         {uploadMutation.isSuccess ? <p className="admin-success" role="status">Upload complete. The asset is ready to associate with catalogue content.</p> : null}
-        <button className="ui-button ui-button--primary" type="submit" disabled={!file || tooLarge || uploadMutation.isPending}>{uploadMutation.isPending ? "Uploading…" : "Upload media"}</button>
+        <button className="ui-button ui-button--primary" type="submit" disabled={!file || !uploadLimitsQuery.isSuccess || maxBytes <= 0 || tooLarge || uploadMutation.isPending}>{uploadMutation.isPending ? "Uploading…" : "Upload media"}</button>
       </form>
     </Surface>
   );
