@@ -180,3 +180,29 @@ The existing branch contains partial implementations of several checkpoints. The
 The existing branch demonstrates meaningful progress and a successful automated CI run, but it is not merge-ready or release-ready. The most important corrections are the client-controlled provider media relay, missing active-runtime Kuhi integration, manual AniList ID entry, missing per-client rate limits, unresolved Anivexa licensing/provenance, out-of-scope legacy Python changes and absence of real-browser playback verification.
 
 All remediation commits must remain in Samren. Anime-streaming remains a read-only reference and must remain unchanged.
+
+ 
+---
+
+## 9. Reconciliation and provenance addendum — 2026-11-20
+
+The initial audit above records the state observed before branch reconciliation. The following follow-up supersedes its branch-status and legacy-Python observations:
+
+- Reconciliation commit: `99977f0600b6ecab56db39bdff9ea77f0b30af09`.
+- Current Samren main (`05b7d859dbcc42aec03a782039c47fd22404625e`) is now a parent of the feature branch.
+- The branch comparison reports **zero commits behind main**. The raw GitHub PR API reports `mergeable=true`; PR #5 remains draft/open/unmerged.
+- The PR diff was reduced to 84 files, approximately 10,702 additions and 95 deletions at the reconciliation checkpoint.
+- Phase 3-only changes to legacy `apps/api` were removed from the feature diff; its existing files were restored to main-branch versions. The Python test workflow step added for those changes was also removed.
+- Root README now describes the active React/Vite + Express/TypeScript workspace. The active backend CORS example now matches Vite's `http://localhost:5173` origin.
+- The full technical contracts are recorded in [PHASE_3_CONTRACTS.md](./PHASE_3_CONTRACTS.md).
+
+### Additional reference-source findings
+
+- The accessible Kuhi API v3 source includes an MIT license, but its service shell also contains wildcard CORS and public `/proxy_m3u8` / `/proxy_segment` routes accepting caller-supplied URLs. The approved Samren design excludes those proxy routes and uses only a loopback provider service with the required search/episode/extraction operations.
+- The Anivexa source provenance review found exact/near-exact line matches in three current Samren files: `animegg.js` (100% matching non-empty lines), `new-provider-utils.js` (100%) and `vidplay.js` (exact match). No applicable Anivexa LICENSE was found at the inspected reference/upstream paths. These files must be clean-room rewritten or cleared by a compatible license/permission before release.
+- The existing provider relay still uses client-controlled raw URL/referer query parameters. It remains a blocking issue and is scheduled for replacement with opaque session-bound resource handles.
+- No write operation has been made to `diabolicalG/Anime-streaming`.
+
+### CI status at this update
+
+The reconciliation commit triggered CI run [44735651560](https://github.com/diabolicalG/samren/actions/runs/44735651560). It was in progress when this addendum was prepared. Do not mark Checkpoint 3.1 complete until the workflow result is verified and the progress/provider audit documents are aligned.

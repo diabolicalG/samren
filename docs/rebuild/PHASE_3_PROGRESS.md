@@ -2,217 +2,106 @@
 
 **Status:** IN PROGRESS — not accepted or frozen  
 **Branch:** `phase-3-media-providers`  
-**Baseline:** `dcbc460639d5cf6ee7b2debcd3adee7e9f888bee`  
-**Latest code checkpoint:** `9eb6b03d019b658a22c3b17901b35ae2b902eb5c`  
-**Pull request:** https://github.com/diabolicalG/samren/pull/5 (open; not merged)
+**Main baseline:** `05b7d859dbcc42aec03a782039c47fd22404625e` (merged into the feature branch)  
+**Latest existing implementation code:** `fbf22b29470b9eb78dae6decafe8f94127f2978f`  
+**Branch reconciliation:** `99977f0600b6ecab56db39bdff9ea77f0b30af09`  
+**Contracts checkpoint document:** [PHASE_3_CONTRACTS.md](./PHASE_3_CONTRACTS.md)  
+**Readiness audit:** [PHASE_3_READINESS_AUDIT.md](./PHASE_3_READINESS_AUDIT.md)  
+**Pull request:** [#5](https://github.com/diabolicalG/samren/pull/5) (open, draft, not merged)
 
 ## 1. Repository boundaries
 
 - Active implementation repository: `diabolicalG/samren`.
-- Reference repository: `diabolicalG/Anime-streaming`, inspected read-only.
-- All Phase 3 commits are on this Samren feature branch. `main` has not been changed.
-- Phase 1 and Phase 2 are treated as frozen; changes so far extend media behavior without changing their catalogue contracts.
+- Reference repository: `diabolicalG/Anime-streaming`, read-only.
 - No changes have been made to Anime-streaming.
+- Phase 1 and Phase 2 remain frozen.
+- The active runtime is the React/Vite frontend, Express/TypeScript backend, shared TypeScript packages and Prisma/PostgreSQL.
+- The legacy `apps/api` Python gateway is not a Phase 3 target. Phase 3-only changes previously made there were removed from the feature diff and its files restored to the main-branch versions.
 
-## 2. Approved scope revision
+## 2. Approved scope
 
-The product owner selected option B on 2026-11-15. The approved Phase 3 scope therefore includes:
+The user-approved Option B amendment includes:
+- First-party local media storage, upload, delivery, artwork and playback.
+- Kuhi provider integration using the reference TypeScript client contract and accessible MIT-licensed Kuhi API v3 source where required.
+- Native Anivexa provider/extractor integration in Samren, without a separately operated Anivexa API service.
+- Strict separation between first-party stored assets and transient provider-resolved streams.
 
-- First-party local media storage, upload, delivery, artwork and episode playback.
-- Kuhi provider integration.
-- Native Anivexa provider/extractor integration in Samren rather than requiring a separately managed Anivexa service.
+The amendment does not authorize arbitrary client-supplied URLs, an unrestricted proxy, exposing provider credentials, copying unlicensed source code, or modifying Anime-streaming.
 
-This revision does not authorize unrestricted URL proxying, exposing provider secrets, or changing the reference repository.
+## 3. Existing first-party media implementation
 
-## 3. Source audit and provider blockers
+The feature branch already contains:
+- Generated opaque storage keys, root/parent containment checks, atomic temporary writes, SHA-256 checksums and restrictive file permissions.
+- Bounded streaming and multipart upload handling.
+- Signature checks for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT and ASS.
+- PENDING/READY/FAILED asset state transitions and best-effort stale pending/orphan cleanup.
+- ADMIN and trusted-Origin upload protection.
+- Publication-aware GET/HEAD media delivery and single-byte-range support.
+- First-party artwork URLs and episode playback metadata.
+- A watch page with source quality selection, episode navigation, browser-local progress and WebVTT subtitle tracks.
+- SRT-to-WebVTT conversion for first-party subtitles.
 
-### Kuhi
+Known hardening still required: reject symlinks at read time, compare stored and on-disk size, require explicit persistent production storage, make upload limits configurable, add the asset status endpoint, harden disconnect/timeouts, validate codecs/formats, guard localStorage and add real-browser tests.
 
-- Anime-streaming contains a TypeScript `KuhiProvider` client and provider contracts under `apps/backend/src/services/streaming`.
-- The Kuhi service itself is a Git submodule at `services/kuhi`, gitlink commit `d9a785ad030d6fc6a8ad709291be9612c864449e`.
-- The reference repository has no root `.gitmodules` file, and GitHub's submodule entry does not expose a canonical source URL.
-- The missing submodule URL was bypassed without guessing: the reference repository also contains a separately licensed Kuhi API v3 implementation under `apps/kuhi-api`.
-- Adapted the MIT-licensed provider modules into Samren's existing Python API: AniBD, AniKoto, AnimeGG, AnimeOnsen, AniNeko, AniWaves, AniZone, KAA, MKissa and ReAnime, with shared matching/cache/media/race helpers.
-- Added native `/v1/kuhi/search`, `/providers`, `/episodes/{anilist_id}` and `/extract/{anilist_id}` routes. The extract route returns only allowlisted direct HTTPS streams and subtitle URLs; provider cookies/headers and raw URLs in episode metadata are omitted.
-- Added an outbound HTTP transport that enforces HTTPS, explicit hostname allowlists, redirect revalidation and a 10 MiB response cap. Empty allowlists fail closed. `KUHI_PROVIDER_ALLOWED_HOSTS` and `KUHI_STREAM_ALLOWED_HOSTS` must be configured deliberately.
-- Preserved the upstream MIT license and attribution in `apps/api/THIRD_PARTY_NOTICES.md`.
-- The original Kuhi TypeScript client/submodule was not copied; the Python Kuhi API implementation is now the selected native integration path.
+## 4. Provider implementation status
 
 ### Anivexa
 
-- The reference contains a Node.js API aggregator, twelve provider modules, AniList mapping/cache/episode strategy modules, six extractor modules, and FlixCloud support.
-- Its runtime dependencies include `playwright-core` and `wreq-js`; some providers use browser/request impersonation.
-- The source also contains unsafe or unsuitable patterns that must not be copied unchanged:
-  - `animedunya.js` constructs a shell command with a URL and executes it through `execSync`.
-  - `mkissa.js` contains a hard-coded TMDB bearer token.
-  - Some handlers expose raw upstream error details, cookies, request headers or diagnostic data.
-  - The aggregator uses wildcard CORS.
-- No Anivexa-specific LICENSE/NOTICE file was found in `apps/anivexa-api`. Its README identifies the upstream Anivexa API project separately. Reuse must be limited to material the user is authorized to reuse; otherwise implement a clean-room adapter from documented behavior.
-- The product owner explicitly approved adapting/copying Anivexa into Samren, with the hard boundary that `Anime-streaming` remains read-only. The integration is being ported natively into Samren rather than running the standalone Anivexa service.
-- Three native TypeScript provider adapters are implemented in Samren: AnimeGG episode discovery/watch extraction, AniZone paginated episode discovery plus watch extraction, and AniKoto episode discovery plus sub/dub watch extraction. AniZone resolves the selected series/episode using the existing AniList matcher and episode catalogue, parses the static Vidstack `vidstackPlayer(JSON.parse(...))` payload without executing scripts, and returns only allowlisted HTTPS HLS/MP4 sources and allowlisted subtitle URLs. AniZone currently exposes subbed sources only; dub requests fail closed. AniKoto resolves the selected server, accepts direct allowlisted HLS/MP4 URLs, supports the Vidplay `getSources` JSON endpoint, and supports MegaPlay plaintext sources or AES-CBC payloads when the key/IV are recoverable from static script literals. Embed pages and scripts must pass the configured upstream HTTPS allowlist; resulting media URLs must pass the separate stream-host allowlist. The adapters never execute provider JavaScript. MegaPlay sources requiring a runtime-derived HMAC signing key are deliberately skipped; those servers remain unsupported until a safe, non-executing signing implementation is available. This is an adapted native implementation, not a wholesale copy of the upstream runtime.
-- The upstream source contains unsafe or unsuitable patterns that remain excluded: shell-command execution, embedded bearer credentials, unsafe dynamic-code evaluation, raw upstream diagnostics/cookies, and wildcard CORS. Any additional provider/extractor must use Samren's HTTPS allowlist, redirect revalidation, response limits and stream-host policy. Do not copy secrets or execute provider-supplied code.
+The current branch registers 11 Anivexa provider adapters and includes:
+- Bounded worker concurrency and queue capacity.
+- Provider circuit breakers and short-lived in-memory sessions.
+- HTTPS host allowlists, DNS-pinned outbound transport, redirect revalidation, timeouts and response-size limits.
+- HLS/DASH manifest rewriting and same-origin relay.
+- HLS.js/dash.js player integration and provider fallback.
 
-### Anivexa provider extraction checkpoint
+These are implementation facts, not acceptance evidence. No live provider-wide playback or real-browser compatibility has been established. Anivexa remains disabled by default.
 
-- Added AniZone watch extraction through `GET /api/v1/anivexa/extract/:anilistId/:episode?provider=anizone&audio=sub`.
-- Added safe Vidstack player-payload parsing tests, including missing/malformed source rejection.
-- CI run [43910499307](https://github.com/diabolicalG/samren/actions/runs/43910499307) passed lint, typecheck, backend tests, frontend smoke/accessibility tests, Python API tests and production builds on `9eb6b03d019b658a22c3b17901b35ae2b902eb5c`.
-- No live AniZone stream or browser playback has been verified. AniZone's provider response currently exposes sub only; dub extraction is explicitly unsupported. Subtitle formats are passed through as metadata after URL allowlisting; actual browser subtitle compatibility still needs end-to-end testing.
+**Critical provenance correction:** the reference Anivexa API and its identified upstream repository had no LICENSE file at the inspected paths. Three current Samren files were found to be 100% matching on non-empty source lines: `apps/backend/src/anivexa/providers/animegg.js`, `apps/backend/src/anivexa/core/new-provider-utils.js` and `apps/backend/src/anivexa/extractors/vidplay.js`. These must be replaced with clean-room implementations based on public behavior/protocol contracts or cleared by an applicable license/permission before distribution. Do not treat the current provider set as license-cleared.
 
-## 4. Implemented first-party media work
+**Critical security correction:** the current relay still accepts raw upstream `url` and `referer` query parameters. It must be replaced with short-lived opaque resource handles bound to a provider playback session. Host allowlisting alone does not satisfy the no-user-controlled-destination requirement.
 
-### Storage and upload
+### Kuhi
 
-- Added `MEDIA_STORAGE_ROOT`, defaulting to `.data/media`, and documented it in `apps/backend/.env.example`.
-- Added `.data/` to `.gitignore`.
-- Added generated opaque storage keys with strict format validation.
-- Added root/parent canonicalization and path containment checks.
-- Added atomic temporary-file writes, restrictive file permissions, SHA-256 checksums and cleanup on failure.
-- Added conservative API-startup cleanup for abandoned generated temp files older than 24 hours. It scans only canonical shard directories and generated temp-file names, preserves symlinks and unrelated files, and is best-effort so cleanup failures do not prevent API startup.
-- Added conservative startup cleanup for abandoned generated temp files older than 24 hours. It scans only canonical two-character shard directories and generated temp-file names, preserves symlinks/unrelated files, and is best-effort so cleanup failure does not block API startup.
-- Added bounded streaming writes with incremental hashing and size enforcement.
-- Added file-signature detection for JPEG, PNG, WebP, AVIF, MP4, WebM, WebVTT, SRT and ASS.
-- Added an ADMIN- and trusted-Origin-protected upload endpoint that accepts both bounded raw-binary requests (compatibility) and multipart/form-data requests with exactly one `file` part:
-  - `POST /api/v1/admin/catalog/assets/upload`
-  - Headers: `x-media-kind`; multipart uses the uploaded file name and part MIME type, while raw-binary compatibility uses `x-original-filename` and `Content-Type`.
-  - Multipart is parsed with Formidable, limited to one accepted file part and no extra fields; staging uses a private temporary directory that is removed after processing.
-  - Limits: 15 MiB for images, 2 MiB for subtitles, 2 GiB for video.
-- The upload endpoint creates a `PENDING` `MediaAsset` record before writing, transitions it to `READY` only after storage and signature validation, and transitions it to `FAILED` on processing errors. Database writes are guarded by the expected `PENDING` state to prevent stale-upload reconciliation races.
-- API startup marks stale managed `PENDING` assets older than 24 hours as `FAILED` and removes their managed file when present. Reconciliation is conditional, paginated in batches of 500, skips legacy metadata-only storage keys, and does not block API startup on failure.
-- API startup also scans only old regular files matching the generated managed-storage layout. Files without a database reference or attached to a `FAILED` record are removed; files referenced by `READY` or `PENDING` records are preserved. Database checks are batched and deletion failures are retried on a later startup.
-- Added an admin upload control and API client method.
-- Legacy metadata-only assets remain supported. Deletion only unlinks files with Samren-generated managed storage keys.
+- The reference contains a TypeScript `KuhiProvider` client and provider contracts.
+- The Kuhi service is also present as a Git submodule, but its canonical source URL was not available from the inspected metadata; do not guess or copy that submodule.
+- An accessible Kuhi API v3 implementation under `apps/kuhi-api` includes an MIT license.
+- The Kuhi API README describes the service as experimental. Its service shell includes wildcard CORS and public `/proxy_m3u8` and `/proxy_segment` routes that accept caller-supplied URLs. Those proxy routes and wildcard CORS must not be copied.
+- The earlier Python Kuhi implementation under legacy `apps/api` has been removed from the Phase 3 diff. Kuhi is not yet integrated into the active Express/TypeScript runtime.
+- The approved implementation design is an isolated new `services/kuhi-api` component in Samren, exposing only the required provider search/episode/extraction operations, bound to loopback and called by a typed client in the active backend. Preserve MIT license and attribution. All returned media URLs must pass Samren validation and opaque-resource delivery.
 
-**Limitations:** the upload operation does not automatically attach the asset to an anime or episode; the existing admin association endpoints remain responsible for that. Reconciliation is startup-driven and best-effort; orphan-file cleanup after a failed filesystem deletion and multi-instance operational scheduling still need additional coverage.
+### Catalogue mapping
 
-### Public media delivery and playback
+The current `Anime` model has no AniList identity, and the watch page asks viewers to type an AniList ID manually. Add an administrator-managed optional unique AniList ID to the local anime record, with a Phase 3 migration and validation. The playback API must resolve the mapping server-side; viewers must not supply or guess provider IDs.
 
-- Added publication-aware `GET` and `HEAD` delivery at `/api/v1/media/:id`.
-- Added single HTTP byte-range support and 416 responses for invalid ranges.
-- Delivery only exposes READY assets attached to published anime/episodes.
-- Public catalogue responses now include first-party poster URLs; the frontend renders poster and detail artwork when present.
-- Added published episode playback metadata at `/api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback`.
-- Added a first-party watch page at `/watch/:slug/:episodeNumber` with native video controls and WebVTT subtitle tracks.
+## 5. Branch reconciliation
 
-**Frontend status:** previous/next episode navigation and browser-local playback progress are implemented. A first-party quality selector was added in checkpoint `18138781cb77303c87cab9c1c022ebdf7be34549`, and a frontend regression test now verifies switching between available sources. CI run `43890218066` passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`. An end-to-end browser playback test remains outstanding. SRT and ASS can be stored and delivered as files but are not advertised as native HTML subtitle tracks; WebVTT is the player-supported format.
+At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
+- Current Samren main was merged as a parent; the feature branch is zero commits behind main.
+- The raw GitHub PR API reports `mergeable=true`; PR #5 remains draft and unmerged.
+- The PR diff was reduced from 111 files to 84 files by removing Phase 3-only changes to legacy `apps/api`.
+- The active CI workflow was restored to the TypeScript/PostgreSQL workspace; the legacy Python test step was removed.
+- Root README now documents the active React/Vite + Express/TypeScript runtime.
+- `apps/backend/.env.example` now uses `CORS_ORIGIN=http://localhost:5173`.
 
-### Latest hardening and test checkpoint
+## 6. Verification evidence and limits
 
-- Added `cleanupStaleMediaTempFiles` with a conservative 24-hour default, strict generated-name/shard matching, symlink avoidance and deterministic unit coverage for stale, fresh, unrelated and symlink entries. The API invokes it at startup; cleanup failure is logged without blocking startup. CI run `43893703065` on code checkpoint `1ecde28dbbf3a9827cfec7bc69147a51039b0450` was in progress when this progress note was prepared.
+- Earlier CI run [43996289197](https://github.com/diabolicalG/samren/actions/runs/43996289197) passed on the pre-reconciliation implementation head. That workflow still included the legacy Python test step.
+- Reconciliation CI run [44735651560](https://github.com/diabolicalG/samren/actions/runs/44735651560) was in progress when this progress update was prepared. Its result must be checked before checkpoint 3.1 is accepted.
+- Existing frontend tests use jsdom and mocked media engines. They do not prove real MP4/HLS/DASH playback, seeking, subtitle synchronization or mobile browser behavior.
+- No live provider availability guarantee is made.
+- Production storage persistence, backup/restore and multi-instance operation have not been certified.
 
-- Enforced `0700` permissions on the configured storage root and generated shard directories, including tightening permissions on an existing root; generated media files remain `0600`.
-- Added a storage regression test that deliberately starts with a permissive `0755` root and verifies the root, shard and file modes are tightened.
-- Added focused public media-delivery tests for published/READY gating, safe response headers, HEAD behavior, byte-range clamping, malformed/unsatisfiable ranges, and missing files.
-- Added an authenticated upload integration test covering successful signature-verified PNG upload, READY asset metadata, signature mismatch rejection, and managed-file cleanup. The first CI attempt (`43891871691`) ran against the preceding test commit with an incorrect route prefix and failed with 404; the route prefix was corrected in `4dd5f77a8f9488cc00606f8b7b0828a9c80e1626`. The corrected route-prefix commit `4dd5f77a8f9488cc00606f8b7b0828a9c80e1626` passed CI run `43892195844`, including the authenticated upload test, signature-mismatch rejection, backend/frontend/Python tests and production builds. [Workflow run](https://github.com/diabolicalG/samren/actions/runs/43892195844).
-- These changes are committed through `a54e19dffccc595114654827afae0798837578bb`. CI run `43889715112` passed the storage/delivery regression suite and all workflow steps. The subsequent quality-selector test run `43890218066` also passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds. [Latest workflow run](https://github.com/diabolicalG/samren/actions/runs/43890218066).
+## 7. Checkpoint status
 
-## 5. Verification
+| Checkpoint | Status |
+|---|---|
+| 3.1 — Contracts and branch reconciliation | In progress: branch cleanup and contracts document committed; CI and progress-doc audit pending |
+| 3.2 — Storage hardening | Not started |
+| 3.3 — Secure ingestion | Not started |
+| 3.4 — First-party delivery | Not started |
+| 3.5 — Playback contracts and providers | Not started |
+| 3.6 — Frontend playback | Not started |
+| 3.7 — Integration/security verification | Not started |
+| 3.8 — Final audit and freeze | Not started |
 
-- CI run `43889715112` passed on `a54e19dffccc595114654827afae0798837578bb`, including the new storage permission and public media-delivery tests.
-- CI run `43890218066` passed on `3b45fbe0869d72e492483b1d5db66ab8042526b8`, including the playback quality-selection regression test.
-- Both runs passed Prisma validation/generation/migrations, deterministic seed/idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds.
-- The earlier Kuhi security and provider test checkpoints also passed CI, including private-DNS rejection.
-- Multipart upload CI run `43894938150` passed Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests, and frontend/backend production builds. The first attempt `43894219693` stopped at typecheck because Formidable lacked declarations; a local declaration was added and the corrected run passed. [Multipart workflow run](https://github.com/diabolicalG/samren/actions/runs/43894938150).
-- Lifecycle CI run `43896585549` passed all workflow steps. It verifies the PENDING-to-READY upload path, signature-mismatch transition to FAILED, stale pending reconciliation, pagination beyond legacy metadata records, typecheck, all API tests, Python tests and production builds. [Lifecycle workflow run](https://github.com/diabolicalG/samren/actions/runs/43896585549).
-- Orphan-file reconciliation CI run `43897217999` passed all workflow steps, including generated-path filtering, stale-file selection, database-reference preservation, typecheck, backend/frontend/Python tests and production builds. [Orphan reconciliation workflow run](https://github.com/diabolicalG/samren/actions/runs/43897217999).
-- Anivexa initial provider-port CI run `43899918673` passed all workflow steps, including Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend/frontend tests, Python API tests and production builds. [Initial AnimeGG episode-discovery CI](https://github.com/diabolicalG/samren/actions/runs/43899918673).
-- AnimeGG watch extraction CI run `43900588919` passed all workflow steps. It verifies the added extraction route, stream-host allowlist policy, lint, typecheck, backend/frontend tests, Python tests and production builds. [AnimeGG extraction CI](https://github.com/diabolicalG/samren/actions/runs/43900588919).
-- AniZone provider CI run `43901242289` passed all workflow steps. [AniZone initial provider CI](https://github.com/diabolicalG/samren/actions/runs/43901242289).
-- AniZone Livewire pagination and AniKoto episode-discovery changes are covered by CI run `43902567326` (pagination) and `43902891845` (AniKoto and final fixture correction); both passed all workflow steps, including typecheck, backend/frontend/Python tests and production builds. [AniKoto provider CI](https://github.com/diabolicalG/samren/actions/runs/43902891845).
-- AniKoto direct extraction CI run `43907502476` passed all workflow steps on `fa7153149ff64d67cf6c948f68f98d2775ad14e7`. Follow-up safe embed extraction CI run `43908912162` passed all workflow steps on `26fa577044bef606f00020d6c9727ba35311b683`, including lint, typecheck, backend/frontend tests, Python API tests and production builds. Tests cover static MegaPlay route parsing, AES-CBC payload decryption, malformed encrypted payload rejection, direct URL/fragment parsing and embed-host rejection. MegaPlay lexer hardening CI run `43914335184` passed all workflow steps on `9cbbdeda13178e73a7e2081b3e20f7738720e2ca`; regression coverage now checks comment/regex false positives and escaped route literals without executing JavaScript. Live provider playback and runtime-HMAC server compatibility remain unverified.
-- GitHub Actions is the executable validation environment for this session; no claim is made that local tests or live provider playback were run.
-- KAA adapter CI run [43924461342](https://github.com/diabolicalG/samren/actions/runs/43924461342) passed all workflow steps on `640a861c3c322d7ec4c40f26fc26c459e1ae7c5b`.
-
-## 6. Current completion matrix
-
-| Area | Status | Remaining work |
-|---|---|---|
-| Local storage primitives | PARTIAL — HARDENED | Startup cleanup covers stale temp files, stale PENDING assets and unreferenced/FAILED managed files; multi-instance and deletion-failure operational tests remain |
-| Admin upload | PARTIAL — MULTIPART + RAW + LIFECYCLE | Multipart/raw upload and PENDING/READY/FAILED lifecycle tests pass CI run `43896585549`; upload/association workflow remains separate; startup reconciliation is best-effort and orphan cleanup remains outstanding |
-| Signature validation/checksum | PARTIAL | Unit tests pass; broaden malformed/large-input cases |
-| Public media delivery | PARTIAL — TESTED | GET/HEAD/range tests pass; add more publication and failure-path coverage |
-| Artwork URLs/rendering | PARTIAL | Verify with real uploaded assets and responsive layouts |
-| Episode playback metadata | PARTIAL | Add database-backed playback integration coverage |
-| Frontend player | PARTIAL — TESTED | Quality selector test passes; real browser playback and subtitle behavior remain to verify |
-| Kuhi providers/API | IMPLEMENTED — CI VERIFIED | Configure reviewed provider/CDN allowlists; live provider smoke tests remain environment-dependent |
-| Anivexa providers/extractors | PARTIAL — FOUR ROUTED PROVIDERS | AnimeGG, AniZone, AniKoto and KickAssAnime episode discovery/watch extraction are implemented. KAA uses fixed HTTPS API/CDN origins, confidence-gated AniList matching, bounded episode pagination and allowlisted stream URL construction. AnimeOnsen is not routed; its dynamic API/search origin checks and stream/subtitle URL filtering are hardened, but it remains disabled/unavailable until separately integrated and live-tested. Runtime-HMAC MegaPlay, additional safe provider ports, mapping/cache parity and live playback remain outstanding |
-| Provider security tests | PARTIAL | Kuhi URL/DNS/allowlist tests exist; Anivexa HTTPS host allowlist, redirect revalidation, timeout, 5 MiB response cap, stream URL allowlist, disabled-route tests, MegaPlay static-lexer tests and AnimeOnsen dynamic-origin/stream/subtitle allowlist tests pass. AnimeOnsen bearer headers are no longer returned in stream metadata. pinned DNS transport regression tests now cover lookup pinning and private/mixed DNS answers; live provider tests remain |
-| Final Phase 3 audit | NOT STARTED | Complete only after all approved acceptance gates pass |
-
-## 7. Security requirements retained
-
-- Local files and remote provider streams remain separate asset paths.
-- Never store a remote provider URL as a local storage key.
-- Never proxy arbitrary user-supplied URLs.
-- Never expose cookies, credentials, private headers, stack traces or raw provider diagnostics.
-- Any provider-returned URL must be validated against an explicit provider policy before use.
-- No browser-automation or request-impersonation dependency is to be introduced without a provider-specific justification, license review and CI plan.
-- Preserve admin authentication and trusted-Origin checks.
-
-## 8. Next checkpoints
-
-1. Continue the user-authorized Anivexa port into Samren only. Keep all integrated providers behind explicit host allowlists and bounded safe transport. AnimeDunya has been rewritten to remove shell execution; MKissa remains excluded because its upstream source contains an embedded bearer credential. Ani.pm and Senshi use ordinary safe HTTPS without browser/TLS impersonation, so anti-bot failures are expected to fail over. Keep MegaPlay runtime-HMAC servers fail-closed; do not execute provider JavaScript. Do not modify Anime-streaming.
-2. Broaden storage failure/race tests under multi-instance deployment conditions and verify orphan deletion retry behavior when filesystem permissions or disk errors prevent cleanup.
-3. Add end-to-end browser playback verification, including real media seeking, source switching, subtitle selection and episode navigation.
-4. Complete provider failure/SSRF/security tests, Phase 2 regression checks and full CI after the Anivexa port.
-5. Complete the final Phase 3 audit. Freeze Phase 3 only when every approved acceptance criterion is verified.
-
-
-## 9. AnimeOnsen security hardening checkpoint (2026-11-16)
-
-- The dormant AnimeOnsen adapter was audited before any route integration. Its bootstrap page supplies API/search origins dynamically; these origins are now rejected unless their exact HTTPS hostnames are explicitly configured through `ANIVEXA_ANIMEONSEN_API_HOSTS` and `ANIVEXA_ANIMEONSEN_SEARCH_HOSTS`. The generic `ANIVEXA_ALLOWED_HOSTS` policy still applies to outbound requests.
-- The adapter revalidates the configured origins immediately before sending bearer-authenticated API/search requests.
-- Returned DASH stream URLs and subtitle URLs must pass the separate `ANIVEXA_STREAM_ALLOWED_HOSTS` allowlist. Subtitle URLs from other hosts are filtered out.
-- The provider response no longer includes the AnimeOnsen bearer token in stream or subtitle `headers`; no provider authorization header is sent to the browser.
-- Added tests for hostile origin suffixes, HTTP, userinfo, non-default ports, origin paths, stream allowlist boundaries and subtitle filtering/credential isolation.
-- CI run `43916398893` passed all workflow steps on `2d39c2e701041bc5bb18654c413303a8cab986c9`, including lint, typecheck, backend/frontend/Python tests and production builds.
-- This is security hardening only. AnimeOnsen is not added to the public provider route and is not claimed as a working playback provider. Its stream may require server-side authorization; browser playback must not be enabled until the required transport is implemented without exposing credentials.
-
-
-## 10. DNS-rebinding hardening checkpoint (2026-11-16)
-
-- Replaced the Anivexa core client's check-then-fetch sequence with a pinned HTTPS transport. Each request resolves its hostname once, rejects the entire answer set if any address is non-public, and supplies those validated addresses to Node's HTTPS lookup callback. The TLS request still uses the original hostname, preserving hostname-based certificate validation and SNI.
-- Every redirect is handled manually and independently revalidated, re-resolved and pinned. The transport retains HTTPS-only and host-suffix allowlisting, a 10-second abort timeout, a four-redirect limit and a 5 MiB response cap.
-- The separate TypeScript Anivexa HTTP client now delegates to this same pinned transport, so provider requests do not bypass DNS pinning.
-- Expanded address filtering to reject private, loopback, link-local, carrier-grade NAT, multicast/reserved IPv4, non-global IPv6, IPv4-mapped private IPv6 and IPv6 documentation/special-use ranges. Mixed public/private DNS answer sets fail closed.
-- Added regression tests for pinned IPv4/IPv6 lookup callbacks, empty pin sets, private/loopback/link-local/documentation addresses and mixed DNS answer sets.
-- Request bodies are buffered before transmission; unsupported streaming bodies fail closed rather than silently falling back to native fetch.
-- CI run [43917982848](https://github.com/diabolicalG/samren/actions/runs/43917982848) passed on `3d3dd37baca7aa1340c739c4f5eccfcbd18798d3`, including lint, typecheck, backend/frontend/Python tests and production builds. This does not establish live provider availability or browser playback.
-
-
-## 11. Remaining-provider audit and KickAssAnime checkpoint (2026-11-16)
-
-- Audited the remaining Anivexa providers against the approved constraints: fixed HTTPS origins, configured hostname allowlists, bounded requests, no embedded credentials, no shell execution, no provider JavaScript execution, and no unreviewed browser/request-impersonation dependency. The decision record is in `docs/rebuild/PHASE_3_PROVIDER_AUDIT.md`.
-- Selected KickAssAnime (KAA) as the next independent adapter. AnimeNoSub is deferred pending third-party embed/extractor host review; Ani.pm and Senshi are deferred because their upstream implementations depend on `wreq-js` request impersonation and dynamic embed/session services; AnimeDunya and MKissa remain excluded as-is because of shell execution and an embedded bearer credential respectively.
-- Added native KAA episode discovery and stream extraction in `apps/backend/src/anivexa/kaa.ts`, and exposed `kaa` through the existing Anivexa provider discovery and extraction routes. Existing AnimeGG, AniZone, AniKoto and AnimeOnsen implementations were not rewritten.
-- KAA uses the existing safe Anivexa HTTP transport for AniList and `kaa.lt`; it performs confidence-gated title/year/format matching, bounds episode pagination, validates episode/server identifiers, checks the configured upstream host allowlist before parsing a server ID, constructs HLS URLs only on the fixed `hls.krussdomi.com` CDN, and returns streams only when the CDN passes `ANIVEXA_STREAM_ALLOWED_HOSTS`.
-- Documented the KAA host requirements in `apps/backend/.env.example`. Discovery requires `graphql.anilist.co` and `kaa.lt` in `ANIVEXA_ALLOWED_HOSTS`; stream extraction requires `hls.krussdomi.com` (or a verified narrower parent suffix) in `ANIVEXA_STREAM_ALLOWED_HOSTS`. Anivexa remains disabled by default and empty allowlists fail closed.
-- Added unit coverage for HTTPS/host/credential/port validation, server-ID character bounds, fixed CDN URL construction and stream allowlist rejection.
-- CI run [43924461342](https://github.com/diabolicalG/samren/actions/runs/43924461342) passed on `640a861c3c322d7ec4c40f26fc26c459e1ae7c5b`: Prisma validation/generation/migrations, seed idempotence, lint, typecheck, backend API tests, frontend smoke/accessibility tests, Python API tests and frontend/backend production builds. Live provider availability, browser playback, seeking and subtitle behavior have not been verified.
-- DNS-pinning expansion is deferred from the next provider milestones. Existing code is left unchanged; no additional DNS-related work is included in this checkpoint.
-
-
-## 12. Multi-provider aggregation and worker checkpoint (2026-11-16)
-
-- Added a provider registry for 11 integrations: AnimeGG, AniZone, AniKoto, KickAssAnime, AniWaves, ReAnime, AnimeOnsen, AnimeNoSub, Ani.pm, Senshi and AnimeDunya. MKissa remains deliberately excluded because its upstream implementation contains an embedded bearer credential that must not be copied or used.
-- Ported AnimeNoSub's static HTML/AJAX adapter and exposed its direct safe extractors. Embed-only results are not treated as playable sources.
-- Exposed the existing AniWaves, ReAnime and AnimeOnsen modules through typed internal adapters. AnimeOnsen's DASH and subtitle URLs remain allowlist-checked and no bearer header is sent to the browser.
-- Added Ani.pm and Senshi adapters using a compatibility transport backed by ordinary safe HTTPS. The old browser/request-impersonation options are ignored; if a provider requires fingerprint impersonation it fails and the aggregator moves to another provider.
-- Rewrote AnimeDunya's upstream shell/curl transport to use the existing safe HTTPS client restricted to the fixed `anime-dunya.com` host. No shell command is executed.
-- Added a safe extractor registry for Byse, DataSV, Nova, Vidplay, Vidmoly and Flixcloud. The upstream MegaPlay VM-based runtime-HMAC extractor is not registered; the static MegaPlay parser in AniKoto remains available where statically derivable.
-- Added `BoundedWorkerPool` with configurable concurrency (default 11, one worker per integrated provider) and queue capacity, plus per-provider circuit breakers with failure thresholds and cooldowns. All provider extraction tasks start concurrently; the first validated, allowlisted HTTPS HLS/MP4/DASH stream wins. Other provider tasks continue and can supply a fallback.
-- Added short-lived playback sessions and API routes: `GET /api/v1/anivexa/aggregate/:anilistId/:episode?audio=sub|dub`, `POST /api/v1/anivexa/aggregate/:sessionId/fallback`, `DELETE /api/v1/anivexa/aggregate/:sessionId`, and `GET /api/v1/anivexa/aggregate/providers`.
-- Added API-client methods and the frontend `useProviderPlayback` hook. A watch/player route does not yet exist in Samren, so the hook exposes `reportPlaybackError()` for the player to call on media errors; automatic browser switching is not yet end-to-end wired to a video element.
-- Worker queues, circuit state and playback sessions are currently bounded in-process memory. This is not a distributed Redis/BullMQ worker service; multi-instance deployment requires shared session/circuit storage and coordinated workers.
-- Live provider availability and browser playback remain unverified. Anivexa remains disabled by default; configure exact upstream and media hosts before enabling. DNS-pinning expansion remains deferred.
-- CI run [43928280200](https://github.com/diabolicalG/samren/actions/runs/43928280200) passed on `539bf97dc9272883aadd705a2efa8a965de2a4f6`, including Prisma validation/migrations/seeding, lint, typecheck, backend tests (including worker/aggregator tests), frontend smoke/accessibility tests, Python API tests and production builds.
-
-
-## 13. Adaptive playback limitations checkpoint (2026-11-17)
-
-- Replaced the native-only player path with AdaptivePlayer: MP4 uses native HTML video, HLS uses version-pinned HLS.js 1.7.4 with bounded network/media recovery, and DASH uses version-pinned dash.js 5.3.0.
-- Added a same-origin media relay for aggregate streams. HLS playlists, nested playlists, keys, segments and DASH manifests/templates/segments are rewritten through the relay, avoiding browser CORS restrictions and applying provider Referer on the server.
-- Added bounded streaming media transport with byte-range forwarding, DNS pinning, HTTPS-only URLs, configured stream-host allowlists, redirect revalidation, a 512 MiB per-response cap and a 60-second upstream timeout. Manifests are separately capped at 2 MiB.
-- Added adaptive player tests and media manifest rewrite tests. Playback progress is restored after source/provider changes; engine instances are disposed when switching streams or leaving the watch page.
-- Updated Helmet CSP for the pinned HLS.js and dash.js script CDNs; the bundles are lazy-loaded only for HLS/DASH playback and media network requests use the same-origin relay. The browser bundles are CDN-hosted rather than vendored.
-- Remaining verification: live playback against each provider, real browser codec support, device-specific seeking, subtitles and any provider-specific anti-bot/token expiry behavior. DRM streams remain unsupported. Do not claim universal playback.
+Finish each checkpoint, run its tests, inspect the diff and record its audit before starting the next. Do not merge PR #5 or claim Phase 3 complete until all acceptance gates pass.
