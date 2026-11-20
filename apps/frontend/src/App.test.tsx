@@ -301,7 +301,7 @@ describe("first-party watch experience", () => {
     });
 
     renderApp("/watch/the-clockwork-orbit/4");
-    fireEvent.error(await screen.findByTestId("watch-video"));
+    fireEvent.error(await screen.findByLabelText("Anime episode video player"));
 
     await waitFor(() => {
       expect(aggregate).toHaveBeenCalledWith("the-clockwork-orbit", 4, "sub");
