@@ -8,7 +8,6 @@ import { authenticateSession } from "./auth/session.js";
 import { adminCatalogRouter } from "./catalog/admin.routes.js";
 import { adminMediaRouter } from "./media/admin.routes.js";
 import { mediaRouter } from "./media/media.routes.js";
-import { anivexaRouter } from "./anivexa/router.js";
 
 export const app = express();
 app.set("trust proxy", env.TRUST_PROXY_HOPS);
@@ -21,7 +20,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https:", "data:"],
       imgSrc: ["'self'", "data:", "https:"],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdn.dashjs.org"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
       mediaSrc: ["'self'", "blob:"],
@@ -38,7 +37,6 @@ app.use("/api/v1/admin/catalog", adminCatalogRouter);
 app.use("/api/v1/admin/catalog", adminMediaRouter);
 app.use("/api/v1/catalog", catalogRouter);
 app.use("/api/v1/media", mediaRouter);
-app.use("/api/v1/anivexa", anivexaRouter);
 
 app.get("/api/v1/health", (_request, response) => {
   response.status(200).json({ data: { status: "ok", service: "samren-api", timestamp: new Date().toISOString() }, error: null });
