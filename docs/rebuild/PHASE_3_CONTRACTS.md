@@ -190,3 +190,16 @@ Add bounded per-client throttling to the provider API. Initial configurable defa
 - [x] Progress and provider-audit documents are updated to reflect the reconciled active-runtime design.
 
 **Checkpoint 3.1 accepted on 2026-11-20.** Reconciliation CI run `44735651560` passed all active-workspace gates; the legacy Python API test step is no longer part of the Phase 3 workflow. The progress, provider and readiness audit documents are aligned. Proceed to Checkpoint 3.2 only, then audit it before moving forward.
+
+
+## 9. First-party delivery and playback route reconciliation — 2026-11-20
+
+The canonical first-party playback metadata route follows the active catalogue route convention:
+
+GET /api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback
+
+It returns only sources/subtitles attached to a published episode under a published anime, with READY state, correct media kind, supported MIME/format pairing and verified managed-file existence/size. It returns first-party media URLs only; storage keys and absolute paths remain server-side.
+
+Public asset delivery is through GET/HEAD /api/v1/media/:assetId; SRT subtitle conversion is through GET/HEAD /api/v1/media/:assetId/vtt. The generic route permits published poster/banner, video and VTT subtitle associations only. SRT tracks use the conversion route. Single byte ranges are supported; multi-range requests are intentionally unsupported.
+
+**Implementation status:** first-party delivery (Checkpoint 3.4) and the first-party playback metadata/subtitle API (Checkpoint 3.5A) are accepted. This does not implement the active frontend watch route and does not complete provider integration. Kuhi, clean-room/licensed Anivexa adapters, AniList identity mapping, opaque session-bound provider resource handles and per-client rate limiting remain outstanding within Checkpoint 3.5. The active frontend watch/player remains Checkpoint 3.6.

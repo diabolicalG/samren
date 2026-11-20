@@ -237,3 +237,12 @@ Verified: validated environment-based per-kind upload limits (15 MiB image, 2 Gi
 Residual limits: upload throttling is not yet implemented; request timeout is applied at the Node server level rather than only to upload routes; no malware scanner or deep codec probe is included; browser-disconnect behavior is not yet exercised in a real-browser E2E test; and the status endpoint reports filesystem presence/size, not a full checksum revalidation. These remain release-hardening items.
 
 **Checkpoint 3.3 accepted.** Proceed to Checkpoint 3.4 — review first-party delivery/publication gating and end-to-end range behavior. Anime-streaming remains read-only.
+
+
+### Active frontend and delivery audit correction — 2026-11-20
+
+The current active React/Vite application registers Home, Browse, Search, Anime detail and Admin routes. It does **not** register a watch route and does not consume apiClient.catalogPlayback. The watch page and manual AniList ID entry mentioned in earlier findings belong to legacy apps/web, which is excluded from the active workspace. Those legacy UI capabilities must not be counted as implemented in the active application. The active frontend player, source switching, subtitle controls, episode navigation and browser-local progress remain outstanding for Checkpoint 3.6.
+
+The backend does have first-party media delivery and a catalogue playback metadata endpoint. The implemented canonical metadata route is GET /api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback, reconciled to Samren's catalogue route convention. It now filters by published episode/anime, READY asset, media kind, supported MIME, subtitle format/MIME match and actual managed file/size availability. Delivery enforces matching published associations and media kind. Checkpoint 3.4 and subcheckpoint 3.5A are audited separately; overall 3.5 remains open for provider/security integration.
+
+CI run [44738805397](https://github.com/diabolicalG/samren/actions/runs/44738805397) passed all active-workspace gates. See the dedicated checkpoint audit documents for evidence and remaining limitations.

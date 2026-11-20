@@ -38,7 +38,7 @@ The feature branch already contains:
 - ADMIN and trusted-Origin upload protection.
 - Publication-aware GET/HEAD media delivery and single-byte-range support.
 - First-party artwork URLs and episode playback metadata.
-- A watch page with source quality selection, episode navigation, browser-local progress and WebVTT subtitle tracks.
+- The active React/Vite frontend does **not** yet have a watch route or player consuming apiClient.catalogPlayback. The old apps/web watch page is legacy and excluded from the active runtime; it is not evidence of a working active playback experience.
 - SRT-to-WebVTT conversion for first-party subtitles.
 
 Known hardening still required: reject symlinks at read time, compare stored and on-disk size, require explicit persistent production storage, make upload limits configurable, add the asset status endpoint, harden disconnect/timeouts, validate codecs/formats, guard localStorage and add real-browser tests.
@@ -71,7 +71,7 @@ These are implementation facts, not acceptance evidence. No live provider-wide p
 
 ### Catalogue mapping
 
-The current `Anime` model has no AniList identity, and the watch page asks viewers to type an AniList ID manually. Add an administrator-managed optional unique AniList ID to the local anime record, with a Phase 3 migration and validation. The playback API must resolve the mapping server-side; viewers must not supply or guess provider IDs.
+The current Anime model has no AniList identity. The manual AniList ID prompt exists only in the legacy apps/web watch page, which is excluded from the active runtime. The active React frontend has no watch page yet. Add an administrator-managed optional unique AniList ID to the local anime record, with a Phase 3 migration and validation. Any provider playback API must resolve the mapping server-side; viewers must not supply or guess provider IDs.
 
 ## 5. Branch reconciliation
 
@@ -98,9 +98,9 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 | 3.1 — Contracts and branch reconciliation | **Complete** — branch reconciled, contracts recorded, legacy changes removed, and CI passed |
 | 3.2 — Storage hardening | **Complete** — symlink-safe reads, production-root validation, file-size consistency and range-edge tests; CI run 447372 passed |
 | 3.3 — Secure ingestion | **Complete** — configurable limits, admin status/limits endpoints, abort cleanup and UI integration; CI run 447378 passed |
-| 3.4 — First-party delivery | Not started |
-| 3.5 — Playback contracts and providers | Not started |
-| 3.6 — Frontend playback | Not started |
+| 3.4 — First-party delivery | **Complete** — published-content/MIME eligibility, GET/HEAD/range delivery, file integrity checks and delivery tests; CI run 447388 passed |
+| 3.5 — Playback contracts and providers | **In progress** — first-party playback metadata/subtitle API subcheckpoint accepted; Kuhi, clean-room/licensed Anivexa, AniList mapping, opaque resource handles and rate limits remain |
+| 3.6 — Frontend playback | Not started — active React app has no watch route/player; legacy apps/web is not active |
 | 3.7 — Integration/security verification | Not started |
 | 3.8 — Final audit and freeze | Not started |
 
@@ -136,3 +136,23 @@ Finish each checkpoint, run its tests, inspect the diff and record its audit bef
 - Added request timeout configuration and abort/disconnect checks; multipart temporary directories and partial storage writes are cleaned on failure.
 - Tests cover authentication, configured limits, PRESENT/NOT_MANAGED/SIZE_MISMATCH status, and the existing signature/size/multipart upload paths.
 - **Checkpoint 3.3 accepted.** Proceed to Checkpoint 3.4 — first-party delivery audit and hardening.
+
+
+### Checkpoint 3.4 acceptance — 2026-11-20
+
+- Implementation head: 4986091f1c90a6ca0698d14f95d48048f011dd63.
+- CI run [44738805397](https://github.com/diabolicalG/samren/actions/runs/44738805397) passed Prisma validation/migrations/seeding, lint, typecheck, backend tests, frontend smoke/accessibility tests and production builds.
+- Public media delivery now enforces published-content association, matching media kind and MIME allowlists; safe file handles, database/on-disk size consistency, GET/HEAD, single-byte-range handling, ETag and WebVTT/SRT handling are covered.
+- **Checkpoint 3.4 accepted.** See PHASE_3_CHECKPOINT_3_4_AUDIT.md.
+
+### Checkpoint 3.5A acceptance — first-party playback metadata and subtitle API — 2026-11-20
+
+- The catalogue playback route filters published episodes/anime, READY VIDEO/SUBTITLE assets, supported MIME types, matching subtitle format/MIME and physically present files whose byte size matches database metadata.
+- Missing, mismatched or invalid subtitle/video assets are omitted from playback metadata. Internal storage paths/keys are not returned.
+- Canonical route: GET /api/v1/catalog/anime/:slug/episodes/:episodeNumber/playback. This reconciles the earlier proposed route with Samren's existing catalogue route convention.
+- CI run [44738805397](https://github.com/diabolicalG/samren/actions/runs/44738805397) passed all active-workspace gates.
+- **Checkpoint 3.5A accepted as a subcheckpoint only. Overall Checkpoint 3.5 remains IN PROGRESS** until Kuhi integration, clean-room/licensed Anivexa adapters, AniList mapping, opaque session-bound media resource handles and rate limiting are complete and audited. See PHASE_3_CHECKPOINT_3_5A_AUDIT.md.
+
+### Active frontend correction — 2026-11-20
+
+The active React/Vite App.tsx registers Home, Browse, Search, Anime detail and Admin routes only. It has no /watch route and does not call apiClient.catalogPlayback. The legacy apps/web watch route is excluded from the active pnpm workspace. Therefore the actual player, source switching, subtitles in the UI, episode navigation and browser-local progress remain outstanding under Checkpoint 3.6. Earlier statements in this progress document that described an active watch page were inaccurate and are superseded by this correction.
