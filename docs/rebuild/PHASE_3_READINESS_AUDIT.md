@@ -206,3 +206,12 @@ The initial audit above records the state observed before branch reconciliation.
 ### CI status at this update
 
 The reconciliation commit triggered CI run [44735651560](https://github.com/diabolicalG/samren/actions/runs/44735651560). It was in progress when this addendum was prepared. Do not mark Checkpoint 3.1 complete until the workflow result is verified and the progress/provider audit documents are aligned.
+
+
+### CI and checkpoint acceptance update — 2026-11-20
+
+Reconciliation CI run [44735651560](https://github.com/diabolicalG/samren/actions/runs/44735651560) completed successfully. Its single `foundation` job passed Prisma validation/client generation, PostgreSQL migration, deterministic seed/idempotence, lint, TypeScript typecheck, backend API tests, frontend smoke/accessibility tests and frontend/backend production builds. It no longer runs the out-of-scope legacy Python API tests.
+
+The feature branch is now zero commits behind Samren main; the raw GitHub PR API reports `mergeable=true`. PR #5 remains draft and unmerged. The legacy Python changes were removed from the Phase 3 diff, the active README/CORS example were corrected, and the detailed contracts are recorded in [PHASE_3_CONTRACTS.md](./PHASE_3_CONTRACTS.md).
+
+**Checkpoint 3.1 — Contracts and branch reconciliation: ACCEPTED.** This acceptance does not accept Phase 3 as a whole and does not authorize merging PR #5. Continue with Checkpoint 3.2 and audit it before proceeding.

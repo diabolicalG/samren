@@ -95,7 +95,7 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 
 | Checkpoint | Status |
 |---|---|
-| 3.1 — Contracts and branch reconciliation | In progress: branch cleanup and contracts document committed; CI and progress-doc audit pending |
+| 3.1 — Contracts and branch reconciliation | **Complete** — branch reconciled, contracts recorded, legacy changes removed, and CI passed |
 | 3.2 — Storage hardening | Not started |
 | 3.3 — Secure ingestion | Not started |
 | 3.4 — First-party delivery | Not started |
@@ -105,3 +105,13 @@ At reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09`:
 | 3.8 — Final audit and freeze | Not started |
 
 Finish each checkpoint, run its tests, inspect the diff and record its audit before starting the next. Do not merge PR #5 or claim Phase 3 complete until all acceptance gates pass.
+
+
+### Checkpoint 3.1 acceptance — 2026-11-20
+
+- Reconciliation CI run [44735651560](https://github.com/diabolicalG/samren/actions/runs/44735651560) completed successfully.
+- The single CI job passed Prisma validation/generation/migrations, seed idempotence, lint, TypeScript typecheck, backend API tests, frontend smoke/accessibility tests and production builds.
+- The run did not execute the legacy Python API test step; Phase 3-only legacy Python changes were removed from the branch diff.
+- The branch is zero commits behind main and the raw PR API reports `mergeable=true`. PR #5 remains draft/open/unmerged.
+- The contracts and readiness/provider audit documents now reflect the read-only reference boundary, Kuhi service restrictions, Anivexa provenance issue, server-owned resource handles, AniList mapping, rate limits and upload configuration.
+- **Checkpoint 3.1 accepted.** Proceed to Checkpoint 3.2 only; do not begin later checkpoints until 3.2 is implemented, tested and audited.

@@ -186,7 +186,7 @@ Add bounded per-client throttling to the provider API. Initial configurable defa
 - [x] AniList mapping, opaque media resource, rate-limit and upload configuration contracts defined.
 - [x] Kuhi service boundary defined without copying its open proxy/CORS demo.
 - [x] Anivexa clean-room/licensing rule recorded.
-- [ ] CI run for reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09` completes successfully.
-- [ ] Progress and provider-audit documents are updated to reflect the reconciled active-runtime design.
+- [x] CI run for reconciliation commit `99977f0600b6ecab56db39bdff9ea77f0b30af09` completed successfully (run `44735651560`).
+- [x] Progress and provider-audit documents are updated to reflect the reconciled active-runtime design.
 
-Checkpoint 3.1 is not accepted until the remaining CI/documentation items are completed and audited. Do not begin Checkpoint 3.2 before then.
+**Checkpoint 3.1 accepted on 2026-11-20.** Reconciliation CI run `44735651560` passed all active-workspace gates; the legacy Python API test step is no longer part of the Phase 3 workflow. The progress, provider and readiness audit documents are aligned. Proceed to Checkpoint 3.2 only, then audit it before moving forward.
