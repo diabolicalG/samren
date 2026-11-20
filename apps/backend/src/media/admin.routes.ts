@@ -4,16 +4,23 @@ import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtemp, rm } from "node:fs/promises";
 import formidable, { type File as FormidableFile } from "formidable";
+import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../auth/authorization.js";
 import { requireTrustedOrigin } from "../auth/session.js";
-import { createMediaStorageKey, deleteStoredMedia, storeMediaStream } from "./storage.js";
+import { env } from "../config/env.js";
+import { createMediaStorageKey, deleteStoredMedia, isManagedStorageKey, readStoredMediaStat, storeMediaStream } from "./storage.js";
 import { detectMediaSignature, type UploadMediaKind } from "./signature.js";
 
 export const adminMediaRouter = Router();
 adminMediaRouter.use(requireRole("ADMIN"));
 
-const MAX_UPLOAD_BYTES: Record<UploadMediaKind, number> = { POSTER: 15 * 1024 * 1024, BANNER: 15 * 1024 * 1024, VIDEO: 2 * 1024 * 1024 * 1024, SUBTITLE: 2 * 1024 * 1024 };
+const MAX_UPLOAD_BYTES: Record<UploadMediaKind, number> = {
+  POSTER: env.MEDIA_UPLOAD_IMAGE_MAX_BYTES,
+  BANNER: env.MEDIA_UPLOAD_IMAGE_MAX_BYTES,
+  VIDEO: env.MEDIA_UPLOAD_VIDEO_MAX_BYTES,
+  SUBTITLE: env.MEDIA_UPLOAD_SUBTITLE_MAX_BYTES,
+};
 const allowedMime: Record<string, string[]> = {
   POSTER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
   BANNER: ["image/jpeg", "image/png", "image/webp", "image/avif"],
@@ -46,6 +53,7 @@ async function parseMultipartUpload(request: import("express").Request, maxBytes
   });
   try {
     const [fields, files] = await form.parse(request);
+    if (request.aborted) throw new Error("Client disconnected during multipart upload");
     if (Object.keys(fields).length !== 0 || Object.keys(files).length !== 1 || !files.file || files.file.length !== 1) {
       throw new Error("Multipart upload must contain exactly one file field named file");
     }
@@ -61,6 +69,68 @@ function isPayloadTooLarge(error: unknown) {
   if ("httpCode" in error && error.httpCode === 413) return true;
   return "message" in error && typeof error.message === "string" && error.message.toLowerCase().includes("exceeds");
 }
+
+adminMediaRouter.get("/assets/upload-limits", (_request, response) => {
+  response.status(200).json({
+    data: {
+      POSTER: MAX_UPLOAD_BYTES.POSTER,
+      BANNER: MAX_UPLOAD_BYTES.BANNER,
+      VIDEO: MAX_UPLOAD_BYTES.VIDEO,
+      SUBTITLE: MAX_UPLOAD_BYTES.SUBTITLE,
+    },
+    error: null,
+  });
+});
+
+adminMediaRouter.get("/assets/:assetId/status", async (request, response) => {
+  const parsedId = z.string().min(1).max(64).safeParse(request.params.assetId);
+  if (!parsedId.success) {
+    response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Media asset not found" } });
+    return;
+  }
+
+  try {
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: parsedId.data },
+      select: {
+        id: true, storageKey: true, mediaKind: true, mimeType: true,
+        sizeBytes: true, processingState: true, createdAt: true, updatedAt: true,
+      },
+    });
+    if (!asset) {
+      response.status(404).json({ data: null, error: { code: "NOT_FOUND", message: "Media asset not found" } });
+      return;
+    }
+
+    let fileState: "NOT_MANAGED" | "MISSING" | "PRESENT" | "SIZE_MISMATCH" | "UNAVAILABLE" = "NOT_MANAGED";
+    if (isManagedStorageKey(asset.storageKey)) {
+      try {
+        const stored = await readStoredMediaStat(asset.storageKey);
+        if (!stored) fileState = "MISSING";
+        else if (!Number.isSafeInteger(Number(asset.sizeBytes)) || Number(asset.sizeBytes) !== stored.sizeBytes) fileState = "SIZE_MISMATCH";
+        else fileState = "PRESENT";
+      } catch {
+        fileState = "UNAVAILABLE";
+      }
+    }
+
+    response.status(200).json({
+      data: {
+        id: asset.id,
+        mediaKind: asset.mediaKind,
+        mimeType: asset.mimeType,
+        sizeBytes: asset.sizeBytes.toString(),
+        processingState: asset.processingState,
+        fileState,
+        createdAt: asset.createdAt,
+        updatedAt: asset.updatedAt,
+      },
+      error: null,
+    });
+  } catch {
+    response.status(500).json({ data: null, error: { code: "ASSET_STATUS_FAILED", message: "The media asset status could not be read" } });
+  }
+});
 
 adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, response) => {
   const kind = String(request.get("x-media-kind") ?? "").toUpperCase() as UploadMediaKind;
@@ -92,6 +162,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
   let stored: Awaited<ReturnType<typeof storeMediaStream>> | undefined;
 
   try {
+    if (request.aborted || response.destroyed) throw new Error("Client disconnected before upload processing");
     let source: import("node:stream").Readable = request;
     if (isMultipart) {
       const parsedMultipart = await parseMultipartUpload(request, maxBytes);
@@ -127,6 +198,8 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
     pendingAssetId = pendingAsset.id;
 
     stored = await storeMediaStream(source, maxBytes, storageKey);
+    if (request.aborted || response.destroyed) throw new Error("Client disconnected while finalizing upload");
+
     const detected = detectMediaSignature(kind, stored.signature);
     if (!detected || detected.mimeType !== mime) {
       await deleteStoredMedia(storageKey);
@@ -153,10 +226,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
       },
     });
     pendingAssetId = undefined;
-    response.status(201).json({
-      data: { ...asset, sizeBytes: asset.sizeBytes.toString() },
-      error: null,
-    });
+    response.status(201).json({ data: { ...asset, sizeBytes: asset.sizeBytes.toString() }, error: null });
   } catch (error) {
     if (storageKey) await deleteStoredMedia(storageKey).catch(() => undefined);
     if (pendingAssetId) {
@@ -165,7 +235,7 @@ adminMediaRouter.post("/assets/upload", requireTrustedOrigin, async (request, re
         data: { processingState: "FAILED" },
       }).catch(() => undefined);
     }
-    if (!response.headersSent) {
+    if (!response.headersSent && !response.destroyed) {
       const tooLarge = isPayloadTooLarge(error);
       response.status(tooLarge ? 413 : 400).json({
         data: null,

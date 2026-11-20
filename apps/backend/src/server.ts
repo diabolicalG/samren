@@ -25,9 +25,11 @@ async function start() {
     process.stderr.write("Orphan media reconciliation did not complete; continuing API startup\n");
   }
 
-  app.listen(env.PORT, env.HOST, () => {
+  const server = app.listen(env.PORT, env.HOST, () => {
     process.stdout.write(`Samren API listening on http://${env.HOST}:${env.PORT}\n`);
   });
+  server.requestTimeout = env.MEDIA_UPLOAD_TIMEOUT_MS;
+  server.headersTimeout = Math.min(60_000, env.MEDIA_UPLOAD_TIMEOUT_MS);
 }
 
 void start();
