@@ -14,9 +14,6 @@ class Settings:
     cache_ttl_detail: int = int(os.getenv("MEDIA_API_CACHE_TTL_DETAIL", "86400"))
     cache_ttl_trending: int = int(os.getenv("MEDIA_API_CACHE_TTL_TRENDING", "900"))
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
-    kuhi_enabled: bool = os.getenv("KUHI_ENABLED", "true").lower() in ("1", "true", "yes", "on")
-    kuhi_stream_allowed_hosts: str = os.getenv("KUHI_STREAM_ALLOWED_HOSTS", "")
-    kuhi_provider_allowed_hosts: str = os.getenv("KUHI_PROVIDER_ALLOWED_HOSTS", "")
 
 
 settings = Settings()
